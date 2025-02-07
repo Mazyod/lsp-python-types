@@ -25,8 +25,7 @@ ENUM_OVERRIDES = {
     'TokenFormat': 'StrEnum',
     'TraceValue': 'StrEnum',
     'UniquenessLevel': 'StrEnum',
-    'WatchKind': 'IntFlag',
-    'ApplyKind': 'StrEnum'
+    'WatchKind': 'IntFlag'
 }  # type: Dict[str, Literal['StrEnum', 'IntFlag']]
 
 
@@ -40,8 +39,7 @@ def generate(preferred_structure_kind: StructureKind, output: str) -> None:
         content = "\n".join([
             "# Code generated. DO NOT EDIT.",
             f"# LSP v{specification_version}\n",
-            "from typing_extensions import NotRequired",
-            "from typing import Dict, List, Literal, TypedDict, Union",
+            "from typing import Dict, List, Literal, TypedDict, Union, NotRequired",
             "from enum import IntEnum, IntFlag, StrEnum\n\n",
             "URI = str",
             "DocumentUri = str",
@@ -68,4 +66,4 @@ def generate(preferred_structure_kind: StructureKind, output: str) -> None:
 
 
 generate(preferred_structure_kind=StructureKind.Class, output="./lsp_types.py")
-generate(preferred_structure_kind=StructureKind.Function, output="./lsp_types_sublime_text_33.py")
+# generate(preferred_structure_kind=StructureKind.Function, output="./lsp_types_sublime_text_33.py")

@@ -1,8 +1,7 @@
 # Code generated. DO NOT EDIT.
 # LSP v3.17.0
 
-from typing_extensions import NotRequired
-from typing import Dict, List, Literal, TypedDict, Union
+from typing import Dict, List, Literal, TypedDict, Union, NotRequired
 from enum import IntEnum, IntFlag, StrEnum
 
 
@@ -434,8 +433,7 @@ class MarkupKind(StrEnum):
 
 class LanguageKind(StrEnum):
     """ Predefined Language kinds
-    @since 3.18.0
-    @proposed """
+    @since 3.18.0 """
     ABAP = 'abap'
     WindowsBat = 'bat'
     BibTeX = 'bibtex'
@@ -593,15 +591,15 @@ class CompletionTriggerKind(IntEnum):
     """ Completion was re-triggered as current completion list is incomplete """
 
 
-class ApplyKind(StrEnum):
+class ApplyKind(IntEnum):
     """ Defines how values from a set of defaults and an individual item will be
     merged.
 
     @since 3.18.0 """
-    Replace = 'replace'
+    Replace = 1
     """ The value from the individual item (if provided and not `null`) will be
     used instead of the default. """
-    Merge = 'merge'
+    Merge = 2
     """ The value from the item will be merged with the default.
 
     The specific rules for mergeing values are defined against each field
@@ -786,7 +784,7 @@ DocumentFilter = Union['TextDocumentFilter', 'NotebookCellTextDocumentFilter']
 """ A document filter describes a top level text document or
 a notebook cell document.
 
-@since 3.17.0 - proposed support for NotebookCellTextDocumentFilter. """
+@since 3.17.0 - support for NotebookCellTextDocumentFilter. """
 
 LSPObject = Dict[str, 'LSPAny']
 """ LSP object definition.
@@ -2217,7 +2215,7 @@ class CompletionList(TypedDict):
     If a completion list specifies a default value and a completion item
     also specifies a corresponding value, the rules for combining these are
     defined by `applyKinds` (if the client supports it), defaulting to
-    "replace".
+    ApplyKind.Replace.
 
     Servers are only allowed to return default values if the client
     signals support for this via the `completionList.itemDefaults`
@@ -2228,14 +2226,14 @@ class CompletionList(TypedDict):
     """ Specifies how fields from a completion item should be combined with those
     from `completionList.itemDefaults`.
 
-    If unspecified, all fields will be treated as "replace".
+    If unspecified, all fields will be treated as ApplyKind.Replace.
 
-    If a field's value is "replace", the value from a completion item (if
-    provided and not `null`) will always be used instead of the value from
-    `completionItem.itemDefaults`.
+    If a field's value is ApplyKind.Replace, the value from a completion item
+    (if provided and not `null`) will always be used instead of the value
+    from `completionItem.itemDefaults`.
 
-    If a field's value is "merge", the values will be merged using the rules
-    defined against each field below.
+    If a field's value is ApplyKind.Merge, the values will be merged using
+    the rules defined against each field below.
 
     Servers are only allowed to return `applyKind` if the client
     signals support for this via the `completionList.applyKindSupport`
@@ -3957,7 +3955,7 @@ class CompletionItemDefaults(TypedDict):
     If a completion list specifies a default value and a completion item
     also specifies a corresponding value, the rules for combining these are
     defined by `applyKinds` (if the client supports it), defaulting to
-    "replace".
+    ApplyKind.Replace.
 
     Servers are only allowed to return default values if the client
     signals support for this via the `completionList.itemDefaults`
@@ -3990,13 +3988,13 @@ class CompletionItemApplyKinds(TypedDict):
     """ Specifies how fields from a completion item should be combined with those
     from `completionList.itemDefaults`.
 
-    If unspecified, all fields will be treated as "replace".
+    If unspecified, all fields will be treated as ApplyKind.Replace.
 
-    If a field's value is "replace", the value from a completion item (if
+    If a field's value is ApplyKind.Replace, the value from a completion item (if
     provided and not `null`) will always be used instead of the value from
     `completionItem.itemDefaults`.
 
-    If a field's value is "merge", the values will be merged using the rules
+    If a field's value is ApplyKind.Merge, the values will be merged using the rules
     defined against each field below.
 
     Servers are only allowed to return `applyKind` if the client
@@ -4008,15 +4006,15 @@ class CompletionItemApplyKinds(TypedDict):
     """ Specifies whether commitCharacters on a completion will replace or be
     merged with those in `completionList.itemDefaults.commitCharacters`.
 
-    If "replace", the commit characters from the completion item will
+    If ApplyKind.Replace, the commit characters from the completion item will
     always be used unless not provided, in which case those from
     `completionList.itemDefaults.commitCharacters` will be used. An
     empty list can be used if a completion item does not have any commit
     characters and also should not use those from
     `completionList.itemDefaults.commitCharacters`.
 
-    If "merge" the commitCharacters for the completion will be the union
-    of all values in both `completionList.itemDefaults.commitCharacters`
+    If ApplyKind.Merge the commitCharacters for the completion will be the
+    union of all values in both `completionList.itemDefaults.commitCharacters`
     and the completion's own `commitCharacters`.
 
     @since 3.18.0 """
@@ -4024,13 +4022,13 @@ class CompletionItemApplyKinds(TypedDict):
     """ Specifies whether the `data` field on a completion will replace or
     be merged with data from `completionList.itemDefaults.data`.
 
-    If "replace", the data from the completion item will be used if
+    If ApplyKind.Replace, the data from the completion item will be used if
     provided (and not `null`), otherwise
     `completionList.itemDefaults.data` will be used. An empty object can
     be used if a completion item does not have any data but also should
     not use the value from `completionList.itemDefaults.data`.
 
-    If "merge", a shallow merge will be performed between
+    If ApplyKind.Merge, a shallow merge will be performed between
     `completionList.itemDefaults.data` and the completion's own data
     using the following rules:
 
@@ -4874,6 +4872,10 @@ class TextDocumentClientCapabilities(TypedDict):
     """ Text document specific client capabilities. """
     synchronization: NotRequired['TextDocumentSyncClientCapabilities']
     """ Defines which synchronization capabilities the client supports. """
+    filters: NotRequired['TextDocumentFilterClientCapabilities']
+    """ Defines which filters the client supports.
+
+    @since 3.18.0 """
     completion: NotRequired['CompletionClientCapabilities']
     """ Capabilities specific to the `textDocument/completion` request. """
     hover: NotRequired['HoverClientCapabilities']
@@ -5094,7 +5096,9 @@ class TextDocumentFilterLanguage(TypedDict):
     pattern: NotRequired['GlobPattern']
     """ A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
 
-    @since 3.18.0 - support for relative patterns. """
+    @since 3.18.0 - support for relative patterns. Whether clients support
+    relative patterns depends on the client capability
+    `textDocuments.filters.relativePatternSupport`. """
 
 
 class TextDocumentFilterScheme(TypedDict):
@@ -5108,7 +5112,9 @@ class TextDocumentFilterScheme(TypedDict):
     pattern: NotRequired['GlobPattern']
     """ A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
 
-    @since 3.18.0 - support for relative patterns. """
+    @since 3.18.0 - support for relative patterns. Whether clients support
+    relative patterns depends on the client capability
+    `textDocuments.filters.relativePatternSupport`. """
 
 
 class TextDocumentFilterPattern(TypedDict):
@@ -5122,7 +5128,9 @@ class TextDocumentFilterPattern(TypedDict):
     pattern: 'GlobPattern'
     """ A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
 
-    @since 3.18.0 - support for relative patterns. """
+    @since 3.18.0 - support for relative patterns. Whether clients support
+    relative patterns depends on the client capability
+    `textDocuments.filters.relativePatternSupport`. """
 
 
 class NotebookDocumentFilterNotebookType(TypedDict):
@@ -5381,6 +5389,13 @@ class TextDocumentSyncClientCapabilities(TypedDict):
     be applied to the document before it is saved. """
     didSave: NotRequired[bool]
     """ The client supports did save notifications. """
+
+
+class TextDocumentFilterClientCapabilities(TypedDict):
+    relativePatternSupport: NotRequired[bool]
+    """ The client supports Relative Patterns.
+
+    @since 3.18.0 """
 
 
 class CompletionClientCapabilities(TypedDict):
@@ -6172,3 +6187,4 @@ class ClientSemanticTokensRequestFullDelta(TypedDict):
     delta: NotRequired[bool]
     """ The client will send the `textDocument/semanticTokens/full/delta` request if
     the server provides a corresponding handler. """
+
