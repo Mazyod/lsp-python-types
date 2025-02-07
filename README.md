@@ -1,4 +1,22 @@
-# Setup
+# LSP Types
+
+Publish the excellent work of [Sublime LSP](https://github.com/sublimelsp/lsp-python-types) as a PyPI package.
+
+## Installation
+
+```sh
+pip install lsp-types
+```
+
+## Usage
+
+```python
+import lsp_types
+
+# Use the types
+```
+
+## Development
 
 Requires Python 3.11+.
 
