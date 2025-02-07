@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import json
 
-from lsp_schema import MetaModel
-from typing import Dict, Literal
-from utils.generate_enumerations import generate_enumerations
-from utils.generate_structures import generate_structures
-from utils.generate_type_aliases import generate_type_aliases
-from utils.helpers import get_new_literal_structures, reset_new_literal_structures, StructureKind
+from typing import Dict, Literal  # noqa (for type hint comments)
+from .lsp_schema import MetaModel
+from .utils.generate_enumerations import generate_enumerations
+from .utils.generate_structures import generate_structures
+from .utils.generate_type_aliases import generate_type_aliases
+from .utils.helpers import get_new_literal_structures, reset_new_literal_structures, StructureKind
 
 
 ENUM_OVERRIDES = {
@@ -32,7 +32,7 @@ ENUM_OVERRIDES = {
 def generate(preferred_structure_kind: StructureKind, output: str) -> None:
     reset_new_literal_structures()
 
-    with open('./lsprotocol/lsp.json') as file:
+    with open('./assets/lsprotocol/lsp.json') as file:
         lsp_json: MetaModel = json.load(file)
         specification_version = lsp_json.get('metaData')['version']
 
@@ -65,5 +65,5 @@ def generate(preferred_structure_kind: StructureKind, output: str) -> None:
             new_file.write(content)
 
 
-generate(preferred_structure_kind=StructureKind.Class, output="./lsp_types.py")
-# generate(preferred_structure_kind=StructureKind.Function, output="./lsp_types_sublime_text_33.py")
+generate(preferred_structure_kind=StructureKind.Class, output="./lsp_types/types.py")
+# generate(preferred_structure_kind=StructureKind.Function, output="./lsp/types_sublime_text_33.py")

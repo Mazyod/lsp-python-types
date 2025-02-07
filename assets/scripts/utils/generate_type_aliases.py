@@ -1,6 +1,6 @@
 from typing import List
-from lsp_schema import TypeAlias
-from utils.helpers import format_comment, format_type, StructureKind
+from ..lsp_schema import TypeAlias
+from .helpers import format_comment, format_type, StructureKind
 
 
 def generate_type_aliases(type_aliases: List[TypeAlias], preferred_structure_kind: StructureKind) -> List[str]:

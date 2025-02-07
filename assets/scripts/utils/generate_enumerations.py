@@ -1,7 +1,7 @@
 from enum import Enum
-from lsp_schema import Enumeration, EnumerationEntry
+from ..lsp_schema import Enumeration, EnumerationEntry
 from typing import Dict, List, Literal
-from utils.helpers import capitalize, format_comment, indentation
+from .helpers import capitalize, format_comment, indentation
 import keyword
 
 
