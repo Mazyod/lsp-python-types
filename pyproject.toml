@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "lsp-types"
 version = "0.2.0"
-description = ""
+description = "Zero-dependency Python library for Language Server Protocol types"
 authors = ["Mazyad Alabduljaleel <mazjaleel@gmail.com>"]
 include = ["lsp_types"]
 readme = "README.md"
