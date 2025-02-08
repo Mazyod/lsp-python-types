@@ -64,12 +64,12 @@ def generate_notification(notification: Notification) -> str:
                 "I expected params to be of type _Type. But got: " + str(params)
             )
         formatted_params = f",  params: types.{params_type}"
-    result += f"{indentation}async def {symbol_name}(self{formatted_params}) -> None:"
+    result += f"{indentation}def {symbol_name}(self{formatted_params}):"
     documentation = format_comment(
         notification.get("documentation"), indentation + indentation
     )
     if documentation.strip():
         result += f"\n{documentation}"
-    result += f"""\n{indentation}{indentation}return await self.dispatcher("{method}"{", params" if params else ""})\n"""
+    result += f"""\n{indentation}{indentation}return self.dispatcher("{method}", {"params" if params else "None"})\n"""
 
     return result

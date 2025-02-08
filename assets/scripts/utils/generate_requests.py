@@ -111,7 +111,7 @@ def generate_request(request: Request) -> str:
     if documentation:
         result += f"\n{documentation}"
     result += f"""
-{indentation}{indentation}return await self.dispatcher("{method}"{", params" if params else ""})
+{indentation}{indentation}return await self.dispatcher("{method}", {"params" if params else "None"})
 """
     return result
 

@@ -4,7 +4,7 @@ from typing import Any, Awaitable, Callable, List, Mapping, Union
 from . import types
 
 
-RequestDispatcher = Callable[[str, Mapping], Awaitable[Any]]
+RequestDispatcher = Callable[[str, Mapping | None], Awaitable[Any]]
 
 
 class Request:
@@ -211,7 +211,7 @@ class Request:
         It is sent once when the client decides to shutdown the
         server. The only notification that is sent after a shutdown request
         is the exit event."""
-        return await self.dispatcher("shutdown")
+        return await self.dispatcher("shutdown", None)
 
     async def will_save_wait_until(self, params: types.WillSaveTextDocumentParams) -> Union[List[types.TextEdit], None]:
         """A document will save request is sent from the client to the server before
@@ -360,83 +360,83 @@ class Request:
 
 
 
-NotificationDispatcher = Callable[[str, Mapping], Awaitable[None]]
+NotificationDispatcher = Callable[[str, Mapping | None], Awaitable[None]]
 
 
 class Notification:
     def __init__(self, dispatcher: NotificationDispatcher):
         self.dispatcher = dispatcher
 
-    async def did_change_workspace_folders(self,  params: types.DidChangeWorkspaceFoldersParams) -> None:
+    def did_change_workspace_folders(self,  params: types.DidChangeWorkspaceFoldersParams):
         """The `workspace/didChangeWorkspaceFolders` notification is sent from the client to the server when the workspace
         folder configuration changes."""
-        return await self.dispatcher("workspace/didChangeWorkspaceFolders", params)
+        return self.dispatcher("workspace/didChangeWorkspaceFolders", params)
 
-    async def cancel_work_done_progress(self,  params: types.WorkDoneProgressCancelParams) -> None:
+    def cancel_work_done_progress(self,  params: types.WorkDoneProgressCancelParams):
         """The `window/workDoneProgress/cancel` notification is sent from  the client to the server to cancel a progress
         initiated on the server side."""
-        return await self.dispatcher("window/workDoneProgress/cancel", params)
+        return self.dispatcher("window/workDoneProgress/cancel", params)
 
-    async def did_create_files(self,  params: types.CreateFilesParams) -> None:
+    def did_create_files(self,  params: types.CreateFilesParams):
         """The did create files notification is sent from the client to the server when
         files were created from within the client.
 
         @since 3.16.0"""
-        return await self.dispatcher("workspace/didCreateFiles", params)
+        return self.dispatcher("workspace/didCreateFiles", params)
 
-    async def did_rename_files(self,  params: types.RenameFilesParams) -> None:
+    def did_rename_files(self,  params: types.RenameFilesParams):
         """The did rename files notification is sent from the client to the server when
         files were renamed from within the client.
 
         @since 3.16.0"""
-        return await self.dispatcher("workspace/didRenameFiles", params)
+        return self.dispatcher("workspace/didRenameFiles", params)
 
-    async def did_delete_files(self,  params: types.DeleteFilesParams) -> None:
+    def did_delete_files(self,  params: types.DeleteFilesParams):
         """The will delete files request is sent from the client to the server before files are actually
         deleted as long as the deletion is triggered from within the client.
 
         @since 3.16.0"""
-        return await self.dispatcher("workspace/didDeleteFiles", params)
+        return self.dispatcher("workspace/didDeleteFiles", params)
 
-    async def did_open_notebook_document(self,  params: types.DidOpenNotebookDocumentParams) -> None:
+    def did_open_notebook_document(self,  params: types.DidOpenNotebookDocumentParams):
         """A notification sent when a notebook opens.
 
         @since 3.17.0"""
-        return await self.dispatcher("notebookDocument/didOpen", params)
+        return self.dispatcher("notebookDocument/didOpen", params)
 
-    async def did_change_notebook_document(self,  params: types.DidChangeNotebookDocumentParams) -> None:
-        return await self.dispatcher("notebookDocument/didChange", params)
+    def did_change_notebook_document(self,  params: types.DidChangeNotebookDocumentParams):
+        return self.dispatcher("notebookDocument/didChange", params)
 
-    async def did_save_notebook_document(self,  params: types.DidSaveNotebookDocumentParams) -> None:
+    def did_save_notebook_document(self,  params: types.DidSaveNotebookDocumentParams):
         """A notification sent when a notebook document is saved.
 
         @since 3.17.0"""
-        return await self.dispatcher("notebookDocument/didSave", params)
+        return self.dispatcher("notebookDocument/didSave", params)
 
-    async def did_close_notebook_document(self,  params: types.DidCloseNotebookDocumentParams) -> None:
+    def did_close_notebook_document(self,  params: types.DidCloseNotebookDocumentParams):
         """A notification sent when a notebook closes.
 
         @since 3.17.0"""
-        return await self.dispatcher("notebookDocument/didClose", params)
+        return self.dispatcher("notebookDocument/didClose", params)
 
-    async def initialized(self,  params: types.InitializedParams) -> None:
+    def initialized(self,  params: types.InitializedParams):
         """The initialized notification is sent from the client to the
         server after the client is fully initialized and the server
         is allowed to send requests from the server to the client."""
-        return await self.dispatcher("initialized", params)
+        return self.dispatcher("initialized", params)
 
-    async def exit(self) -> None:
+    def exit(self):
         """The exit event is sent from the client to the server to
         ask the server to exit its process."""
-        return await self.dispatcher("exit")
+        return self.dispatcher("exit", None)
 
-    async def workspace_did_change_configuration(self,  params: types.DidChangeConfigurationParams) -> None:
+    def workspace_did_change_configuration(self,  params: types.DidChangeConfigurationParams):
         """The configuration change notification is sent from the client to the server
         when the client's configuration has changed. The notification contains
         the changed configuration as defined by the language client."""
-        return await self.dispatcher("workspace/didChangeConfiguration", params)
+        return self.dispatcher("workspace/didChangeConfiguration", params)
 
-    async def did_open_text_document(self,  params: types.DidOpenTextDocumentParams) -> None:
+    def did_open_text_document(self,  params: types.DidOpenTextDocumentParams):
         """The document open notification is sent from the client to the server to signal
         newly opened text documents. The document's truth is now managed by the client
         and the server must not try to read the document's truth using the document's
@@ -445,14 +445,14 @@ class Notification:
         be sent more than once without a corresponding close notification send before.
         This means open and close notification must be balanced and the max open count
         is one."""
-        return await self.dispatcher("textDocument/didOpen", params)
+        return self.dispatcher("textDocument/didOpen", params)
 
-    async def did_change_text_document(self,  params: types.DidChangeTextDocumentParams) -> None:
+    def did_change_text_document(self,  params: types.DidChangeTextDocumentParams):
         """The document change notification is sent from the client to the server to signal
         changes to a text document."""
-        return await self.dispatcher("textDocument/didChange", params)
+        return self.dispatcher("textDocument/didChange", params)
 
-    async def did_close_text_document(self,  params: types.DidCloseTextDocumentParams) -> None:
+    def did_close_text_document(self,  params: types.DidCloseTextDocumentParams):
         """The document close notification is sent from the client to the server when
         the document got closed in the client. The document's truth now exists where
         the document's uri points to (e.g. if the document's uri is a file uri the
@@ -460,28 +460,28 @@ class Notification:
         is about managing the document's content. Receiving a close notification
         doesn't mean that the document was open in an editor before. A close
         notification requires a previous open notification to be sent."""
-        return await self.dispatcher("textDocument/didClose", params)
+        return self.dispatcher("textDocument/didClose", params)
 
-    async def did_save_text_document(self,  params: types.DidSaveTextDocumentParams) -> None:
+    def did_save_text_document(self,  params: types.DidSaveTextDocumentParams):
         """The document save notification is sent from the client to the server when
         the document got saved in the client."""
-        return await self.dispatcher("textDocument/didSave", params)
+        return self.dispatcher("textDocument/didSave", params)
 
-    async def will_save_text_document(self,  params: types.WillSaveTextDocumentParams) -> None:
+    def will_save_text_document(self,  params: types.WillSaveTextDocumentParams):
         """A document will save notification is sent from the client to the server before
         the document is actually saved."""
-        return await self.dispatcher("textDocument/willSave", params)
+        return self.dispatcher("textDocument/willSave", params)
 
-    async def did_change_watched_files(self,  params: types.DidChangeWatchedFilesParams) -> None:
+    def did_change_watched_files(self,  params: types.DidChangeWatchedFilesParams):
         """The watched files notification is sent from the client to the server when
         the client detects changes to file watched by the language client."""
-        return await self.dispatcher("workspace/didChangeWatchedFiles", params)
+        return self.dispatcher("workspace/didChangeWatchedFiles", params)
 
-    async def set_trace(self,  params: types.SetTraceParams) -> None:
-        return await self.dispatcher("$/setTrace", params)
+    def set_trace(self,  params: types.SetTraceParams):
+        return self.dispatcher("$/setTrace", params)
 
-    async def cancel_request(self,  params: types.CancelParams) -> None:
-        return await self.dispatcher("$/cancelRequest", params)
+    def cancel_request(self,  params: types.CancelParams):
+        return self.dispatcher("$/cancelRequest", params)
 
-    async def progress(self,  params: types.ProgressParams) -> None:
-        return await self.dispatcher("$/progress", params)
+    def progress(self,  params: types.ProgressParams):
+        return self.dispatcher("$/progress", params)

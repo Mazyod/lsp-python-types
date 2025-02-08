@@ -79,7 +79,7 @@ from typing import Any, Awaitable, Callable, List, Mapping, Union
 from . import types
 
 
-RequestDispatcher = Callable[[str, Mapping], Awaitable[Any]]
+RequestDispatcher = Callable[[str, Mapping | None], Awaitable[Any]]
 
 
 class Request:
@@ -94,7 +94,7 @@ class Request:
         content += f"""
 
 
-NotificationDispatcher = Callable[[str, Mapping], Awaitable[None]]
+NotificationDispatcher = Callable[[str, Mapping | None], Awaitable[None]]
 
 
 class Notification:
