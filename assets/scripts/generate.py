@@ -75,11 +75,11 @@ generate(preferred_structure_kind=StructureKind.Class, output="./lsp_types/types
 def generate_req(output) -> None:
     content = f"""from __future__ import annotations
 # Code generated. DO NOT EDIT.
-from typing import Any, Callable, List, Mapping, Union
+from typing import Any, Awaitable, Callable, List, Mapping, Union
 from . import types
 
 
-RequestDispatcher = Callable[[str, Mapping], Any]
+RequestDispatcher = Callable[[str, Mapping], Awaitable[Any]]
 
 
 class Request:
@@ -94,7 +94,7 @@ class Request:
         content += f"""
 
 
-NotificationDispatcher = Callable[[str, Mapping], None]
+NotificationDispatcher = Callable[[str, Mapping], Awaitable[None]]
 
 
 class Notification:
