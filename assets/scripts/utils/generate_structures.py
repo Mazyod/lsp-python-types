@@ -1,9 +1,8 @@
-from typing import List
 from ..lsp_schema import Structure
 from .helpers import FormattedProperty, format_comment, indentation, format_class_properties, format_dict_properties, get_formatted_properties, has_invalid_property_name, StructureKind
 
 
-def generate_structures(structures: List[Structure], preferred_structure_kind: StructureKind) -> List[str]:
+def generate_structures(structures: list[Structure], preferred_structure_kind: StructureKind) -> list[str]:
 
     def toString(structure: Structure) -> str:
         kind = preferred_structure_kind
@@ -14,9 +13,9 @@ def generate_structures(structures: List[Structure], preferred_structure_kind: S
     return [toString(structure) for structure in structures if not structure['name'].startswith('_')]
 
 
-def get_additional_properties(for_structure: Structure, structures: List[Structure], structure_kind: StructureKind) -> List[FormattedProperty]:
+def get_additional_properties(for_structure: Structure, structures: list[Structure], structure_kind: StructureKind) -> list[FormattedProperty]:
     """Returns properties from extended and mixin types. """
-    result: List[FormattedProperty] = []
+    result: list[FormattedProperty] = []
     additional_structures = for_structure.get('extends') or []
     additional_structures.extend(for_structure.get('mixins') or [])
     for additional_structure in additional_structures:
@@ -29,7 +28,7 @@ def get_additional_properties(for_structure: Structure, structures: List[Structu
     return result
 
 
-def generate_structure(structure: Structure, structures: List[Structure], structure_kind: StructureKind) -> str:
+def generate_structure(structure: Structure, structures: list[Structure], structure_kind: StructureKind) -> str:
     result = ""
     symbol_name = structure['name']
     properties = get_formatted_properties(structure['properties'], structure['name'], structure_kind)

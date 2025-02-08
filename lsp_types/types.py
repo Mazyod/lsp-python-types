@@ -2,7 +2,7 @@ from __future__ import annotations
 # Code generated. DO NOT EDIT.
 # LSP v3.17.0
 
-from typing import Dict, List, Literal, TypedDict, Union, NotRequired
+from typing import Literal, TypedDict, Union, NotRequired
 from enum import IntEnum, IntFlag, StrEnum
 
 
@@ -688,7 +688,7 @@ class TokenFormat(StrEnum):
     Relative = 'relative'
 
 
-Definition = Union['Location', List['Location']]
+Definition = Union['Location', list['Location']]
 """The definition of a symbol represented as one or many {@link Location locations}.
 For most programming languages there is only one location at which a symbol is
 defined.
@@ -702,7 +702,7 @@ DefinitionLink = 'LocationLink'
 Provides additional metadata over normal {@link Location location} definitions, including the range of
 the defining symbol"""
 
-LSPArray = List['LSPAny']
+LSPArray = list['LSPAny']
 """LSP arrays.
 @since 3.17.0"""
 
@@ -714,7 +714,7 @@ convenience it is allowed and assumed that all these properties are
 optional as well.
 @since 3.17.0"""
 
-Declaration = Union['Location', List['Location']]
+Declaration = Union['Location', list['Location']]
 """The declaration of a symbol representation as one or many {@link Location locations}."""
 
 DeclarationLink = 'LocationLink'
@@ -746,7 +746,7 @@ pull request.
 
 PrepareRenameResult = Union['Range', 'PrepareRenamePlaceholder', 'PrepareRenameDefaultBehavior']
 
-DocumentSelector = List['DocumentFilter']
+DocumentSelector = list['DocumentFilter']
 """A document selector is the combination of one or many document filters.
 
 @sample `let sel:DocumentSelector = [{ language: 'typescript' }, { language: 'json', pattern: '**∕tsconfig.json' }]`;
@@ -787,7 +787,7 @@ a notebook cell document.
 
 @since 3.17.0 - support for NotebookCellTextDocumentFilter."""
 
-LSPObject = Dict[str, 'LSPAny']
+LSPObject = dict[str, 'LSPAny']
 """LSP object definition.
 @since 3.17.0"""
 
@@ -901,7 +901,7 @@ class DidChangeWorkspaceFoldersParams(TypedDict):
 
 class ConfigurationParams(TypedDict):
     """The parameters of a configuration request."""
-    items: List['ConfigurationItem']
+    items: list['ConfigurationItem']
 
 
 class DocumentColorParams(TypedDict):
@@ -956,7 +956,7 @@ class ColorPresentation(TypedDict):
     """An {@link TextEdit edit} which is applied to a document when selecting
     this presentation for the color.  When `falsy` the {@link ColorPresentation.label label}
     is used."""
-    additionalTextEdits: NotRequired[List['TextEdit']]
+    additionalTextEdits: NotRequired[list['TextEdit']]
     """An optional array of additional {@link TextEdit text edits} that are applied when
     selecting this color presentation. Edits must not overlap with the main {@link ColorPresentation.textEdit edit} nor with themselves."""
 
@@ -1042,7 +1042,7 @@ class SelectionRangeParams(TypedDict):
     """A parameter literal used in selection range requests."""
     textDocument: 'TextDocumentIdentifier'
     """The text document."""
-    positions: List['Position']
+    positions: list['Position']
     """The positions inside the text document."""
     workDoneToken: NotRequired['ProgressToken']
     """An optional token that a server can use to report work done progress."""
@@ -1100,7 +1100,7 @@ class CallHierarchyItem(TypedDict):
     """The name of this item."""
     kind: 'SymbolKind'
     """The kind of this item."""
-    tags: NotRequired[List['SymbolTag']]
+    tags: NotRequired[list['SymbolTag']]
     """Tags for this item."""
     detail: NotRequired[str]
     """More detail for this item, e.g. the signature of a function."""
@@ -1145,7 +1145,7 @@ CallHierarchyIncomingCall = TypedDict('CallHierarchyIncomingCall', {
     'from': 'CallHierarchyItem',
     # The ranges at which the calls appear. This is relative to the caller
     # denoted by {@link CallHierarchyIncomingCall.from `this.from`}.
-    'fromRanges': List['Range'],
+    'fromRanges': list['Range'],
 })
 """Represents an incoming call, e.g. a caller of a method or constructor.
 
@@ -1170,7 +1170,7 @@ class CallHierarchyOutgoingCall(TypedDict):
     @since 3.16.0"""
     to: 'CallHierarchyItem'
     """The item that is called."""
-    fromRanges: List['Range']
+    fromRanges: list['Range']
     """The range at which this item is called. This is the range relative to the caller, e.g the item
     passed to {@link CallHierarchyItemProvider.provideCallHierarchyOutgoingCalls `provideCallHierarchyOutgoingCalls`}
     and not {@link CallHierarchyOutgoingCall.to `this.to`}."""
@@ -1194,13 +1194,13 @@ class SemanticTokens(TypedDict):
     the client will include the result id in the next semantic token request.
     A server can then instead of computing all semantic tokens again simply
     send a delta."""
-    data: List[Uint]
+    data: list[Uint]
     """The actual tokens."""
 
 
 class SemanticTokensPartialResult(TypedDict):
     """@since 3.16.0"""
-    data: List[Uint]
+    data: list[Uint]
 
 
 class SemanticTokensRegistrationOptions(TypedDict):
@@ -1237,13 +1237,13 @@ class SemanticTokensDeltaParams(TypedDict):
 class SemanticTokensDelta(TypedDict):
     """@since 3.16.0"""
     resultId: NotRequired[str]
-    edits: List['SemanticTokensEdit']
+    edits: list['SemanticTokensEdit']
     """The semantic token edits to transform a previous result into a new result."""
 
 
 class SemanticTokensDeltaPartialResult(TypedDict):
     """@since 3.16.0"""
-    edits: List['SemanticTokensEdit']
+    edits: list['SemanticTokensEdit']
 
 
 class SemanticTokensRangeParams(TypedDict):
@@ -1302,7 +1302,7 @@ class LinkedEditingRanges(TypedDict):
     """The result of a linked editing range request.
 
     @since 3.16.0"""
-    ranges: List['Range']
+    ranges: list['Range']
     """A list of ranges that can be edited together. The ranges must have
     identical length and contain identical text content. The ranges cannot overlap."""
     wordPattern: NotRequired[str]
@@ -1325,7 +1325,7 @@ class CreateFilesParams(TypedDict):
     files.
 
     @since 3.16.0"""
-    files: List['FileCreate']
+    files: list['FileCreate']
     """An array of all files/folders created in this operation."""
 
 
@@ -1342,9 +1342,9 @@ class WorkspaceEdit(TypedDict):
     An invalid sequence (e.g. (1) delete file a.txt and (2) insert text into file a.txt) will
     cause failure of the operation. How the client recovers from the failure is described by
     the client capability: `workspace.workspaceEdit.failureHandling`"""
-    changes: NotRequired[Dict['DocumentUri', List['TextEdit']]]
+    changes: NotRequired[dict['DocumentUri', list['TextEdit']]]
     """Holds changes to existing resources."""
-    documentChanges: NotRequired[List[Union['TextDocumentEdit', 'CreateFile', 'RenameFile', 'DeleteFile']]]
+    documentChanges: NotRequired[list[Union['TextDocumentEdit', 'CreateFile', 'RenameFile', 'DeleteFile']]]
     """Depending on the client capability `workspace.workspaceEdit.resourceOperations` document changes
     are either an array of `TextDocumentEdit`s to express changes to n different text documents
     where each text document edit addresses a specific version of a text document. Or it can contain
@@ -1355,7 +1355,7 @@ class WorkspaceEdit(TypedDict):
 
     If a client neither supports `documentChanges` nor `workspace.workspaceEdit.resourceOperations` then
     only plain `TextEdit`s using the `changes` property are supported."""
-    changeAnnotations: NotRequired[Dict['ChangeAnnotationIdentifier', 'ChangeAnnotation']]
+    changeAnnotations: NotRequired[dict['ChangeAnnotationIdentifier', 'ChangeAnnotation']]
     """A map of change annotations that can be referenced in `AnnotatedTextEdit`s or create, rename and
     delete file / folder operations.
 
@@ -1368,7 +1368,7 @@ class FileOperationRegistrationOptions(TypedDict):
     """The options to register for file operations.
 
     @since 3.16.0"""
-    filters: List['FileOperationFilter']
+    filters: list['FileOperationFilter']
     """The actual filters."""
 
 
@@ -1377,7 +1377,7 @@ class RenameFilesParams(TypedDict):
     files.
 
     @since 3.16.0"""
-    files: List['FileRename']
+    files: list['FileRename']
     """An array of all files/folders renamed in this operation. When a folder is renamed, only
     the folder will be included, and not its children."""
 
@@ -1387,7 +1387,7 @@ class DeleteFilesParams(TypedDict):
     files.
 
     @since 3.16.0"""
-    files: List['FileDelete']
+    files: list['FileDelete']
     """An array of all files/folders deleted in this operation."""
 
 
@@ -1442,7 +1442,7 @@ class TypeHierarchyItem(TypedDict):
     """The name of this item."""
     kind: 'SymbolKind'
     """The kind of this item."""
-    tags: NotRequired[List['SymbolTag']]
+    tags: NotRequired[list['SymbolTag']]
     """Tags for this item."""
     detail: NotRequired[str]
     """More detail for this item, e.g. the signature of a function."""
@@ -1546,7 +1546,7 @@ class InlayHint(TypedDict):
 
     If multiple hints have the same position, they will be shown in the order
     they appear in the response."""
-    label: Union[str, List['InlayHintLabelPart']]
+    label: Union[str, list['InlayHintLabelPart']]
     """The label of this hint. A human readable string or an array of
     InlayHintLabelPart label parts.
 
@@ -1554,7 +1554,7 @@ class InlayHint(TypedDict):
     kind: NotRequired['InlayHintKind']
     """The kind of this hint. Can be omitted in which case the client
     should fall back to a reasonable default."""
-    textEdits: NotRequired[List['TextEdit']]
+    textEdits: NotRequired[list['TextEdit']]
     """Optional text edits that are performed when accepting this inlay hint.
 
     *Note* that edits are expected to change the document so that the inlay
@@ -1615,7 +1615,7 @@ class DocumentDiagnosticReportPartialResult(TypedDict):
     """A partial result for a document diagnostic report.
 
     @since 3.17.0"""
-    relatedDocuments: Dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]
+    relatedDocuments: dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]
 
 
 class DiagnosticServerCancellationData(TypedDict):
@@ -1653,7 +1653,7 @@ class WorkspaceDiagnosticParams(TypedDict):
     @since 3.17.0"""
     identifier: NotRequired[str]
     """The additional identifier provided during registration."""
-    previousResultIds: List['PreviousResultId']
+    previousResultIds: list['PreviousResultId']
     """The currently known diagnostic reports with their
     previous result ids."""
     workDoneToken: NotRequired['ProgressToken']
@@ -1667,14 +1667,14 @@ class WorkspaceDiagnosticReport(TypedDict):
     """A workspace diagnostic report.
 
     @since 3.17.0"""
-    items: List['WorkspaceDocumentDiagnosticReport']
+    items: list['WorkspaceDocumentDiagnosticReport']
 
 
 class WorkspaceDiagnosticReportPartialResult(TypedDict):
     """A partial result for a workspace diagnostic report.
 
     @since 3.17.0"""
-    items: List['WorkspaceDocumentDiagnosticReport']
+    items: list['WorkspaceDocumentDiagnosticReport']
 
 
 class DidOpenNotebookDocumentParams(TypedDict):
@@ -1683,7 +1683,7 @@ class DidOpenNotebookDocumentParams(TypedDict):
     @since 3.17.0"""
     notebookDocument: 'NotebookDocument'
     """The notebook document that got opened."""
-    cellTextDocuments: List['TextDocumentItem']
+    cellTextDocuments: list['TextDocumentItem']
     """The text documents that represent the content
     of a notebook cell."""
 
@@ -1692,7 +1692,7 @@ class NotebookDocumentSyncRegistrationOptions(TypedDict):
     """Registration options specific to a notebook.
 
     @since 3.17.0"""
-    notebookSelector: List[Union['NotebookDocumentFilterWithNotebook', 'NotebookDocumentFilterWithCells']]
+    notebookSelector: list[Union['NotebookDocumentFilterWithNotebook', 'NotebookDocumentFilterWithCells']]
     """The notebooks to be synced"""
     save: NotRequired[bool]
     """Whether save notification should be forwarded to
@@ -1741,7 +1741,7 @@ class DidCloseNotebookDocumentParams(TypedDict):
     @since 3.17.0"""
     notebookDocument: 'NotebookDocumentIdentifier'
     """The notebook document that got closed."""
-    cellTextDocuments: List['TextDocumentIdentifier']
+    cellTextDocuments: list['TextDocumentIdentifier']
     """The text documents that represent the content
     of a notebook cell that got closed."""
 
@@ -1767,7 +1767,7 @@ class InlineCompletionList(TypedDict):
 
     @since 3.18.0
     @proposed"""
-    items: List['InlineCompletionItem']
+    items: list['InlineCompletionItem']
     """The inline completion items"""
 
 
@@ -1825,7 +1825,7 @@ class TextDocumentContentRegistrationOptions(TypedDict):
 
     @since 3.18.0
     @proposed"""
-    schemes: List[str]
+    schemes: list[str]
     """The schemes for which the server provides content."""
     id: NotRequired[str]
     """The id used to register the request. The id can be used to deregister
@@ -1842,11 +1842,11 @@ class TextDocumentContentRefreshParams(TypedDict):
 
 
 class RegistrationParams(TypedDict):
-    registrations: List['Registration']
+    registrations: list['Registration']
 
 
 class UnregistrationParams(TypedDict):
-    unregisterations: List['Unregistration']
+    unregisterations: list['Unregistration']
 
 
 class InitializeParams(TypedDict):
@@ -1886,7 +1886,7 @@ class InitializeParams(TypedDict):
     """User provided initialization options."""
     trace: NotRequired['TraceValue']
     """The initial trace setting. If omitted trace is disabled ('off')."""
-    workspaceFolders: NotRequired[Union[List['WorkspaceFolder'], None]]
+    workspaceFolders: NotRequired[Union[list['WorkspaceFolder'], None]]
     """The workspace folders configured in the client when the server starts.
 
     This property is only available if the client supports workspace folders.
@@ -1927,7 +1927,7 @@ class DidChangeConfigurationParams(TypedDict):
 
 
 class DidChangeConfigurationRegistrationOptions(TypedDict):
-    section: NotRequired[Union[str, List[str]]]
+    section: NotRequired[Union[str, list[str]]]
 
 
 class ShowMessageParams(TypedDict):
@@ -1943,7 +1943,7 @@ class ShowMessageRequestParams(TypedDict):
     """The message type. See {@link MessageType}"""
     message: str
     """The actual message."""
-    actions: NotRequired[List['MessageActionItem']]
+    actions: NotRequired[list['MessageActionItem']]
     """The message action items to present."""
 
 
@@ -1972,7 +1972,7 @@ class DidChangeTextDocumentParams(TypedDict):
     """The document that did change. The version number points
     to the version after all provided content changes have
     been applied."""
-    contentChanges: List['TextDocumentContentChangeEvent']
+    contentChanges: list['TextDocumentContentChangeEvent']
     """The actual content changes. The content changes describe single state changes
     to the document. So if there are two content changes c1 (at array index 0) and
     c2 (at array index 1) for a document in state S then c1 moves the document from
@@ -2039,13 +2039,13 @@ class TextEdit(TypedDict):
 
 class DidChangeWatchedFilesParams(TypedDict):
     """The watched files change notification's parameters."""
-    changes: List['FileEvent']
+    changes: list['FileEvent']
     """The actual file events."""
 
 
 class DidChangeWatchedFilesRegistrationOptions(TypedDict):
     """Describe options to be used when registered for text document change events."""
-    watchers: List['FileSystemWatcher']
+    watchers: list['FileSystemWatcher']
     """The watchers to register."""
 
 
@@ -2057,7 +2057,7 @@ class PublishDiagnosticsParams(TypedDict):
     """Optional the version number of the document the diagnostics are published for.
 
     @since 3.15.0"""
-    diagnostics: List['Diagnostic']
+    diagnostics: list['Diagnostic']
     """An array of diagnostic information items."""
 
 
@@ -2095,7 +2095,7 @@ class CompletionItem(TypedDict):
     kind: NotRequired['CompletionItemKind']
     """The kind of this completion item. Based of the kind
     an icon is chosen by the editor."""
-    tags: NotRequired[List['CompletionItemTag']]
+    tags: NotRequired[list['CompletionItemTag']]
     """Tags for this completion item.
 
     @since 3.15.0"""
@@ -2178,7 +2178,7 @@ class CompletionItem(TypedDict):
     property is used as a text.
 
     @since 3.17.0"""
-    additionalTextEdits: NotRequired[List['TextEdit']]
+    additionalTextEdits: NotRequired[list['TextEdit']]
     """An optional array of additional {@link TextEdit text edits} that are applied when
     selecting this completion. Edits must not overlap (including the same insert position)
     with the main {@link CompletionItem.textEdit edit} nor with themselves.
@@ -2186,7 +2186,7 @@ class CompletionItem(TypedDict):
     Additional text edits should be used to change text unrelated to the current cursor position
     (for example adding an import statement at the top of the file if the completion item will
     insert an unqualified type)."""
-    commitCharacters: NotRequired[List[str]]
+    commitCharacters: NotRequired[list[str]]
     """An optional set of characters that when pressed while this completion is active will accept it first and
     then type that character. *Note* that all commit characters should have `length=1` and that superfluous
     characters will be ignored."""
@@ -2241,7 +2241,7 @@ class CompletionList(TypedDict):
     capability.
 
     @since 3.18.0"""
-    items: List['CompletionItem']
+    items: list['CompletionItem']
     """The completion items."""
 
 
@@ -2250,7 +2250,7 @@ class CompletionRegistrationOptions(TypedDict):
     documentSelector: Union['DocumentSelector', None]
     """A document selector to identify the scope of the registration. If set to null
     the document selector provided on the client side will be used."""
-    triggerCharacters: NotRequired[List[str]]
+    triggerCharacters: NotRequired[list[str]]
     """Most tools trigger completion request automatically without explicitly requesting
     it using a keyboard shortcut (e.g. Ctrl+Space). Typically they do so when the user
     starts to type an identifier. For example if the user types `c` in a JavaScript file
@@ -2259,7 +2259,7 @@ class CompletionRegistrationOptions(TypedDict):
 
     If code complete should automatically be trigger on characters not being valid inside
     an identifier (for example `.` in JavaScript) list them in `triggerCharacters`."""
-    allCommitCharacters: NotRequired[List[str]]
+    allCommitCharacters: NotRequired[list[str]]
     """The list of all possible characters that commit a completion. This field can be used
     if clients don't support individual commit characters per completion item. See
     `ClientCapabilities.textDocument.completion.completionItem.commitCharactersSupport`
@@ -2290,7 +2290,7 @@ class HoverParams(TypedDict):
 
 class Hover(TypedDict):
     """The result of a hover request."""
-    contents: Union['MarkupContent', 'MarkedString', List['MarkedString']]
+    contents: Union['MarkupContent', 'MarkedString', list['MarkedString']]
     """The hover's content"""
     range: NotRequired['Range']
     """An optional range inside the text document that is used to
@@ -2323,7 +2323,7 @@ class SignatureHelp(TypedDict):
     """Signature help represents the signature of something
     callable. There can be multiple signature but only one
     active and only one active parameter."""
-    signatures: List['SignatureInformation']
+    signatures: list['SignatureInformation']
     """One or more signatures."""
     activeSignature: NotRequired[Uint]
     """The active signature. If omitted or the value lies outside the
@@ -2359,9 +2359,9 @@ class SignatureHelpRegistrationOptions(TypedDict):
     documentSelector: Union['DocumentSelector', None]
     """A document selector to identify the scope of the registration. If set to null
     the document selector provided on the client side will be used."""
-    triggerCharacters: NotRequired[List[str]]
+    triggerCharacters: NotRequired[list[str]]
     """List of characters that trigger signature help automatically."""
-    retriggerCharacters: NotRequired[List[str]]
+    retriggerCharacters: NotRequired[list[str]]
     """List of characters that re-trigger signature help.
 
     These trigger characters are only active when signature help is already showing. All trigger characters
@@ -2473,7 +2473,7 @@ class SymbolInformation(TypedDict):
     """The name of this symbol."""
     kind: 'SymbolKind'
     """The kind of this symbol."""
-    tags: NotRequired[List['SymbolTag']]
+    tags: NotRequired[list['SymbolTag']]
     """Tags for this symbol.
 
     @since 3.16.0"""
@@ -2496,7 +2496,7 @@ class DocumentSymbol(TypedDict):
     """More detail for this symbol, e.g the signature of a function."""
     kind: 'SymbolKind'
     """The kind of this symbol."""
-    tags: NotRequired[List['SymbolTag']]
+    tags: NotRequired[list['SymbolTag']]
     """Tags for this document symbol.
 
     @since 3.16.0"""
@@ -2511,7 +2511,7 @@ class DocumentSymbol(TypedDict):
     selectionRange: 'Range'
     """The range that should be selected and revealed when this symbol is being picked, e.g the name of a function.
     Must be contained by the `range`."""
-    children: NotRequired[List['DocumentSymbol']]
+    children: NotRequired[list['DocumentSymbol']]
     """Children of this symbol, e.g. properties of a class."""
 
 
@@ -2556,7 +2556,7 @@ class Command(TypedDict):
     @proposed"""
     command: str
     """The identifier of the actual command handler."""
-    arguments: NotRequired[List['LSPAny']]
+    arguments: NotRequired[list['LSPAny']]
     """Arguments that the command handler should be
     invoked with."""
 
@@ -2572,7 +2572,7 @@ class CodeAction(TypedDict):
     """The kind of the code action.
 
     Used to filter code actions."""
-    diagnostics: NotRequired[List['Diagnostic']]
+    diagnostics: NotRequired[list['Diagnostic']]
     """The diagnostics that this code action resolves."""
     isPreferred: NotRequired[bool]
     """Marks this as a preferred action. Preferred actions are used by the `auto fix` command and can be targeted
@@ -2609,7 +2609,7 @@ class CodeAction(TypedDict):
     a `textDocument/codeAction` and a `codeAction/resolve` request.
 
     @since 3.16.0"""
-    tags: NotRequired[List['CodeActionTag']]
+    tags: NotRequired[list['CodeActionTag']]
     """Tags for this code action.
 
     @since 3.18.0 - proposed"""
@@ -2620,12 +2620,12 @@ class CodeActionRegistrationOptions(TypedDict):
     documentSelector: Union['DocumentSelector', None]
     """A document selector to identify the scope of the registration. If set to null
     the document selector provided on the client side will be used."""
-    codeActionKinds: NotRequired[List['CodeActionKind']]
+    codeActionKinds: NotRequired[list['CodeActionKind']]
     """CodeActionKinds that this server may return.
 
     The list of kinds may be generic, such as `CodeActionKind.Refactor`, or the server
     may list out every specific kind they provide."""
-    documentation: NotRequired[List['CodeActionKindDocumentation']]
+    documentation: NotRequired[list['CodeActionKindDocumentation']]
     """Static documentation for a class of code actions.
 
     Documentation from the provider should be shown in the code actions menu if either:
@@ -2685,7 +2685,7 @@ class WorkspaceSymbol(TypedDict):
     """The name of this symbol."""
     kind: 'SymbolKind'
     """The kind of this symbol."""
-    tags: NotRequired[List['SymbolTag']]
+    tags: NotRequired[list['SymbolTag']]
     """Tags for this symbol.
 
     @since 3.16.0"""
@@ -2828,7 +2828,7 @@ class DocumentRangesFormattingParams(TypedDict):
     @proposed"""
     textDocument: 'TextDocumentIdentifier'
     """The document to format."""
-    ranges: List['Range']
+    ranges: list['Range']
     """The ranges to format"""
     options: 'FormattingOptions'
     """The format options"""
@@ -2860,7 +2860,7 @@ class DocumentOnTypeFormattingRegistrationOptions(TypedDict):
     the document selector provided on the client side will be used."""
     firstTriggerCharacter: str
     """A character on which formatting should be triggered, like `{`."""
-    moreTriggerCharacter: NotRequired[List[str]]
+    moreTriggerCharacter: NotRequired[list[str]]
     """More trigger characters."""
 
 
@@ -2902,7 +2902,7 @@ class ExecuteCommandParams(TypedDict):
     """The parameters of a {@link ExecuteCommandRequest}."""
     command: str
     """The identifier of the actual command handler."""
-    arguments: NotRequired[List['LSPAny']]
+    arguments: NotRequired[list['LSPAny']]
     """Arguments that the command should be invoked with."""
     workDoneToken: NotRequired['ProgressToken']
     """An optional token that a server can use to report work done progress."""
@@ -2910,7 +2910,7 @@ class ExecuteCommandParams(TypedDict):
 
 class ExecuteCommandRegistrationOptions(TypedDict):
     """Registration options for a {@link ExecuteCommandRequest}."""
-    commands: List[str]
+    commands: list[str]
     """The commands to be executed on the server"""
 
 
@@ -3096,9 +3096,9 @@ class TypeDefinitionOptions(TypedDict):
 
 class WorkspaceFoldersChangeEvent(TypedDict):
     """The workspace folder change event."""
-    added: List['WorkspaceFolder']
+    added: list['WorkspaceFolder']
     """The array of added workspace folders"""
-    removed: List['WorkspaceFolder']
+    removed: list['WorkspaceFolder']
     """The array of the removed workspace folders"""
 
 
@@ -3205,7 +3205,7 @@ class SemanticTokensEdit(TypedDict):
     """The start offset of the edit."""
     deleteCount: Uint
     """The count of elements to remove."""
-    data: NotRequired[List[Uint]]
+    data: NotRequired[list[Uint]]
     """The elements to insert."""
 
 
@@ -3228,7 +3228,7 @@ class TextDocumentEdit(TypedDict):
     kind of ordering. However the edits must be non overlapping."""
     textDocument: 'OptionalVersionedTextDocumentIdentifier'
     """The text document to change."""
-    edits: List[Union['TextEdit', 'AnnotatedTextEdit', 'SnippetTextEdit']]
+    edits: list[Union['TextEdit', 'AnnotatedTextEdit', 'SnippetTextEdit']]
     """The edits to be applied.
 
     @since 3.16.0 - support for AnnotatedTextEdit. This is guarded using a
@@ -3464,7 +3464,7 @@ class RelatedFullDocumentDiagnosticReport(TypedDict):
     """A full diagnostic report with a set of related documents.
 
     @since 3.17.0"""
-    relatedDocuments: NotRequired[Dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
+    relatedDocuments: NotRequired[dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
     """Diagnostics of related documents. This information is useful
     in programming languages where code in a file A can generate
     diagnostics in a file B which A depends on. An example of
@@ -3478,7 +3478,7 @@ class RelatedFullDocumentDiagnosticReport(TypedDict):
     """An optional result id. If provided it will
     be sent on the next diagnostic request for the
     same document."""
-    items: List['Diagnostic']
+    items: list['Diagnostic']
     """The actual items."""
 
 
@@ -3486,7 +3486,7 @@ class RelatedUnchangedDocumentDiagnosticReport(TypedDict):
     """An unchanged diagnostic report with a set of related documents.
 
     @since 3.17.0"""
-    relatedDocuments: NotRequired[Dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
+    relatedDocuments: NotRequired[dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
     """Diagnostics of related documents. This information is useful
     in programming languages where code in a file A can generate
     diagnostics in a file B which A depends on. An example of
@@ -3514,7 +3514,7 @@ class FullDocumentDiagnosticReport(TypedDict):
     """An optional result id. If provided it will
     be sent on the next diagnostic request for the
     same document."""
-    items: List['Diagnostic']
+    items: list['Diagnostic']
     """The actual items."""
 
 
@@ -3577,7 +3577,7 @@ class NotebookDocument(TypedDict):
     document.
 
     Note: should always be an object literal (e.g. LSPObject)"""
-    cells: List['NotebookCell']
+    cells: list['NotebookCell']
     """The cells of a notebook."""
 
 
@@ -3609,7 +3609,7 @@ class NotebookDocumentSyncOptions(TypedDict):
     cell will be synced.
 
     @since 3.17.0"""
-    notebookSelector: List[Union['NotebookDocumentFilterWithNotebook', 'NotebookDocumentFilterWithCells']]
+    notebookSelector: list[Union['NotebookDocumentFilterWithNotebook', 'NotebookDocumentFilterWithCells']]
     """The notebooks to be synced"""
     save: NotRequired[bool]
     """Whether save notification should be forwarded to
@@ -3687,7 +3687,7 @@ class TextDocumentContentOptions(TypedDict):
 
     @since 3.18.0
     @proposed"""
-    schemes: List[str]
+    schemes: list[str]
     """The schemes for which the server provides content."""
 
 
@@ -3712,7 +3712,7 @@ class Unregistration(TypedDict):
 
 
 class WorkspaceFoldersInitializeParams(TypedDict):
-    workspaceFolders: NotRequired[Union[List['WorkspaceFolder'], None]]
+    workspaceFolders: NotRequired[Union[list['WorkspaceFolder'], None]]
     """The workspace folders configured in the client when the server starts.
 
     This property is only available if the client supports workspace folders.
@@ -3900,11 +3900,11 @@ class Diagnostic(TypedDict):
     appears in the user interface."""
     message: str
     """The diagnostic's message. It usually appears in the user interface"""
-    tags: NotRequired[List['DiagnosticTag']]
+    tags: NotRequired[list['DiagnosticTag']]
     """Additional metadata about the diagnostic.
 
     @since 3.15.0"""
-    relatedInformation: NotRequired[List['DiagnosticRelatedInformation']]
+    relatedInformation: NotRequired[list['DiagnosticRelatedInformation']]
     """An array of related diagnostic information, e.g. when symbol-names within
     a scope collide all definitions can be marked via this property."""
     data: NotRequired['LSPAny']
@@ -3963,7 +3963,7 @@ class CompletionItemDefaults(TypedDict):
     capability.
 
     @since 3.17.0"""
-    commitCharacters: NotRequired[List[str]]
+    commitCharacters: NotRequired[list[str]]
     """A default commit character set.
 
     @since 3.17.0"""
@@ -4046,7 +4046,7 @@ class CompletionItemApplyKinds(TypedDict):
 
 class CompletionOptions(TypedDict):
     """Completion options."""
-    triggerCharacters: NotRequired[List[str]]
+    triggerCharacters: NotRequired[list[str]]
     """Most tools trigger completion request automatically without explicitly requesting
     it using a keyboard shortcut (e.g. Ctrl+Space). Typically they do so when the user
     starts to type an identifier. For example if the user types `c` in a JavaScript file
@@ -4055,7 +4055,7 @@ class CompletionOptions(TypedDict):
 
     If code complete should automatically be trigger on characters not being valid inside
     an identifier (for example `.` in JavaScript) list them in `triggerCharacters`."""
-    allCommitCharacters: NotRequired[List[str]]
+    allCommitCharacters: NotRequired[list[str]]
     """The list of all possible characters that commit a completion. This field can be used
     if clients don't support individual commit characters per completion item. See
     `ClientCapabilities.textDocument.completion.completionItem.commitCharactersSupport`
@@ -4112,7 +4112,7 @@ class SignatureInformation(TypedDict):
     documentation: NotRequired[Union[str, 'MarkupContent']]
     """The human-readable doc-comment of this signature. Will be shown
     in the UI but can be omitted."""
-    parameters: NotRequired[List['ParameterInformation']]
+    parameters: NotRequired[list['ParameterInformation']]
     """The parameters of this signature."""
     activeParameter: NotRequired[Union[Uint, None]]
     """The index of the active parameter.
@@ -4130,9 +4130,9 @@ class SignatureInformation(TypedDict):
 
 class SignatureHelpOptions(TypedDict):
     """Server Capabilities for a {@link SignatureHelpRequest}."""
-    triggerCharacters: NotRequired[List[str]]
+    triggerCharacters: NotRequired[list[str]]
     """List of characters that trigger signature help automatically."""
-    retriggerCharacters: NotRequired[List[str]]
+    retriggerCharacters: NotRequired[list[str]]
     """List of characters that re-trigger signature help.
 
     These trigger characters are only active when signature help is already showing. All trigger characters
@@ -4170,7 +4170,7 @@ class BaseSymbolInformation(TypedDict):
     """The name of this symbol."""
     kind: 'SymbolKind'
     """The kind of this symbol."""
-    tags: NotRequired[List['SymbolTag']]
+    tags: NotRequired[list['SymbolTag']]
     """Tags for this symbol.
 
     @since 3.16.0"""
@@ -4194,13 +4194,13 @@ class DocumentSymbolOptions(TypedDict):
 class CodeActionContext(TypedDict):
     """Contains additional diagnostic information about the context in which
     a {@link CodeActionProvider.provideCodeActions code action} is run."""
-    diagnostics: List['Diagnostic']
+    diagnostics: list['Diagnostic']
     """An array of diagnostics known on the client side overlapping the range provided to the
     `textDocument/codeAction` request. They are provided so that the server knows which
     errors are currently presented to the user for the given range. There is no guarantee
     that these accurately reflect the error state of the resource. The primary parameter
     to compute code actions is the provided range."""
-    only: NotRequired[List['CodeActionKind']]
+    only: NotRequired[list['CodeActionKind']]
     """Requested kind of actions to return.
 
     Actions not of this kind are filtered out by the client before being shown. So servers
@@ -4223,12 +4223,12 @@ class CodeActionDisabled(TypedDict):
 
 class CodeActionOptions(TypedDict):
     """Provider options for a {@link CodeActionRequest}."""
-    codeActionKinds: NotRequired[List['CodeActionKind']]
+    codeActionKinds: NotRequired[list['CodeActionKind']]
     """CodeActionKinds that this server may return.
 
     The list of kinds may be generic, such as `CodeActionKind.Refactor`, or the server
     may list out every specific kind they provide."""
-    documentation: NotRequired[List['CodeActionKindDocumentation']]
+    documentation: NotRequired[list['CodeActionKindDocumentation']]
     """Static documentation for a class of code actions.
 
     Documentation from the provider should be shown in the code actions menu if either:
@@ -4322,7 +4322,7 @@ class DocumentOnTypeFormattingOptions(TypedDict):
     """Provider options for a {@link DocumentOnTypeFormattingRequest}."""
     firstTriggerCharacter: str
     """A character on which formatting should be triggered, like `{`."""
-    moreTriggerCharacter: NotRequired[List[str]]
+    moreTriggerCharacter: NotRequired[list[str]]
     """More trigger characters."""
 
 
@@ -4348,7 +4348,7 @@ class PrepareRenameDefaultBehavior(TypedDict):
 
 class ExecuteCommandOptions(TypedDict):
     """The server capabilities of a {@link ExecuteCommandRequest}."""
-    commands: List[str]
+    commands: list[str]
     """The commands to be executed on the server"""
     workDoneProgress: NotRequired[bool]
 
@@ -4364,9 +4364,9 @@ class WorkspaceEditMetadata(TypedDict):
 
 class SemanticTokensLegend(TypedDict):
     """@since 3.16.0"""
-    tokenTypes: List[str]
+    tokenTypes: list[str]
     """The token types a server uses."""
-    tokenModifiers: List[str]
+    tokenModifiers: list[str]
     """The token modifiers a server uses."""
 
 
@@ -4487,7 +4487,7 @@ class WorkspaceFullDocumentDiagnosticReport(TypedDict):
     """An optional result id. If provided it will
     be sent on the next diagnostic request for the
     same document."""
-    items: List['Diagnostic']
+    items: list['Diagnostic']
     """The actual items."""
 
 
@@ -4538,7 +4538,7 @@ class NotebookDocumentFilterWithNotebook(TypedDict):
     """The notebook to be synced If a string
     value is provided it matches against the
     notebook type. '*' matches every notebook."""
-    cells: NotRequired[List['NotebookCellLanguage']]
+    cells: NotRequired[list['NotebookCellLanguage']]
     """The cells of the matching notebook to be synced."""
 
 
@@ -4548,7 +4548,7 @@ class NotebookDocumentFilterWithCells(TypedDict):
     """The notebook to be synced If a string
     value is provided it matches against the
     notebook type. '*' matches every notebook."""
-    cells: List['NotebookCellLanguage']
+    cells: list['NotebookCellLanguage']
     """The cells of the matching notebook to be synced."""
 
 
@@ -4559,10 +4559,10 @@ class NotebookDocumentCellChanges(TypedDict):
     structure: NotRequired['NotebookDocumentCellChangeStructure']
     """Changes to the cell structure to add or
     remove cells."""
-    data: NotRequired[List['NotebookCell']]
+    data: NotRequired[list['NotebookCell']]
     """Changes to notebook cells properties like its
     kind, execution summary or metadata."""
-    textContent: NotRequired[List['NotebookDocumentCellContentChanges']]
+    textContent: NotRequired[list['NotebookDocumentCellContentChanges']]
     """Changes to the text content of notebook cells."""
 
 
@@ -4709,7 +4709,7 @@ class MarkedStringWithLanguage(TypedDict):
 class ParameterInformation(TypedDict):
     """Represents a parameter of a callable-signature. A parameter can
     have a label and a doc-comment."""
-    label: Union[str, List[Union[Uint, Uint]]]
+    label: Union[str, list[Union[Uint, Uint]]]
     """The label of this parameter information.
 
     Either a string or an inclusive start and exclusive end offsets within its containing
@@ -4790,9 +4790,9 @@ class NotebookDocumentCellChangeStructure(TypedDict):
     @since 3.18.0"""
     array: 'NotebookCellArrayChange'
     """The change to the cell array."""
-    didOpen: NotRequired[List['TextDocumentItem']]
+    didOpen: NotRequired[list['TextDocumentItem']]
     """Additional opened cell text documents."""
-    didClose: NotRequired[List['TextDocumentIdentifier']]
+    didClose: NotRequired[list['TextDocumentIdentifier']]
     """Additional closed cell text documents."""
 
 
@@ -4801,7 +4801,7 @@ class NotebookDocumentCellContentChanges(TypedDict):
 
     @since 3.18.0"""
     document: 'VersionedTextDocumentIdentifier'
-    changes: List['TextDocumentContentChangeEvent']
+    changes: list['TextDocumentContentChangeEvent']
 
 
 class WorkspaceClientCapabilities(TypedDict):
@@ -5021,7 +5021,7 @@ class GeneralClientCapabilities(TypedDict):
     """Client capabilities specific to the client's markdown parser.
 
     @since 3.16.0"""
-    positionEncodings: NotRequired[List['PositionEncodingKind']]
+    positionEncodings: NotRequired[list['PositionEncodingKind']]
     """The position encodings supported by the client. Client and server
     have to agree on the same position encoding to ensure that offsets
     (e.g. character position in a line) are interpreted the same on both
@@ -5179,14 +5179,14 @@ class NotebookCellArrayChange(TypedDict):
     """The start oftest of the cell that changed."""
     deleteCount: Uint
     """The deleted cells"""
-    cells: NotRequired[List['NotebookCell']]
+    cells: NotRequired[list['NotebookCell']]
     """The new cells, if any"""
 
 
 class WorkspaceEditClientCapabilities(TypedDict):
     documentChanges: NotRequired[bool]
     """The client supports versioned document changes in `WorkspaceEdit`s"""
-    resourceOperations: NotRequired[List['ResourceOperationKind']]
+    resourceOperations: NotRequired[list['ResourceOperationKind']]
     """The resource operations the client supports. Clients should at least
     support 'create', 'rename' and 'delete' files and folders.
 
@@ -5426,7 +5426,7 @@ class CompletionClientCapabilities(TypedDict):
 class HoverClientCapabilities(TypedDict):
     dynamicRegistration: NotRequired[bool]
     """Whether hover supports dynamic registration."""
-    contentFormat: NotRequired[List['MarkupKind']]
+    contentFormat: NotRequired[list['MarkupKind']]
     """Client supports the following content formats for the content
     property. The order describes the preferred format of the client."""
 
@@ -5731,11 +5731,11 @@ class SemanticTokensClientCapabilities(TypedDict):
     `request.range` are both set to true but the server only provides a
     range provider the client might not render a minimap correctly or might
     even decide to not show any semantic tokens at all."""
-    tokenTypes: List[str]
+    tokenTypes: list[str]
     """The token types that the client supports."""
-    tokenModifiers: List[str]
+    tokenModifiers: list[str]
     """The token modifiers that the client supports."""
-    formats: List['TokenFormat']
+    formats: list['TokenFormat']
     """The token formats the clients supports."""
     overlappingTokenSupport: NotRequired[bool]
     """Whether the client supports tokens that can overlap each other."""
@@ -5878,7 +5878,7 @@ class StaleRequestSupportOptions(TypedDict):
     """@since 3.18.0"""
     cancel: bool
     """The client will actively cancel the request."""
-    retryOnContentModified: List[str]
+    retryOnContentModified: list[str]
     """The list of requests for which the client
     will retry the request if it receives a
     response with error code `ContentModified`"""
@@ -5902,7 +5902,7 @@ class MarkdownClientCapabilities(TypedDict):
     """The name of the parser."""
     version: NotRequired[str]
     """The version of the parser."""
-    allowedTags: NotRequired[List[str]]
+    allowedTags: NotRequired[list[str]]
     """A list of HTML tags that the client allows / supports in
     Markdown.
 
@@ -5919,7 +5919,7 @@ class ChangeAnnotationsSupportOptions(TypedDict):
 
 class ClientSymbolKindOptions(TypedDict):
     """@since 3.18.0"""
-    valueSet: NotRequired[List['SymbolKind']]
+    valueSet: NotRequired[list['SymbolKind']]
     """The symbol kind values the client supports. When this
     property exists the client also guarantees that it will
     handle values outside its set gracefully and falls back
@@ -5932,13 +5932,13 @@ class ClientSymbolKindOptions(TypedDict):
 
 class ClientSymbolTagOptions(TypedDict):
     """@since 3.18.0"""
-    valueSet: List['SymbolTag']
+    valueSet: list['SymbolTag']
     """The tags supported by the client."""
 
 
 class ClientSymbolResolveOptions(TypedDict):
     """@since 3.18.0"""
-    properties: List[str]
+    properties: list[str]
     """The properties that a client can resolve lazily. Usually
     `location.range`"""
 
@@ -5954,7 +5954,7 @@ class ClientCompletionItemOptions(TypedDict):
     that is typing in one will update others too."""
     commitCharactersSupport: NotRequired[bool]
     """Client supports commit characters on a completion item."""
-    documentationFormat: NotRequired[List['MarkupKind']]
+    documentationFormat: NotRequired[list['MarkupKind']]
     """Client supports the following content formats for the documentation
     property. The order describes the preferred format of the client."""
     deprecatedSupport: NotRequired[bool]
@@ -5994,7 +5994,7 @@ class ClientCompletionItemOptions(TypedDict):
 
 class ClientCompletionItemOptionsKind(TypedDict):
     """@since 3.18.0"""
-    valueSet: NotRequired[List['CompletionItemKind']]
+    valueSet: NotRequired[list['CompletionItemKind']]
     """The completion item kind values the client supports. When this
     property exists the client also guarantees that it will
     handle values outside its set gracefully and falls back
@@ -6010,7 +6010,7 @@ class CompletionListCapabilities(TypedDict):
     capabilities.
 
     @since 3.17.0"""
-    itemDefaults: NotRequired[List[str]]
+    itemDefaults: NotRequired[list[str]]
     """The client supports the following itemDefaults on
     a completion list.
 
@@ -6035,7 +6035,7 @@ class CompletionListCapabilities(TypedDict):
 
 class ClientSignatureInformationOptions(TypedDict):
     """@since 3.18.0"""
-    documentationFormat: NotRequired[List['MarkupKind']]
+    documentationFormat: NotRequired[list['MarkupKind']]
     """Client supports the following content formats for the documentation
     property. The order describes the preferred format of the client."""
     parameterInformation: NotRequired['ClientSignatureParameterInformationOptions']
@@ -6063,25 +6063,25 @@ class ClientCodeActionLiteralOptions(TypedDict):
 
 class ClientCodeActionResolveOptions(TypedDict):
     """@since 3.18.0"""
-    properties: List[str]
+    properties: list[str]
     """The properties that a client can resolve lazily."""
 
 
 class CodeActionTagOptions(TypedDict):
     """@since 3.18.0 - proposed"""
-    valueSet: List['CodeActionTag']
+    valueSet: list['CodeActionTag']
     """The tags supported by the client."""
 
 
 class ClientCodeLensResolveOptions(TypedDict):
     """@since 3.18.0"""
-    properties: List[str]
+    properties: list[str]
     """The properties that a client can resolve lazily."""
 
 
 class ClientFoldingRangeKindOptions(TypedDict):
     """@since 3.18.0"""
-    valueSet: NotRequired[List['FoldingRangeKind']]
+    valueSet: NotRequired[list['FoldingRangeKind']]
     """The folding range kind values the client supports. When this
     property exists the client also guarantees that it will
     handle values outside its set gracefully and falls back
@@ -6130,7 +6130,7 @@ class ClientSemanticTokensRequestOptions(TypedDict):
 
 class ClientInlayHintResolveOptions(TypedDict):
     """@since 3.18.0"""
-    properties: List[str]
+    properties: list[str]
     """The properties that a client can resolve lazily."""
 
 
@@ -6144,19 +6144,19 @@ class ClientShowMessageActionItemOptions(TypedDict):
 
 class CompletionItemTagOptions(TypedDict):
     """@since 3.18.0"""
-    valueSet: List['CompletionItemTag']
+    valueSet: list['CompletionItemTag']
     """The tags supported by the client."""
 
 
 class ClientCompletionItemResolveOptions(TypedDict):
     """@since 3.18.0"""
-    properties: List[str]
+    properties: list[str]
     """The properties that a client can resolve lazily."""
 
 
 class ClientCompletionItemInsertTextModeOptions(TypedDict):
     """@since 3.18.0"""
-    valueSet: List['InsertTextMode']
+    valueSet: list['InsertTextMode']
 
 
 class ClientSignatureParameterInformationOptions(TypedDict):
@@ -6170,7 +6170,7 @@ class ClientSignatureParameterInformationOptions(TypedDict):
 
 class ClientCodeActionKindOptions(TypedDict):
     """@since 3.18.0"""
-    valueSet: List['CodeActionKind']
+    valueSet: list['CodeActionKind']
     """The code action kind values the client supports. When this
     property exists the client also guarantees that it will
     handle values outside its set gracefully and falls back
@@ -6179,7 +6179,7 @@ class ClientCodeActionKindOptions(TypedDict):
 
 class ClientDiagnosticsTagOptions(TypedDict):
     """@since 3.18.0"""
-    valueSet: List['DiagnosticTag']
+    valueSet: list['DiagnosticTag']
     """The tags supported by the client."""
 
 

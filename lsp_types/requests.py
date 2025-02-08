@@ -1,6 +1,6 @@
 from __future__ import annotations
 # Code generated. DO NOT EDIT.
-from typing import Any, Awaitable, Callable, List, Mapping, Union
+from typing import Any, Awaitable, Callable, Mapping, Union
 from . import types
 
 
@@ -11,67 +11,67 @@ class Request:
     def __init__(self, dispatcher: RequestDispatcher):
         self.dispatcher = dispatcher
 
-    async def implementation(self, params: types.ImplementationParams) -> Union[types.Definition, List[types.LocationLink], None]:
+    async def implementation(self, params: types.ImplementationParams) -> Union[types.Definition, list[types.LocationLink], None]:
         """A request to resolve the implementation locations of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPositionParams}
         the response is of type {@link Definition} or a Thenable that resolves to such."""
         return await self.dispatcher("textDocument/implementation", params)
 
-    async def type_definition(self, params: types.TypeDefinitionParams) -> Union[types.Definition, List[types.LocationLink], None]:
+    async def type_definition(self, params: types.TypeDefinitionParams) -> Union[types.Definition, list[types.LocationLink], None]:
         """A request to resolve the type definition locations of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPositionParams}
         the response is of type {@link Definition} or a Thenable that resolves to such."""
         return await self.dispatcher("textDocument/typeDefinition", params)
 
-    async def document_color(self, params: types.DocumentColorParams) -> List[types.ColorInformation]:
+    async def document_color(self, params: types.DocumentColorParams) -> list[types.ColorInformation]:
         """A request to list all color symbols found in a given text document. The request's
         parameter is of type {@link DocumentColorParams} the
         response is of type {@link ColorInformation ColorInformation[]} or a Thenable
         that resolves to such."""
         return await self.dispatcher("textDocument/documentColor", params)
 
-    async def color_presentation(self, params: types.ColorPresentationParams) -> List[types.ColorPresentation]:
+    async def color_presentation(self, params: types.ColorPresentationParams) -> list[types.ColorPresentation]:
         """A request to list all presentation for a color. The request's
         parameter is of type {@link ColorPresentationParams} the
         response is of type {@link ColorInformation ColorInformation[]} or a Thenable
         that resolves to such."""
         return await self.dispatcher("textDocument/colorPresentation", params)
 
-    async def folding_range(self, params: types.FoldingRangeParams) -> Union[List[types.FoldingRange], None]:
+    async def folding_range(self, params: types.FoldingRangeParams) -> Union[list[types.FoldingRange], None]:
         """A request to provide folding ranges in a document. The request's
         parameter is of type {@link FoldingRangeParams}, the
         response is of type {@link FoldingRangeList} or a Thenable
         that resolves to such."""
         return await self.dispatcher("textDocument/foldingRange", params)
 
-    async def declaration(self, params: types.DeclarationParams) -> Union[types.Declaration, List[types.LocationLink], None]:
+    async def declaration(self, params: types.DeclarationParams) -> Union[types.Declaration, list[types.LocationLink], None]:
         """A request to resolve the type definition locations of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPositionParams}
         the response is of type {@link Declaration} or a typed array of {@link DeclarationLink}
         or a Thenable that resolves to such."""
         return await self.dispatcher("textDocument/declaration", params)
 
-    async def selection_range(self, params: types.SelectionRangeParams) -> Union[List[types.SelectionRange], None]:
+    async def selection_range(self, params: types.SelectionRangeParams) -> Union[list[types.SelectionRange], None]:
         """A request to provide selection ranges in a document. The request's
         parameter is of type {@link SelectionRangeParams}, the
         response is of type {@link SelectionRange SelectionRange[]} or a Thenable
         that resolves to such."""
         return await self.dispatcher("textDocument/selectionRange", params)
 
-    async def prepare_call_hierarchy(self, params: types.CallHierarchyPrepareParams) -> Union[List[types.CallHierarchyItem], None]:
+    async def prepare_call_hierarchy(self, params: types.CallHierarchyPrepareParams) -> Union[list[types.CallHierarchyItem], None]:
         """A request to result a `CallHierarchyItem` in a document at a given position.
         Can be used as an input to an incoming or outgoing call hierarchy.
 
         @since 3.16.0"""
         return await self.dispatcher("textDocument/prepareCallHierarchy", params)
 
-    async def incoming_calls(self, params: types.CallHierarchyIncomingCallsParams) -> Union[List[types.CallHierarchyIncomingCall], None]:
+    async def incoming_calls(self, params: types.CallHierarchyIncomingCallsParams) -> Union[list[types.CallHierarchyIncomingCall], None]:
         """A request to resolve the incoming calls for a given `CallHierarchyItem`.
 
         @since 3.16.0"""
         return await self.dispatcher("callHierarchy/incomingCalls", params)
 
-    async def outgoing_calls(self, params: types.CallHierarchyOutgoingCallsParams) -> Union[List[types.CallHierarchyOutgoingCall], None]:
+    async def outgoing_calls(self, params: types.CallHierarchyOutgoingCallsParams) -> Union[list[types.CallHierarchyOutgoingCall], None]:
         """A request to resolve the outgoing calls for a given `CallHierarchyItem`.
 
         @since 3.16.0"""
@@ -120,32 +120,32 @@ class Request:
         @since 3.16.0"""
         return await self.dispatcher("workspace/willDeleteFiles", params)
 
-    async def moniker(self, params: types.MonikerParams) -> Union[List[types.Moniker], None]:
+    async def moniker(self, params: types.MonikerParams) -> Union[list[types.Moniker], None]:
         """A request to get the moniker of a symbol at a given text document position.
         The request parameter is of type {@link TextDocumentPositionParams}.
         The response is of type {@link Moniker Moniker[]} or `null`."""
         return await self.dispatcher("textDocument/moniker", params)
 
-    async def prepare_type_hierarchy(self, params: types.TypeHierarchyPrepareParams) -> Union[List[types.TypeHierarchyItem], None]:
+    async def prepare_type_hierarchy(self, params: types.TypeHierarchyPrepareParams) -> Union[list[types.TypeHierarchyItem], None]:
         """A request to result a `TypeHierarchyItem` in a document at a given position.
         Can be used as an input to a subtypes or supertypes type hierarchy.
 
         @since 3.17.0"""
         return await self.dispatcher("textDocument/prepareTypeHierarchy", params)
 
-    async def type_hierarchy_supertypes(self, params: types.TypeHierarchySupertypesParams) -> Union[List[types.TypeHierarchyItem], None]:
+    async def type_hierarchy_supertypes(self, params: types.TypeHierarchySupertypesParams) -> Union[list[types.TypeHierarchyItem], None]:
         """A request to resolve the supertypes for a given `TypeHierarchyItem`.
 
         @since 3.17.0"""
         return await self.dispatcher("typeHierarchy/supertypes", params)
 
-    async def type_hierarchy_subtypes(self, params: types.TypeHierarchySubtypesParams) -> Union[List[types.TypeHierarchyItem], None]:
+    async def type_hierarchy_subtypes(self, params: types.TypeHierarchySubtypesParams) -> Union[list[types.TypeHierarchyItem], None]:
         """A request to resolve the subtypes for a given `TypeHierarchyItem`.
 
         @since 3.17.0"""
         return await self.dispatcher("typeHierarchy/subtypes", params)
 
-    async def inline_value(self, params: types.InlineValueParams) -> Union[List[types.InlineValue], None]:
+    async def inline_value(self, params: types.InlineValueParams) -> Union[list[types.InlineValue], None]:
         """A request to provide inline values in a document. The request's parameter is of
         type {@link InlineValueParams}, the response is of type
         {@link InlineValue InlineValue[]} or a Thenable that resolves to such.
@@ -153,7 +153,7 @@ class Request:
         @since 3.17.0"""
         return await self.dispatcher("textDocument/inlineValue", params)
 
-    async def inlay_hint(self, params: types.InlayHintParams) -> Union[List[types.InlayHint], None]:
+    async def inlay_hint(self, params: types.InlayHintParams) -> Union[list[types.InlayHint], None]:
         """A request to provide inlay hints in a document. The request's parameter is of
         type {@link InlayHintsParams}, the response is of type
         {@link InlayHint InlayHint[]} or a Thenable that resolves to such.
@@ -181,7 +181,7 @@ class Request:
         @since 3.17.0"""
         return await self.dispatcher("workspace/diagnostic", params)
 
-    async def inline_completion(self, params: types.InlineCompletionParams) -> Union[types.InlineCompletionList, List[types.InlineCompletionItem], None]:
+    async def inline_completion(self, params: types.InlineCompletionParams) -> Union[types.InlineCompletionList, list[types.InlineCompletionItem], None]:
         """A request to provide inline completions in a document. The request's parameter is of
         type {@link InlineCompletionParams}, the response is of type
         {@link InlineCompletion InlineCompletion[]} or a Thenable that resolves to such.
@@ -213,7 +213,7 @@ class Request:
         is the exit event."""
         return await self.dispatcher("shutdown", None)
 
-    async def will_save_wait_until(self, params: types.WillSaveTextDocumentParams) -> Union[List[types.TextEdit], None]:
+    async def will_save_wait_until(self, params: types.WillSaveTextDocumentParams) -> Union[list[types.TextEdit], None]:
         """A document will save request is sent from the client to the server before
         the document is actually saved. The request can return an array of TextEdits
         which will be applied to the text document before it is saved. Please note that
@@ -222,7 +222,7 @@ class Request:
         reliable."""
         return await self.dispatcher("textDocument/willSaveWaitUntil", params)
 
-    async def completion(self, params: types.CompletionParams) -> Union[List[types.CompletionItem], types.CompletionList, None]:
+    async def completion(self, params: types.CompletionParams) -> Union[list[types.CompletionItem], types.CompletionList, None]:
         """Request to request completion at a given text document position. The request's
         parameter is of type {@link TextDocumentPosition} the response
         is of type {@link CompletionItem CompletionItem[]} or {@link CompletionList}
@@ -249,35 +249,35 @@ class Request:
     async def signature_help(self, params: types.SignatureHelpParams) -> Union[types.SignatureHelp, None]:
         return await self.dispatcher("textDocument/signatureHelp", params)
 
-    async def definition(self, params: types.DefinitionParams) -> Union[types.Definition, List[types.LocationLink], None]:
+    async def definition(self, params: types.DefinitionParams) -> Union[types.Definition, list[types.LocationLink], None]:
         """A request to resolve the definition location of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPosition}
         the response is of either type {@link Definition} or a typed array of
         {@link DefinitionLink} or a Thenable that resolves to such."""
         return await self.dispatcher("textDocument/definition", params)
 
-    async def references(self, params: types.ReferenceParams) -> Union[List[types.Location], None]:
+    async def references(self, params: types.ReferenceParams) -> Union[list[types.Location], None]:
         """A request to resolve project-wide references for the symbol denoted
         by the given text document position. The request's parameter is of
         type {@link ReferenceParams} the response is of type
         {@link Location Location[]} or a Thenable that resolves to such."""
         return await self.dispatcher("textDocument/references", params)
 
-    async def document_highlight(self, params: types.DocumentHighlightParams) -> Union[List[types.DocumentHighlight], None]:
+    async def document_highlight(self, params: types.DocumentHighlightParams) -> Union[list[types.DocumentHighlight], None]:
         """Request to resolve a {@link DocumentHighlight} for a given
         text document position. The request's parameter is of type {@link TextDocumentPosition}
         the request response is an array of type {@link DocumentHighlight}
         or a Thenable that resolves to such."""
         return await self.dispatcher("textDocument/documentHighlight", params)
 
-    async def document_symbol(self, params: types.DocumentSymbolParams) -> Union[List[types.SymbolInformation], List[types.DocumentSymbol], None]:
+    async def document_symbol(self, params: types.DocumentSymbolParams) -> Union[list[types.SymbolInformation], list[types.DocumentSymbol], None]:
         """A request to list all symbols found in a given text document. The request's
         parameter is of type {@link TextDocumentIdentifier} the
         response is of type {@link SymbolInformation SymbolInformation[]} or a Thenable
         that resolves to such."""
         return await self.dispatcher("textDocument/documentSymbol", params)
 
-    async def code_action(self, params: types.CodeActionParams) -> Union[List[Union[types.Command, types.CodeAction]], None]:
+    async def code_action(self, params: types.CodeActionParams) -> Union[list[Union[types.Command, types.CodeAction]], None]:
         """A request to provide commands for the given text document and range."""
         return await self.dispatcher("textDocument/codeAction", params)
 
@@ -287,7 +287,7 @@ class Request:
         is of type {@link CodeAction} or a Thenable that resolves to such."""
         return await self.dispatcher("codeAction/resolve", params)
 
-    async def workspace_symbol(self, params: types.WorkspaceSymbolParams) -> Union[List[types.SymbolInformation], List[types.WorkspaceSymbol], None]:
+    async def workspace_symbol(self, params: types.WorkspaceSymbolParams) -> Union[list[types.SymbolInformation], list[types.WorkspaceSymbol], None]:
         """A request to list project-wide symbols matching the query string given
         by the {@link WorkspaceSymbolParams}. The response is
         of type {@link SymbolInformation SymbolInformation[]} or a Thenable that
@@ -306,7 +306,7 @@ class Request:
         @since 3.17.0"""
         return await self.dispatcher("workspaceSymbol/resolve", params)
 
-    async def code_lens(self, params: types.CodeLensParams) -> Union[List[types.CodeLens], None]:
+    async def code_lens(self, params: types.CodeLensParams) -> Union[list[types.CodeLens], None]:
         """A request to provide code lens for the given text document."""
         return await self.dispatcher("textDocument/codeLens", params)
 
@@ -314,7 +314,7 @@ class Request:
         """A request to resolve a command for a given code lens."""
         return await self.dispatcher("codeLens/resolve", params)
 
-    async def document_link(self, params: types.DocumentLinkParams) -> Union[List[types.DocumentLink], None]:
+    async def document_link(self, params: types.DocumentLinkParams) -> Union[list[types.DocumentLink], None]:
         """A request to provide document links"""
         return await self.dispatcher("textDocument/documentLink", params)
 
@@ -324,22 +324,22 @@ class Request:
         is of type {@link DocumentLink} or a Thenable that resolves to such."""
         return await self.dispatcher("documentLink/resolve", params)
 
-    async def formatting(self, params: types.DocumentFormattingParams) -> Union[List[types.TextEdit], None]:
+    async def formatting(self, params: types.DocumentFormattingParams) -> Union[list[types.TextEdit], None]:
         """A request to format a whole document."""
         return await self.dispatcher("textDocument/formatting", params)
 
-    async def range_formatting(self, params: types.DocumentRangeFormattingParams) -> Union[List[types.TextEdit], None]:
+    async def range_formatting(self, params: types.DocumentRangeFormattingParams) -> Union[list[types.TextEdit], None]:
         """A request to format a range in a document."""
         return await self.dispatcher("textDocument/rangeFormatting", params)
 
-    async def ranges_formatting(self, params: types.DocumentRangesFormattingParams) -> Union[List[types.TextEdit], None]:
+    async def ranges_formatting(self, params: types.DocumentRangesFormattingParams) -> Union[list[types.TextEdit], None]:
         """A request to format ranges in a document.
 
         @since 3.18.0
         @proposed"""
         return await self.dispatcher("textDocument/rangesFormatting", params)
 
-    async def on_type_formatting(self, params: types.DocumentOnTypeFormattingParams) -> Union[List[types.TextEdit], None]:
+    async def on_type_formatting(self, params: types.DocumentOnTypeFormattingParams) -> Union[list[types.TextEdit], None]:
         """A request to format a document on type."""
         return await self.dispatcher("textDocument/onTypeFormatting", params)
 

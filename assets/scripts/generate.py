@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 
-from typing import Dict, Literal  # noqa (for type hint comments)
+from typing import Literal
 from .lsp_schema import MetaModel
 from .utils.generate_enumerations import generate_enumerations
 from .utils.generate_structures import generate_structures
@@ -11,7 +11,7 @@ from .utils.generate_notifications import generate_notifications
 from .utils.helpers import get_new_literal_structures, reset_new_literal_structures, StructureKind, indentation
 
 
-ENUM_OVERRIDES = {
+ENUM_OVERRIDES: dict[str, Literal['StrEnum', 'IntFlag']] = {
     'CodeActionKind': 'StrEnum',
     'DocumentDiagnosticReportKind': 'StrEnum',
     'FailureHandlingKind': 'StrEnum',
@@ -28,7 +28,7 @@ ENUM_OVERRIDES = {
     'TraceValue': 'StrEnum',
     'UniquenessLevel': 'StrEnum',
     'WatchKind': 'IntFlag',
-}  # type: Dict[str, Literal['StrEnum', 'IntFlag']]
+}
 
 
 def generate(preferred_structure_kind: StructureKind, output: str) -> None:
@@ -42,7 +42,7 @@ def generate(preferred_structure_kind: StructureKind, output: str) -> None:
             "from __future__ import annotations",
             "# Code generated. DO NOT EDIT.",
             f"# LSP v{specification_version}\n",
-            "from typing import Dict, List, Literal, TypedDict, Union, NotRequired",
+            "from typing import Literal, TypedDict, Union, NotRequired",
             "from enum import IntEnum, IntFlag, StrEnum\n\n",
             "URI = str",
             "DocumentUri = str",
@@ -75,7 +75,7 @@ generate(preferred_structure_kind=StructureKind.Class, output="./lsp_types/types
 def generate_req(output) -> None:
     content = f"""from __future__ import annotations
 # Code generated. DO NOT EDIT.
-from typing import Any, Awaitable, Callable, List, Mapping, Union
+from typing import Any, Awaitable, Callable, Mapping, Union
 from . import types
 
 

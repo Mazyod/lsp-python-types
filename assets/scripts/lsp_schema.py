@@ -1,6 +1,6 @@
 from __future__  import annotations
 
-from typing import List, Literal, TypedDict, Union, NotRequired
+from typing import Literal, TypedDict, Union, NotRequired
 
 _Type = Union["BaseType", "ReferenceType", "ArrayType", "MapType", "AndType", "OrType", "TupleType", "StructureLiteralType", "StringLiteralType", "IntegerLiteralType", "BooleanLiteralType"]
 _BaseTypes = Literal["URI", "DocumentUri", "integer", "uinteger", "decimal", "RegExp", "string", "boolean", "null"]
@@ -44,13 +44,13 @@ class StringLiteralType(TypedDict):
 
 class AndType(TypedDict):
     """ Represents an `and`type (e.g. TextDocumentParams & WorkDoneProgressParams`). """
-    items: List[_Type]
+    items: list[_Type]
     kind: Literal["and"]
 
 
 class OrType(TypedDict):
     """Represents an `or` type (e.g. `Location | LocationLink`). """
-    items: List[_Type]
+    items: list[_Type]
     kind: Literal["or"]
 
 
@@ -80,7 +80,7 @@ class Enumeration(TypedDict):
     since: NotRequired[str]
     supportsCustomValues: NotRequired[bool]
     type: EnumerationType
-    values: List[EnumerationEntry]
+    values: list[EnumerationEntry]
 
 
 class IntegerLiteralType(TypedDict):
@@ -113,7 +113,7 @@ class Notification(TypedDict):
     documentation: NotRequired[str]
     messageDirection: MessageDirection
     method: str
-    params: NotRequired[Union[_Type, List[_Type]]]
+    params: NotRequired[Union[_Type, list[_Type]]]
     proposed: NotRequired[bool]
     registrationMethod: NotRequired[str]
     """Optional a dynamic registration method if it different from the request's method."""
@@ -128,7 +128,7 @@ class Request(TypedDict):
     errorData: NotRequired[_Type]
     messageDirection: MessageDirection
     method: str
-    params: NotRequired[Union[_Type, List[_Type]]]
+    params: NotRequired[Union[_Type, list[_Type]]]
     partialResult: NotRequired[_Type]
     proposed: NotRequired[bool]
     registrationMethod: NotRequired[str]
@@ -140,12 +140,12 @@ class Request(TypedDict):
 class Structure(TypedDict):
     deprecated: NotRequired[str]
     documentation: NotRequired[str]
-    extends: NotRequired[List[_Type]]
+    extends: NotRequired[list[_Type]]
     """Structures extended from. This structures form a polymorphic type hierarchy."""
-    mixins: NotRequired[List[_Type]]
+    mixins: NotRequired[list[_Type]]
     """Structures to mix in. The properties of these structures are `copied` into this structure. Mixins don't form a polymorphic type hierarchy in LSP."""
     name: str
-    properties: List[Property]
+    properties: list[Property]
     proposed: NotRequired[bool]
     since: NotRequired[str]
 
@@ -154,7 +154,7 @@ class StructureLiteral(TypedDict):
     """Defines a unnamed structure of an object literal."""
     deprecated: NotRequired[str]
     documentation: NotRequired[str]
-    properties: List[Property]
+    properties: list[Property]
     proposed: NotRequired[bool]
     since: NotRequired[str]
 
@@ -168,7 +168,7 @@ class StructureLiteralType(TypedDict):
 class TupleType(TypedDict):
     """Represents a `tuple` type (e.g. `[integer, integer]`)."""
     kind: Literal["tuple"]
-    items: List[_Type]
+    items: list[_Type]
 
 
 class TypeAlias(TypedDict):
@@ -189,9 +189,9 @@ class MetaData(TypedDict):
 
 
 class MetaModel(TypedDict):
-    enumerations: List[Enumeration]
+    enumerations: list[Enumeration]
     metaData: MetaData
-    notifications: List[Notification]
-    requests: List[Request]
-    structures: List[Structure]
-    typeAliases: List[TypeAlias]
+    notifications: list[Notification]
+    requests: list[Request]
+    structures: list[Structure]
+    typeAliases: list[TypeAlias]

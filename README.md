@@ -10,10 +10,25 @@ pip install lsp-types
 
 ## Usage
 
+Using the LSP types:
+
 ```python
 import lsp_types
 
 # Use the types
+```
+
+Using an LSP session through stdio:
+
+```python
+from lsp_types.session import LSPSession, ProcessLaunchInfo
+
+process_info = ProcessLaunchInfo(cmd=[
+    "pyright-langserver", "--stdio"
+])
+
+async with LSPSession(process_info) as session:
+    await session.start()
 ```
 
 ## Development

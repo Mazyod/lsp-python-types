@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, List, Optional, Set, TypedDict, Union
+from typing import Any, TypedDict, Union
 from ..lsp_schema import _Type, BaseType, MapKeyType, Property
 import keyword
 
@@ -10,7 +10,7 @@ def capitalize(text: str) -> str:
     return text[0].upper() + text[1:]
 
 
-def format_comment(text: Optional[str], indent: str = "") -> str:
+def format_comment(text: str | None, indent: str = "") -> str:
     if text:
         lines = text.splitlines(keepends=True)
         lines = lines[:1] + [
@@ -20,7 +20,7 @@ def format_comment(text: Optional[str], indent: str = "") -> str:
     return indent + f'"""{text}"""' if text else ""
 
 
-new_literal_structures: Set[str] = set()
+new_literal_structures: set[str] = set()
 
 
 class SymbolNameTracker:
@@ -72,13 +72,13 @@ def format_type(
         literal_symbol_name = format_type(
             type["element"], context, preferred_structure_kind
         )
-        return f"List[{literal_symbol_name}]"
+        return f"list[{literal_symbol_name}]"
     elif type["kind"] == "map":
         key = format_base_types(type["key"])
         value = format_type(
             type["value"], {"root_symbol_name": key}, preferred_structure_kind
         )
-        return f"Dict[{key}, {value}]"
+        return f"dict[{key}, {value}]"
     elif type["kind"] == "and":
         pass
     elif type["kind"] == "or":
@@ -90,7 +90,7 @@ def format_type(
         tuple = []
         for item in type["items"]:
             tuple.append(format_type(item, context, preferred_structure_kind))
-        return f"List[Union[{', '.join(tuple)}]]"
+        return f"list[Union[{', '.join(tuple)}]]"
     elif type["kind"] == "literal":
         if not type["value"]["properties"]:
             return "dict"
@@ -148,11 +148,11 @@ class FormattedProperty(TypedDict):
 
 
 def get_formatted_properties(
-    properties: List[Property],
+    properties: list[Property],
     root_symbol_name,
     preferred_structure_kind: StructureKind,
-) -> List[FormattedProperty]:
-    result: List[FormattedProperty] = []
+) -> list[FormattedProperty]:
+    result: list[FormattedProperty] = []
     for p in properties:
         key = p["name"]
         value = format_type(
@@ -170,15 +170,15 @@ def get_formatted_properties(
     return result  # "\n\t".join(result)
 
 
-def has_invalid_property_name(properties: List[Property]):
+def has_invalid_property_name(properties: list[Property]):
     for p in properties:
         if keyword.iskeyword(p["name"]):
             return True
     return False
 
 
-def format_class_properties(properties: List[FormattedProperty]) -> str:
-    result: List[str] = []
+def format_class_properties(properties: list[FormattedProperty]) -> str:
+    result: list[str] = []
     for p in properties:
         line = f"{p['name']}: {p['value']}"
         comment = format_comment(p["documentation"], indentation)
@@ -188,8 +188,8 @@ def format_class_properties(properties: List[FormattedProperty]) -> str:
     return f"\n{indentation}".join(result)
 
 
-def format_dict_properties(properties: List[FormattedProperty]) -> str:
-    result: List[str] = []
+def format_dict_properties(properties: list[FormattedProperty]) -> str:
+    result: list[str] = []
     for p in properties:
         documentation = p.get("documentation")
         formatted_documentation = ""

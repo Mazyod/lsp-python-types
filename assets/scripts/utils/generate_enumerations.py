@@ -1,6 +1,6 @@
 from enum import Enum
 from ..lsp_schema import Enumeration, EnumerationEntry
-from typing import Dict, List, Literal
+from typing import Literal
 from .helpers import capitalize, format_comment, indentation
 import keyword
 
@@ -10,8 +10,8 @@ class EnumKind(Enum):
     String = 2
 
 
-def format_enumeration_values(values: List[EnumerationEntry], kind: EnumKind) -> str:
-    result: List[str] = []
+def format_enumeration_values(values: list[EnumerationEntry], kind: EnumKind) -> str:
+    result: list[str] = []
     for v in values:
         key = capitalize(v['name'])
         if keyword.iskeyword(key):
@@ -27,7 +27,7 @@ def format_enumeration_values(values: List[EnumerationEntry], kind: EnumKind) ->
     return f"\n{indentation}".join(result)
 
 
-def generate_enumerations(enumerations: List[Enumeration], overrides: Dict[str, Literal['StrEnum', 'IntFlag']]) -> List[str]:
+def generate_enumerations(enumerations: list[Enumeration], overrides: dict[str, Literal['StrEnum', 'IntFlag']]) -> list[str]:
 
     def toString(enumeration: Enumeration) -> str:
         result = ''

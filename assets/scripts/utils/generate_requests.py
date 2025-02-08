@@ -1,4 +1,3 @@
-from typing import List
 from ..lsp_schema import Request
 from .helpers import format_comment, format_type, indentation, StructureKind
 import re
@@ -61,7 +60,7 @@ method_to_symbol_name = {
 }
 
 
-def generate_requests(requests: List[Request]) -> List[str]:
+def generate_requests(requests: list[Request]) -> list[str]:
     def toString(request: Request) -> str:
         return generate_request(request)
 
@@ -83,7 +82,7 @@ def generate_request(request: Request) -> str:
     if params:
         if isinstance(params, list):
             raise Exception(
-                "You need to add code to handle when params is of type List[_Type]"
+                "You need to add code to handle when params is of type list[_Type]"
             )
 
         # ... I implemented the case when the params is a referenceS

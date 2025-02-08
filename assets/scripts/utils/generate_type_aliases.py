@@ -1,9 +1,8 @@
-from typing import List
 from ..lsp_schema import TypeAlias
 from .helpers import format_comment, format_type, StructureKind
 
 
-def generate_type_aliases(type_aliases: List[TypeAlias], preferred_structure_kind: StructureKind) -> List[str]:
+def generate_type_aliases(type_aliases: list[TypeAlias], preferred_structure_kind: StructureKind) -> list[str]:
 
     def toString(type_alias: TypeAlias) -> str:
         symbol_name = type_alias['name']

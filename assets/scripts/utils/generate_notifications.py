@@ -1,4 +1,3 @@
-from typing import List
 from ..lsp_schema import Notification
 from .helpers import format_comment, indentation
 
@@ -28,7 +27,7 @@ method_to_symbol_name = {
 }
 
 
-def generate_notifications(notifications: List[Notification]) -> List[str]:
+def generate_notifications(notifications: list[Notification]) -> list[str]:
     def toString(notification: Notification) -> str:
         return generate_notification(notification)
 
@@ -50,7 +49,7 @@ def generate_notification(notification: Notification) -> str:
     if params:
         if isinstance(params, list):
             raise Exception(
-                "You need to add code to handle when params is of type List[_Type]"
+                "You need to add code to handle when params is of type list[_Type]"
             )
 
         # ... I implemented the case when the params is a referenceS
