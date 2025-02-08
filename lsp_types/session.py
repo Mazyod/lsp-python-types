@@ -62,8 +62,8 @@ class LSPSession:
     """
 
     def __init__(self, process_launch_info: ProcessLaunchInfo):
-        self.process_launch_info = process_launch_info
-        self.process: asyncio.subprocess.Process | None = None
+        self._process_launch_info = process_launch_info
+        self._process: asyncio.subprocess.Process | None = None
         self._notification_queue: asyncio.Queue[StringDict] = asyncio.Queue()
         self._pending_requests: dict[int | str, asyncio.Future[Any]] = {}
         self._request_id_gen = itertools.count(1)
@@ -83,16 +83,19 @@ class LSPSession:
 
     async def start(self) -> None:
         """Start the LSP server process and initialize communication."""
-        child_proc_env = os.environ.copy()
-        child_proc_env.update(self.process_launch_info.env)
+        if self._process:
+            raise RuntimeError("LSP process already started")
 
-        self.process = await asyncio.create_subprocess_exec(
-            *self.process_launch_info.cmd,
+        child_proc_env = os.environ.copy()
+        child_proc_env.update(self._process_launch_info.env)
+
+        self._process = await asyncio.create_subprocess_exec(
+            *self._process_launch_info.cmd,
             stdout=asyncio.subprocess.PIPE,
             stdin=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=child_proc_env,
-            cwd=self.process_launch_info.cwd,
+            cwd=self._process_launch_info.cwd,
         )
 
         self._tasks.extend(
@@ -116,17 +119,17 @@ class LSPSession:
         for task in self._tasks:
             task.cancel()
 
-        if self.process:
+        if self._process:
             try:
-                return_code = await asyncio.wait_for(self.process.wait(), timeout=5.0)
+                return_code = await asyncio.wait_for(self._process.wait(), timeout=5.0)
                 if return_code != 0:
-                    logging.warning("Server exited with return code: %d", return_code)
+                    logger.warning("Server exited with return code: %d", return_code)
             except asyncio.TimeoutError:
                 try:
-                    self.process.kill()
+                    self._process.kill()
                 except ProcessLookupError:
                     pass
-            self.process = None
+            self._process = None
 
     async def notifications(self):
         """
@@ -142,7 +145,7 @@ class LSPSession:
 
     async def _send_request(self, method: str, params: Mapping | None = None) -> Any:
         """Send a request to the server and await the response."""
-        if not self.process or not self.process.stdin:
+        if not self._process or not self._process.stdin:
             raise RuntimeError("LSP process not available")
 
         request_id = next(self._request_id_gen)
@@ -151,7 +154,7 @@ class LSPSession:
         self._pending_requests[request_id] = future
 
         payload = make_request(method, request_id, params)
-        await self._send_payload(self.process.stdin, payload)
+        await self._send_payload(self._process.stdin, payload)
 
         try:
             return await future
@@ -162,12 +165,12 @@ class LSPSession:
         self, method: str, params: Mapping | None = None
     ) -> asyncio.Task[None]:
         """Send a notification to the server."""
-        if not self.process or not self.process.stdin:
-            logging.warning("LSP process not available: [%s]", method)
+        if not self._process or not self._process.stdin:
+            logger.warning("LSP process not available: [%s]", method)
             return asyncio.create_task(asyncio.sleep(0))
 
         payload = make_notification(method, params)
-        task = asyncio.create_task(self._send_payload(self.process.stdin, payload))
+        task = asyncio.create_task(self._send_payload(self._process.stdin, payload))
         self._tasks.append(task)
 
         return task
@@ -193,12 +196,12 @@ class LSPSession:
         """Read and process messages from the server's stdout."""
         try:
             while (
-                self.process
-                and self.process.stdout
-                and not self.process.stdout.at_eof()
+                self._process
+                and self._process.stdout
+                and not self._process.stdout.at_eof()
             ):
                 # Read header
-                line = await self.process.stdout.readline()
+                line = await self._process.stdout.readline()
                 if not line.strip():
                     continue
 
@@ -210,10 +213,10 @@ class LSPSession:
                     continue
 
                 while line and line.strip():
-                    line = await self.process.stdout.readline()
+                    line = await self._process.stdout.readline()
 
                 # Read message body
-                body = await self.process.stdout.readexactly(content_length)
+                body = await self._process.stdout.readexactly(content_length)
                 payload = json.loads(body.strip())
 
                 logger.debug("Server -> Client: %s", payload)
@@ -247,11 +250,11 @@ class LSPSession:
         """Read and log messages from the server's stderr."""
         try:
             while (
-                self.process
-                and self.process.stderr
-                and not self.process.stderr.at_eof()
+                self._process
+                and self._process.stderr
+                and not self._process.stderr.at_eof()
             ):
-                line = await self.process.stderr.readline()
+                line = await self._process.stderr.readline()
                 if not line:
                     continue
                 logger.error(f"Server - stderr: {line.decode(ENCODING).strip()}")

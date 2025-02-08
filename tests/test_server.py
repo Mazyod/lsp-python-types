@@ -9,9 +9,6 @@ async def test_server_initialize():
     # * Note: pyright must be installed and accessible (e.g. npm i -g pyright)
     process_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
     async with LSPSession(process_info) as session:
-        # Start the server
-        await session.start()
-
         # Send initialize request
         initialize_params: types.InitializeParams = {
             # NOTE: If processId is set to `1` or something, the server will crash after ~3 seconds

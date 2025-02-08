@@ -28,7 +28,7 @@ process_info = ProcessLaunchInfo(cmd=[
 ])
 
 async with LSPSession(process_info) as session:
-    await session.start()
+    # Use the session
 ```
 
 ## Development
