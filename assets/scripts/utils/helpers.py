@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Any, TypedDict, Union
-from ..lsp_schema import _Type, BaseType, MapKeyType, Property
+from ..lsp_schema import Type, BaseType, MapKeyType, Property
 import keyword
 
 indentation = "    "
@@ -60,7 +60,7 @@ class FormatTypeContext(TypedDict):
 
 
 def format_type(
-    type: _Type, context: FormatTypeContext, preferred_structure_kind: StructureKind
+    type: Type, context: FormatTypeContext, preferred_structure_kind: StructureKind
 ) -> str:
     result = "Any"
     if type["kind"] == "base":

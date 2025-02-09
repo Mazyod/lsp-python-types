@@ -25,9 +25,23 @@ download-schemas: ## Download latest LSP schemas (run this before generate-types
 	python -m assets.scripts.download_schemas
 	echo "Done."
 
+generate-schema:
+	datamodel-codegen \
+		--input ./assets/lsprotocol/lsp.schema.json \
+		--output ./assets/scripts/lsp_schema.py \
+		--output-model-type "typing.TypedDict" \
+		--target-python-version "3.11" \
+		--input-file-type "jsonschema" \
+		--use-field-description \
+		--use-schema-description \
+		--use-double-quotes
+
+# see: https://github.com/koxudaxi/datamodel-code-generator/issues/2314
+	python -m assets.scripts.postprocess_schema
+
 generate-types: ## Generate LSP type definitions
 	echo "Generating LSP type definitions..."
 	python -m assets.scripts.generate
 	echo "Done."
 
-generate-latest-types: download-schemas generate-types ## Download latest LSP schemas and generate type definitions
+generate-latest-types: download-schemas generate-schema generate-types ## Download latest LSP schemas and generate type definitions
