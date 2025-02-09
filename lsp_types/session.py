@@ -4,12 +4,10 @@ import itertools
 import json
 import logging
 import os
-from typing import Any, Mapping
+from typing import Any, cast as type_cast
 
 import lsp_types
 
-StringDict = dict[str, Any]
-PayloadLike = list[StringDict] | StringDict | Mapping[str, Any] | None
 CONTENT_LENGTH = "Content-Length: "
 ENCODING = "utf-8"
 
@@ -29,12 +27,14 @@ class Error(Exception):
         super().__init__(message)
         self.code = code
 
-    def to_lsp(self) -> StringDict:
+    def to_lsp(self) -> lsp_types.LSPObject:
         return {"code": self.code, "message": super().__str__()}
 
     @classmethod
-    def from_lsp(cls, d: StringDict) -> "Error":
-        return Error(d["code"], d["message"])
+    def from_lsp(cls, d: lsp_types.LSPObject) -> "Error":
+        code = lsp_types.ErrorCodes(d["code"])
+        message = type_cast(str, d["message"])
+        return Error(code, message)
 
     def __str__(self) -> str:
         return f"{super().__str__()} ({self.code})"
@@ -64,7 +64,7 @@ class LSPSession:
     def __init__(self, process_launch_info: ProcessLaunchInfo):
         self._process_launch_info = process_launch_info
         self._process: asyncio.subprocess.Process | None = None
-        self._notification_queue: asyncio.Queue[StringDict] = asyncio.Queue()
+        self._notification_queue: asyncio.Queue[lsp_types.LSPObject] = asyncio.Queue()
         self._pending_requests: dict[int | str, asyncio.Future[Any]] = {}
         self._request_id_gen = itertools.count(1)
         self._tasks: list[asyncio.Task] = []
@@ -143,7 +143,7 @@ class LSPSession:
             yield await self._notification_queue.get()
             self._notification_queue.task_done()
 
-    async def _send_request(self, method: str, params: Mapping | None = None) -> Any:
+    async def _send_request(self, method: str, params: lsp_types.LSPAny = None) -> Any:
         """Send a request to the server and await the response."""
         if not self._process or not self._process.stdin:
             raise RuntimeError("LSP process not available")
@@ -162,7 +162,7 @@ class LSPSession:
             self._pending_requests.pop(request_id, None)
 
     def _send_notification(
-        self, method: str, params: Mapping | None = None
+        self, method: str, params: lsp_types.LSPAny = None
     ) -> asyncio.Task[None]:
         """Send a notification to the server."""
         if not self._process or not self._process.stdin:
@@ -176,7 +176,9 @@ class LSPSession:
         return task
 
     @staticmethod
-    async def _send_payload(stream: asyncio.StreamWriter, payload: StringDict) -> None:
+    async def _send_payload(
+        stream: asyncio.StreamWriter, payload: lsp_types.LSPObject
+    ) -> None:
         """Send a payload to the server asynchronously."""
         logger.debug("Client -> Server: %s", payload)
 
@@ -264,9 +266,11 @@ class LSPSession:
             logger.exception("Client - Error reading stderr")
 
 
-def make_notification(method: str, params: PayloadLike) -> StringDict:
+def make_notification(method: str, params: lsp_types.LSPAny) -> lsp_types.LSPObject:
     return {"jsonrpc": "2.0", "method": method, "params": params}
 
 
-def make_request(method: str, request_id: int | str, params: PayloadLike) -> StringDict:
+def make_request(
+    method: str, request_id: int | str, params: lsp_types.LSPAny
+) -> lsp_types.LSPObject:
     return {"jsonrpc": "2.0", "method": method, "id": request_id, "params": params}

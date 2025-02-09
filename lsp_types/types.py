@@ -2,7 +2,7 @@ from __future__ import annotations
 # Code generated. DO NOT EDIT.
 # LSP v3.17.0
 
-from typing import Literal, TypedDict, Union, NotRequired
+from typing import Any, Literal, Mapping, TypedDict, Union, NotRequired
 from enum import IntEnum, IntFlag, StrEnum
 
 
@@ -706,7 +706,7 @@ LSPArray = list['LSPAny']
 """LSP arrays.
 @since 3.17.0"""
 
-LSPAny = Union['LSPObject', 'LSPArray', str, int, Uint, float, bool, None]
+LSPAny = Any
 """The LSP any type.
 Please note that strictly speaking a property with the value `undefined`
 can't be converted into JSON preserving the property name. However for
@@ -787,7 +787,7 @@ a notebook cell document.
 
 @since 3.17.0 - support for NotebookCellTextDocumentFilter."""
 
-LSPObject = dict[str, 'LSPAny']
+LSPObject = Mapping[str, 'LSPAny']
 """LSP object definition.
 @since 3.17.0"""
 
@@ -1342,7 +1342,7 @@ class WorkspaceEdit(TypedDict):
     An invalid sequence (e.g. (1) delete file a.txt and (2) insert text into file a.txt) will
     cause failure of the operation. How the client recovers from the failure is described by
     the client capability: `workspace.workspaceEdit.failureHandling`"""
-    changes: NotRequired[dict['DocumentUri', list['TextEdit']]]
+    changes: NotRequired[Mapping['DocumentUri', list['TextEdit']]]
     """Holds changes to existing resources."""
     documentChanges: NotRequired[list[Union['TextDocumentEdit', 'CreateFile', 'RenameFile', 'DeleteFile']]]
     """Depending on the client capability `workspace.workspaceEdit.resourceOperations` document changes
@@ -1355,7 +1355,7 @@ class WorkspaceEdit(TypedDict):
 
     If a client neither supports `documentChanges` nor `workspace.workspaceEdit.resourceOperations` then
     only plain `TextEdit`s using the `changes` property are supported."""
-    changeAnnotations: NotRequired[dict['ChangeAnnotationIdentifier', 'ChangeAnnotation']]
+    changeAnnotations: NotRequired[Mapping['ChangeAnnotationIdentifier', 'ChangeAnnotation']]
     """A map of change annotations that can be referenced in `AnnotatedTextEdit`s or create, rename and
     delete file / folder operations.
 
@@ -1615,7 +1615,7 @@ class DocumentDiagnosticReportPartialResult(TypedDict):
     """A partial result for a document diagnostic report.
 
     @since 3.17.0"""
-    relatedDocuments: dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]
+    relatedDocuments: Mapping['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]
 
 
 class DiagnosticServerCancellationData(TypedDict):
@@ -3464,7 +3464,7 @@ class RelatedFullDocumentDiagnosticReport(TypedDict):
     """A full diagnostic report with a set of related documents.
 
     @since 3.17.0"""
-    relatedDocuments: NotRequired[dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
+    relatedDocuments: NotRequired[Mapping['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
     """Diagnostics of related documents. This information is useful
     in programming languages where code in a file A can generate
     diagnostics in a file B which A depends on. An example of
@@ -3486,7 +3486,7 @@ class RelatedUnchangedDocumentDiagnosticReport(TypedDict):
     """An unchanged diagnostic report with a set of related documents.
 
     @since 3.17.0"""
-    relatedDocuments: NotRequired[dict['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
+    relatedDocuments: NotRequired[Mapping['DocumentUri', Union['FullDocumentDiagnosticReport', 'UnchangedDocumentDiagnosticReport']]]
     """Diagnostics of related documents. This information is useful
     in programming languages where code in a file A can generate
     diagnostics in a file B which A depends on. An example of

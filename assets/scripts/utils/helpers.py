@@ -78,7 +78,7 @@ def format_type(
         value = format_type(
             type["value"], {"root_symbol_name": key}, preferred_structure_kind
         )
-        return f"dict[{key}, {value}]"
+        return f"Mapping[{key}, {value}]"
     elif type["kind"] == "and":
         pass
     elif type["kind"] == "or":

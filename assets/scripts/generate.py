@@ -42,7 +42,7 @@ def generate(preferred_structure_kind: StructureKind, output: str) -> None:
             "from __future__ import annotations",
             "# Code generated. DO NOT EDIT.",
             f"# LSP v{specification_version}\n",
-            "from typing import Literal, TypedDict, Union, NotRequired",
+            "from typing import Any, Literal, Mapping, TypedDict, Union, NotRequired",
             "from enum import IntEnum, IntFlag, StrEnum\n\n",
             "URI = str",
             "DocumentUri = str",
@@ -75,11 +75,11 @@ generate(preferred_structure_kind=StructureKind.Class, output="./lsp_types/types
 def generate_req(output) -> None:
     content = f"""from __future__ import annotations
 # Code generated. DO NOT EDIT.
-from typing import Any, Awaitable, Callable, Mapping, Union
+from typing import Any, Awaitable, Callable, Union
 from . import types
 
 
-RequestDispatcher = Callable[[str, Mapping | None], Awaitable[Any]]
+RequestDispatcher = Callable[[str, types.LSPAny], Awaitable[Any]]
 
 
 class Request:
@@ -94,7 +94,7 @@ class Request:
         content += f"""
 
 
-NotificationDispatcher = Callable[[str, Mapping | None], Awaitable[None]]
+NotificationDispatcher = Callable[[str, types.LSPAny], Awaitable[None]]
 
 
 class Notification:
