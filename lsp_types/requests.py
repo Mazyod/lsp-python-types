@@ -23,20 +23,6 @@ class Request:
         the response is of type {@link Definition} or a Thenable that resolves to such."""
         return await self.dispatcher("textDocument/typeDefinition", params)
 
-    async def workspace_folders(self) -> Union[list[types.WorkspaceFolder], None]:
-        """The `workspace/workspaceFolders` is sent from the server to the client to fetch the open workspace folders."""
-        return await self.dispatcher("workspace/workspaceFolders", None)
-
-    async def workspace_configuration(self, params: types.ConfigurationParams) -> list[types.LSPAny]:
-        """The 'workspace/configuration' request is sent from the server to the client to fetch a certain
-        configuration setting.
-
-        This pull model replaces the old push model were the client signaled configuration change via an
-        event. If the server still needs to react to configuration changes (since the server caches the
-        result of `workspace/configuration` requests) the server should register for an empty configuration
-        change event and empty the cache if such an event is received."""
-        return await self.dispatcher("workspace/configuration", params)
-
     async def document_color(self, params: types.DocumentColorParams) -> list[types.ColorInformation]:
         """A request to list all color symbols found in a given text document. The request's
         parameter is of type {@link DocumentColorParams} the
@@ -58,11 +44,6 @@ class Request:
         that resolves to such."""
         return await self.dispatcher("textDocument/foldingRange", params)
 
-    async def folding_range_refresh(self) -> None:
-        """@since 3.18.0
-        @proposed"""
-        return await self.dispatcher("workspace/foldingRange/refresh", None)
-
     async def declaration(self, params: types.DeclarationParams) -> Union[types.Declaration, list[types.LocationLink], None]:
         """A request to resolve the type definition locations of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPositionParams}
@@ -76,11 +57,6 @@ class Request:
         response is of type {@link SelectionRange SelectionRange[]} or a Thenable
         that resolves to such."""
         return await self.dispatcher("textDocument/selectionRange", params)
-
-    async def create_work_done_progress(self, params: types.WorkDoneProgressCreateParams) -> None:
-        """The `window/workDoneProgress/create` request is sent from the server to the client to initiate progress
-        reporting from the server."""
-        return await self.dispatcher("window/workDoneProgress/create", params)
 
     async def prepare_call_hierarchy(self, params: types.CallHierarchyPrepareParams) -> Union[list[types.CallHierarchyItem], None]:
         """A request to result a `CallHierarchyItem` in a document at a given position.
@@ -112,19 +88,6 @@ class Request:
     async def semantic_tokens_range(self, params: types.SemanticTokensRangeParams) -> Union[types.SemanticTokens, None]:
         """@since 3.16.0"""
         return await self.dispatcher("textDocument/semanticTokens/range", params)
-
-    async def semantic_tokens_refresh(self) -> None:
-        """@since 3.16.0"""
-        return await self.dispatcher("workspace/semanticTokens/refresh", None)
-
-    async def show_document(self, params: types.ShowDocumentParams) -> types.ShowDocumentResult:
-        """A request to show a document. This request might open an
-        external program depending on the value of the URI to open.
-        For example a request to open `https://code.visualstudio.com/`
-        will very likely open the URI in a WEB browser.
-
-        @since 3.16.0"""
-        return await self.dispatcher("window/showDocument", params)
 
     async def linked_editing_range(self, params: types.LinkedEditingRangeParams) -> Union[types.LinkedEditingRanges, None]:
         """A request to provide ranges that can be edited together.
@@ -190,10 +153,6 @@ class Request:
         @since 3.17.0"""
         return await self.dispatcher("textDocument/inlineValue", params)
 
-    async def inline_value_refresh(self) -> None:
-        """@since 3.17.0"""
-        return await self.dispatcher("workspace/inlineValue/refresh", None)
-
     async def inlay_hint(self, params: types.InlayHintParams) -> Union[list[types.InlayHint], None]:
         """A request to provide inlay hints in a document. The request's parameter is of
         type {@link InlayHintsParams}, the response is of type
@@ -210,10 +169,6 @@ class Request:
         @since 3.17.0"""
         return await self.dispatcher("inlayHint/resolve", params)
 
-    async def inlay_hint_refresh(self) -> None:
-        """@since 3.17.0"""
-        return await self.dispatcher("workspace/inlayHint/refresh", None)
-
     async def text_document_diagnostic(self, params: types.DocumentDiagnosticParams) -> types.DocumentDiagnosticReport:
         """The document diagnostic request definition.
 
@@ -225,12 +180,6 @@ class Request:
 
         @since 3.17.0"""
         return await self.dispatcher("workspace/diagnostic", params)
-
-    async def diagnostic_refresh(self) -> None:
-        """The diagnostic refresh request definition.
-
-        @since 3.17.0"""
-        return await self.dispatcher("workspace/diagnostic/refresh", None)
 
     async def inline_completion(self, params: types.InlineCompletionParams) -> Union[types.InlineCompletionList, list[types.InlineCompletionItem], None]:
         """A request to provide inline completions in a document. The request's parameter is of
@@ -249,24 +198,6 @@ class Request:
         @proposed"""
         return await self.dispatcher("workspace/textDocumentContent", params)
 
-    async def text_document_content_refresh(self, params: types.TextDocumentContentRefreshParams) -> None:
-        """The `workspace/textDocumentContent` request is sent from the server to the client to refresh
-        the content of a specific text document.
-
-        @since 3.18.0
-        @proposed"""
-        return await self.dispatcher("workspace/textDocumentContent/refresh", params)
-
-    async def register_capability(self, params: types.RegistrationParams) -> None:
-        """The `client/registerCapability` request is sent from the server to the client to register a new capability
-        handler on the client side."""
-        return await self.dispatcher("client/registerCapability", params)
-
-    async def unregister_capability(self, params: types.UnregistrationParams) -> None:
-        """The `client/unregisterCapability` request is sent from the server to the client to unregister a previously registered capability
-        handler on the client side."""
-        return await self.dispatcher("client/unregisterCapability", params)
-
     async def initialize(self, params: types.InitializeParams) -> types.InitializeResult:
         """The initialize request is sent from the client to the server.
         It is sent once as the request after starting up the server.
@@ -281,11 +212,6 @@ class Request:
         server. The only notification that is sent after a shutdown request
         is the exit event."""
         return await self.dispatcher("shutdown", None)
-
-    async def show_message_request(self, params: types.ShowMessageRequestParams) -> Union[types.MessageActionItem, None]:
-        """The show message request is sent from the server to the client to show a message
-        and a set of options actions to the user."""
-        return await self.dispatcher("window/showMessageRequest", params)
 
     async def will_save_wait_until(self, params: types.WillSaveTextDocumentParams) -> Union[list[types.TextEdit], None]:
         """A document will save request is sent from the client to the server before
@@ -388,12 +314,6 @@ class Request:
         """A request to resolve a command for a given code lens."""
         return await self.dispatcher("codeLens/resolve", params)
 
-    async def code_lens_refresh(self) -> None:
-        """A request to refresh all code actions
-
-        @since 3.16.0"""
-        return await self.dispatcher("workspace/codeLens/refresh", None)
-
     async def document_link(self, params: types.DocumentLinkParams) -> Union[list[types.DocumentLink], None]:
         """A request to provide document links"""
         return await self.dispatcher("textDocument/documentLink", params)
@@ -437,10 +357,6 @@ class Request:
         """A request send from the client to the server to execute a command. The request might return
         a workspace edit which the client will apply to the workspace."""
         return await self.dispatcher("workspace/executeCommand", params)
-
-    async def apply_edit(self, params: types.ApplyWorkspaceEditParams) -> types.ApplyWorkspaceEditResult:
-        """A request sent from the server to the client to modified certain resources."""
-        return await self.dispatcher("workspace/applyEdit", params)
 
 
 
@@ -520,21 +436,6 @@ class Notification:
         the changed configuration as defined by the language client."""
         return self.dispatcher("workspace/didChangeConfiguration", params)
 
-    def show_message(self,  params: types.ShowMessageParams):
-        """The show message notification is sent from a server to a client to ask
-        the client to display a particular message in the user interface."""
-        return self.dispatcher("window/showMessage", params)
-
-    def log_message(self,  params: types.LogMessageParams):
-        """The log message notification is sent from the server to the client to ask
-        the client to log a particular message."""
-        return self.dispatcher("window/logMessage", params)
-
-    def telemetry_event(self,  params: types.LSPAny):
-        """The telemetry event notification is sent from the server to the client to ask
-        the client to log telemetry data."""
-        return self.dispatcher("telemetry/event", params)
-
     def did_open_text_document(self,  params: types.DidOpenTextDocumentParams):
         """The document open notification is sent from the client to the server to signal
         newly opened text documents. The document's truth is now managed by the client
@@ -576,16 +477,8 @@ class Notification:
         the client detects changes to file watched by the language client."""
         return self.dispatcher("workspace/didChangeWatchedFiles", params)
 
-    def publish_diagnostics(self,  params: types.PublishDiagnosticsParams):
-        """Diagnostics notification are sent from the server to the client to signal
-        results of validation runs."""
-        return self.dispatcher("textDocument/publishDiagnostics", params)
-
     def set_trace(self,  params: types.SetTraceParams):
         return self.dispatcher("$/setTrace", params)
-
-    def log_trace(self,  params: types.LogTraceParams):
-        return self.dispatcher("$/logTrace", params)
 
     def cancel_request(self,  params: types.CancelParams):
         return self.dispatcher("$/cancelRequest", params)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # Code generated. DO NOT EDIT.
 # LSP v3.17.0
 

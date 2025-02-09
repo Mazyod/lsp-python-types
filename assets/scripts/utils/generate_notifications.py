@@ -36,6 +36,9 @@ def generate_notifications(notifications: list[Notification]) -> list[str]:
     generated_notifications = []
     failed = False
     for notification in notifications:
+        if notification["messageDirection"] == "serverToClient":
+            continue
+
         try:
             generated_notifications.append(generate_notification(notification))
         except Exception as e:

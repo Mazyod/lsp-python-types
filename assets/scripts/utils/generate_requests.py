@@ -79,6 +79,9 @@ def generate_requests(requests: list[Request]) -> list[str]:
     generated_requests = []
     failed = False
     for request in requests:
+        if request["messageDirection"] == "serverToClient":
+            continue
+
         try:
             generated_requests.append(generate_request(request))
         except Exception as e:
