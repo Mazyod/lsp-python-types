@@ -1,7 +1,14 @@
+from pathlib import Path
 from urllib.request import urlopen
 
-lsp_json_schema = urlopen("https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/main/protocol/metaModel.schema.json").read().decode('utf-8')
-open("./assets/lsprotocol/lsp.schema.json", "w").write(lsp_json_schema)
 
-lsp_meta_model = urlopen("https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/main/protocol/metaModel.json").read().decode('utf-8')
-open("./assets/lsprotocol/lsp.json", "w").write(lsp_meta_model)
+schema_url = "https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/main/protocol/metaModel.schema.json"
+meta_model_url = "https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/main/protocol/metaModel.json"
+
+
+if __name__ == "__main__":
+    lsp_json_schema = urlopen(schema_url).read().decode("utf-8")
+    Path("./assets/lsprotocol/lsp.schema.json").write_text(lsp_json_schema)
+
+    lsp_meta_model = urlopen(meta_model_url).read().decode("utf-8")
+    Path("./assets/lsprotocol/lsp.json").write_text(lsp_meta_model)

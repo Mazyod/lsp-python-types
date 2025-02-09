@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 
+from pathlib import Path
 from typing import Literal
 from .lsp_schema import MetaModel
 from .utils.generate_enumerations import generate_enumerations
@@ -36,15 +37,22 @@ ENUM_OVERRIDES: dict[str, Literal["StrEnum", "IntFlag"]] = {
 }
 
 
-def generate(output: str) -> None:
-    reset_new_literal_structures()
+def generate_python_types(lsp_json: MetaModel, output: Path) -> None:
+    specification_version = lsp_json.get("metaData")["version"]
+    preferred_structure_kind = StructureKind.Class
 
-    with open("./assets/lsprotocol/lsp.json") as file:
-        lsp_json: MetaModel = json.load(file)
-        specification_version = lsp_json.get("metaData")["version"]
-        preferred_structure_kind = StructureKind.Class
+    generated_enums = "\n\n\n".join(
+        generate_enumerations(lsp_json["enumerations"], ENUM_OVERRIDES)
+    )
+    generated_type_aliases = "\n".join(
+        generate_type_aliases(lsp_json["typeAliases"], preferred_structure_kind)
+    )
+    generated_structs = "\n\n\n".join(
+        generate_structures(lsp_json["structures"], preferred_structure_kind)
+    )
+    generated_literals = "\n".join(get_new_literal_structures())
 
-        content = f"""\
+    content = f"""\
 from __future__ import annotations
 
 # Code generated. DO NOT EDIT.
@@ -58,33 +66,29 @@ URI = str
 DocumentUri = str
 Uint = int
 RegExp = str
-"""
-
-        content += "\n\n"
-        content += "\n\n\n".join(
-            generate_enumerations(lsp_json["enumerations"], ENUM_OVERRIDES)
-        )
-        content += "\n\n"
-        content += "\n".join(
-            generate_type_aliases(lsp_json["typeAliases"], preferred_structure_kind)
-        )
-        content += "\n\n\n"
-        content += "\n\n\n".join(
-            generate_structures(lsp_json["structures"], preferred_structure_kind)
-        )
-        content += "\n\n"
-        content += "\n".join(get_new_literal_structures())
-
-        # Remove trailing spaces.
-        lines = content.split("\n")
-        lines = [line.rstrip() for line in lines]
-        content = "\n".join(lines)
-
-        with open(output, "w") as new_file:
-            new_file.write(content)
 
 
-def generate_req(output) -> None:
+{generated_enums}
+
+{generated_type_aliases}
+
+
+{generated_structs}
+
+{generated_literals}"""
+
+    # Remove trailing spaces.
+    lines = content.split("\n")
+    lines = [line.rstrip() for line in lines]
+    content = "\n".join(lines)
+
+    output.write_text(content)
+
+
+def generate_python_requests(lsp_json: MetaModel, output: Path) -> None:
+    generated_requests = "\n".join(generate_requests(lsp_json["requests"]))
+    generated_notifs = "\n".join(generate_notifications(lsp_json["notifications"]))
+
     content = f"""from __future__ import annotations
 # Code generated. DO NOT EDIT.
 from typing import Any, Awaitable, Callable, Union
@@ -98,12 +102,7 @@ class Request:
 {indentation}def __init__(self, dispatcher: RequestDispatcher):
 {indentation}{indentation}self.dispatcher = dispatcher
 
-"""
-
-    with open("./assets/lsprotocol/lsp.json") as file:
-        lsp_json: MetaModel = json.load(file)
-        content += "\n".join(generate_requests(lsp_json["requests"]))
-        content += f"""
+{generated_requests}
 
 
 NotificationDispatcher = Callable[[str, types.LSPAny], Awaitable[None]]
@@ -113,13 +112,19 @@ class Notification:
 {indentation}def __init__(self, dispatcher: NotificationDispatcher):
 {indentation}{indentation}self.dispatcher = dispatcher
 
-"""
-        content += "\n".join(generate_notifications(lsp_json["notifications"]))
+{generated_notifs}"""
 
-        with open(output, "w") as new_file:
-            new_file.write(content)
+    output.write_text(content)
 
 
 if __name__ == "__main__":
-    generate(output="./lsp_types/types.py")
-    generate_req("./lsp_types/requests.py")
+    lsp_json_path = Path("./assets/lsprotocol/lsp.json")
+    base_path = Path("./lsp_types")
+
+    with lsp_json_path.open() as file:
+        lsp_json: MetaModel = json.load(file)
+
+    reset_new_literal_structures()
+
+    generate_python_types(lsp_json, base_path / "types.py")
+    generate_python_requests(lsp_json, base_path / "requests.py")
