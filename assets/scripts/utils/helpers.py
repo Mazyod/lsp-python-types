@@ -63,80 +63,80 @@ def format_type(
     type: Type, context: FormatTypeContext, preferred_structure_kind: StructureKind
 ) -> str:
     result = "Any"
-    if type["kind"] == "base":
-        return format_base_types(type)
-    elif type["kind"] == "reference":
-        literal_symbol_name = type["name"]
-        return f"'{literal_symbol_name}'"
-    elif type["kind"] == "array":
-        literal_symbol_name = format_type(
-            type["element"], context, preferred_structure_kind
-        )
-        return f"list[{literal_symbol_name}]"
-    elif type["kind"] == "map":
-        key = format_base_types(type["key"])
-        value = format_type(
-            type["value"], {"root_symbol_name": key}, preferred_structure_kind
-        )
-        return f"Mapping[{key}, {value}]"
-    elif type["kind"] == "and":
-        pass
-    elif type["kind"] == "or":
-        tuple = []
-        for item in type["items"]:
-            tuple.append(format_type(item, context, preferred_structure_kind))
-        return f"Union[{', '.join(tuple)}]"
-    elif type["kind"] == "tuple":
-        tuple = []
-        for item in type["items"]:
-            tuple.append(format_type(item, context, preferred_structure_kind))
-        return f"list[Union[{', '.join(tuple)}]]"
-    elif type["kind"] == "literal":
-        if not type["value"]["properties"]:
-            return "dict"
-        root_symbol_name = capitalize(context["root_symbol_name"])
-        literal_symbol_name = f"__{root_symbol_name}_Type"
-        symbol_id = SymbolNameTracker.get_symbol_id(literal_symbol_name)
-        literal_symbol_name += f"_{symbol_id}"
-        properties = get_formatted_properties(
-            type["value"]["properties"], root_symbol_name, preferred_structure_kind
-        )
-        if preferred_structure_kind == StructureKind.Function:
-            formatted_properties = format_dict_properties(properties)
-            new_literal_structures.add(f"""
+
+    match type["kind"]:
+        case "base":
+            return format_base_types(type)
+        case "reference":
+            literal_symbol_name = type["name"]
+            return f"'{literal_symbol_name}'"
+        case "array":
+            literal_symbol_name = format_type(
+                type["element"], context, preferred_structure_kind
+            )
+            return f"list[{literal_symbol_name}]"
+        case "map":
+            key = format_base_types(type["key"])
+            value = format_type(
+                type["value"], {"root_symbol_name": key}, preferred_structure_kind
+            )
+            return f"Mapping[{key}, {value}]"
+        case "and":
+            pass
+        case "or":
+            tuple = []
+            for item in type["items"]:
+                tuple.append(format_type(item, context, preferred_structure_kind))
+            return f"Union[{', '.join(tuple)}]"
+        case "tuple":
+            tuple = []
+            for item in type["items"]:
+                tuple.append(format_type(item, context, preferred_structure_kind))
+            return f"list[Union[{', '.join(tuple)}]]"
+        case "literal":
+            if not type["value"]["properties"]:
+                return "dict"
+            root_symbol_name = capitalize(context["root_symbol_name"])
+            literal_symbol_name = f"__{root_symbol_name}_Type"
+            symbol_id = SymbolNameTracker.get_symbol_id(literal_symbol_name)
+            literal_symbol_name += f"_{symbol_id}"
+            properties = get_formatted_properties(
+                type["value"]["properties"], root_symbol_name, preferred_structure_kind
+            )
+            if preferred_structure_kind == StructureKind.Function:
+                formatted_properties = format_dict_properties(properties)
+                new_literal_structures.add(f"""
 {literal_symbol_name} = TypedDict('{literal_symbol_name}', {{
 {indentation}{formatted_properties}
 }})
 """)
-        else:
-            formatted_properties = format_class_properties(properties)
-            new_literal_structures.add(f"""
+            else:
+                formatted_properties = format_class_properties(properties)
+                new_literal_structures.add(f"""
 class {literal_symbol_name}(TypedDict):
 {indentation}{formatted_properties or "pass"}
 """)
-        return f"'{literal_symbol_name}'"
-    elif type["kind"] == "stringLiteral":
-        return f"Literal['{type['value']}']"
-    elif type["kind"] == "integerLiteral":
-        return f"Literal[{type['value']}]"
-    elif type["kind"] == "booleanLiteral":
-        return f"Literal[{type['value']}]"
+            return f"'{literal_symbol_name}'"
+        case "stringLiteral" | "integerLiteral" | "booleanLiteral":
+            return f"Literal['{type['value']}']"
+
     return result
 
 
 def format_base_types(base_type: Union[BaseType, MapKeyType]):
-    if base_type["name"] == "integer":
-        return "int"
-    if base_type["name"] == "uinteger":
-        return "Uint"
-    if base_type["name"] == "decimal":
-        return "float"
-    if base_type["name"] == "string":
-        return "str"
-    if base_type["name"] == "boolean":
-        return "bool"
-    if base_type["name"] == "null":
-        return "None"
+    match base_type["name"]:
+        case "integer":
+            return "int"
+        case "uinteger":
+            return "Uint"
+        case "decimal":
+            return "float"
+        case "string":
+            return "str"
+        case "boolean":
+            return "bool"
+        case "null":
+            return "None"
 
     return f"'{base_type['name']}'"
 
@@ -163,18 +163,13 @@ def get_formatted_properties(
         if p.get("optional"):
             value = f"NotRequired[{value}]"
         documentation = p.get("documentation") or ""
-        result.append(
-            {"name": key, "value": value, "documentation": documentation}
-        )  # f"{key}: {value}{documentation}"
+        result.append({"name": key, "value": value, "documentation": documentation})
 
-    return result  # "\n\t".join(result)
+    return result
 
 
 def has_invalid_property_name(properties: list[Property]):
-    for p in properties:
-        if keyword.iskeyword(p["name"]):
-            return True
-    return False
+    return any(keyword.iskeyword(p["name"]) for p in properties)
 
 
 def format_class_properties(properties: list[FormattedProperty]) -> str:

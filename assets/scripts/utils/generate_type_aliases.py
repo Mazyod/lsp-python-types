@@ -2,17 +2,18 @@ from ..lsp_schema import TypeAlias
 from .helpers import format_comment, format_type, StructureKind
 
 
-def generate_type_aliases(type_aliases: list[TypeAlias], preferred_structure_kind: StructureKind) -> list[str]:
-
+def generate_type_aliases(type_aliases: list[TypeAlias]) -> list[str]:
     def toString(type_alias: TypeAlias) -> str:
-        symbol_name = type_alias['name']
-        documentation = format_comment(type_alias.get('documentation'))
+        symbol_name = type_alias["name"]
+        documentation = format_comment(type_alias.get("documentation"))
         if type_alias["name"] == "LSPAny":
             value = "Any"
         else:
-            value = format_type(type_alias['type'], {
-                'root_symbol_name': symbol_name
-            }, preferred_structure_kind)
+            value = format_type(
+                type_alias["type"],
+                {"root_symbol_name": symbol_name},
+                StructureKind.Class,
+            )
         result = f"""
 {symbol_name} = {value}"""
         if documentation:

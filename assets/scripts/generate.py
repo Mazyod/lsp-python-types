@@ -2,7 +2,6 @@
 import json
 
 from pathlib import Path
-from typing import Literal
 from .lsp_schema import MetaModel
 from .utils.generate_enumerations import generate_enumerations
 from .utils.generate_structures import generate_structures
@@ -12,50 +11,23 @@ from .utils.generate_notifications import generate_notifications
 from .utils.helpers import (
     get_new_literal_structures,
     reset_new_literal_structures,
-    StructureKind,
     indentation,
 )
 
 
-ENUM_OVERRIDES: dict[str, Literal["StrEnum", "IntFlag"]] = {
-    "CodeActionKind": "StrEnum",
-    "DocumentDiagnosticReportKind": "StrEnum",
-    "FailureHandlingKind": "StrEnum",
-    "FileOperationPatternKind": "StrEnum",
-    "FoldingRangeKind": "StrEnum",
-    "LanguageKind": "StrEnum",
-    "MarkupKind": "StrEnum",
-    "MonikerKind": "StrEnum",
-    "PositionEncodingKind": "StrEnum",
-    "ResourceOperationKind": "StrEnum",
-    "SemanticTokenModifiers": "StrEnum",
-    "SemanticTokenTypes": "StrEnum",
-    "TokenFormat": "StrEnum",
-    "TraceValue": "StrEnum",
-    "UniquenessLevel": "StrEnum",
-    "WatchKind": "IntFlag",
-}
+def generate_python_types(lsp_json: MetaModel, output: Path):
+    specification_version = lsp_json["metaData"]["version"]
 
-
-def generate_python_types(lsp_json: MetaModel, output: Path) -> None:
-    specification_version = lsp_json.get("metaData")["version"]
-    preferred_structure_kind = StructureKind.Class
-
-    generated_enums = "\n\n\n".join(
-        generate_enumerations(lsp_json["enumerations"], ENUM_OVERRIDES)
-    )
-    generated_type_aliases = "\n".join(
-        generate_type_aliases(lsp_json["typeAliases"], preferred_structure_kind)
-    )
-    generated_structs = "\n\n\n".join(
-        generate_structures(lsp_json["structures"], preferred_structure_kind)
-    )
+    generated_enums = "\n\n\n".join(generate_enumerations(lsp_json["enumerations"]))
+    generated_type_aliases = "\n".join(generate_type_aliases(lsp_json["typeAliases"]))
+    generated_structs = "\n\n\n".join(generate_structures(lsp_json["structures"]))
     generated_literals = "\n".join(get_new_literal_structures())
 
     content = f"""\
 from __future__ import annotations
 
-# Code generated. DO NOT EDIT.
+# Generated code.
+# DO NOT EDIT.
 # LSP v{specification_version}
 
 from typing import Any, Literal, Mapping, TypedDict, Union, NotRequired
@@ -85,12 +57,18 @@ RegExp = str
     output.write_text(content)
 
 
-def generate_python_requests(lsp_json: MetaModel, output: Path) -> None:
+def generate_python_requests(lsp_json: MetaModel, output: Path):
+    specification_version = lsp_json["metaData"]["version"]
+
     generated_requests = "\n".join(generate_requests(lsp_json["requests"]))
     generated_notifs = "\n".join(generate_notifications(lsp_json["notifications"]))
 
     content = f"""from __future__ import annotations
-# Code generated. DO NOT EDIT.
+
+# Generated code.
+# DO NOT EDIT.
+# LSP v{specification_version}
+
 from typing import Any, Awaitable, Callable, Union
 from . import types
 

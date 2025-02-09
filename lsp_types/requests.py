@@ -1,5 +1,9 @@
 from __future__ import annotations
-# Code generated. DO NOT EDIT.
+
+# Generated code.
+# DO NOT EDIT.
+# LSP v3.17.0
+
 from typing import Any, Awaitable, Callable, Union
 from . import types
 

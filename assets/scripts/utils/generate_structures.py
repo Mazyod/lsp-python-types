@@ -2,11 +2,11 @@ from ..lsp_schema import Structure
 from .helpers import FormattedProperty, format_comment, indentation, format_class_properties, format_dict_properties, get_formatted_properties, has_invalid_property_name, StructureKind
 
 
-def generate_structures(structures: list[Structure], preferred_structure_kind: StructureKind) -> list[str]:
+def generate_structures(structures: list[Structure]) -> list[str]:
 
     def toString(structure: Structure) -> str:
-        kind = preferred_structure_kind
-        if kind == StructureKind.Class and has_invalid_property_name(structure['properties']):
+        kind = StructureKind.Class
+        if has_invalid_property_name(structure['properties']):
             kind = StructureKind.Function
         return generate_structure(structure, structures, kind)
 
