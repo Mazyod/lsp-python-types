@@ -83,7 +83,7 @@ def generate_requests(requests: list[Request]) -> list[str]:
             continue
 
         try:
-            generated_requests.append(generate_request(request))
+            generated_requests.append(generate_request_func(request))
         except Exception as e:
             print(f"Error generating request: {e}")
             failed = True
@@ -94,14 +94,15 @@ def generate_requests(requests: list[Request]) -> list[str]:
     return generated_requests
 
 
-def generate_request(request: Request) -> str:
-    result = ""
+def generate_request_func(request: Request) -> str:
     method = request["method"]
     symbol_name = method_to_symbol_name.get(method)
+
     if not symbol_name:
         raise Exception("Please define a symbol name for ", method)
+
     params = request.get("params", {})
-    formatted_params = ""
+    formatted_params = ["self"]
     if params:
         if isinstance(params, list):
             raise Exception(
@@ -118,23 +119,27 @@ def generate_request(request: Request) -> str:
             raise Exception(
                 "I expected params to be of type _Type. But got: " + str(params)
             )
-        formatted_params = f", params: types.{params_type}"
+        formatted_params += [f"params: types.{params_type}"]
+
     result_type = format_type(
         request["result"], {"root_symbol_name": ""}, StructureKind.Class
     )
     result_type = prefix_lsp_types(result_type)
+
     # fix  Expected class type but received "str"
     result_type = result_type.replace("DefinitionLink", "LocationLink")
     result_type = result_type.replace("DeclarationLink", "LocationLink")
-    result += f"{indentation}async def {symbol_name}(self{formatted_params}) -> {result_type}:"
-    documentation = format_comment(
-        request.get("documentation"), indentation + indentation
-    )
+
+    result = f"{indentation}async def {symbol_name}({', '.join(formatted_params)}) -> {result_type}:"
+
+    documentation = format_comment(request.get("documentation"), 2 * indentation)
     if documentation:
         result += f"\n{documentation}"
+
     result += f"""
 {indentation}{indentation}return await self.dispatcher("{method}", {"params" if params else "None"})
 """
+
     return result
 
 

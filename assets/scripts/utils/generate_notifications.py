@@ -36,14 +36,21 @@ def generate_notifications(notifications: list[Notification]) -> list[str]:
     generated_notifications = []
     failed = False
     for notification in notifications:
-        if notification["messageDirection"] == "serverToClient":
+        method = notification["method"]
+        symbol_name = method_to_symbol_name.get(method)
+
+        if not symbol_name:
+            print(f"Please define a symbol name for: {method = }")
+            failed = True
             continue
 
-        try:
-            generated_notifications.append(generate_notification(notification))
-        except Exception as e:
-            print(f"Error generating notification: {e}")
-            failed = True
+        messageDirection = notification["messageDirection"]
+        if messageDirection == "both" or messageDirection == "serverToClient":
+            handler = generate_notification_handler(method, symbol_name, notification)
+            generated_notifications.append(handler)
+        if messageDirection == "both" or messageDirection == "clientToServer":
+            func = generate_notification_func(method, symbol_name, notification)
+            generated_notifications.append(func)
 
     if failed:
         raise Exception("Failed to generate notifications")
@@ -51,19 +58,40 @@ def generate_notifications(notifications: list[Notification]) -> list[str]:
     return generated_notifications
 
 
-def generate_notification(notification: Notification) -> str:
-    result = ""
-    method = notification["method"]
-    symbol_name = method_to_symbol_name.get(method)
-    if not symbol_name:
-        raise Exception("Please define a symbol name for ", method)
+def generate_notification_handler(
+    method: str, symbol_name: str, notification: Notification
+) -> str:
     params = notification.get("params", {})
-    formatted_params = ""
+    formatted_params = ["self", "*", "timeout: float | None = None"]
+    return_type = "None"
     if params:
         if isinstance(params, list):
-            raise Exception(
-                "You need to add code to handle when params is of type list[_Type]"
-            )
+            raise NotImplementedError("Params of type list is not implemented")
+
+        params_type = params.get("name")
+        if not params_type:
+            raise Exception(f"Expected params to have 'name', but got: {params!r}")
+        return_type = f"types.{params_type}"
+
+    result = f"{indentation}async def on_{symbol_name}({', '.join(formatted_params)}) -> {return_type}:"
+
+    documentation = format_comment(notification.get("documentation"), 2 * indentation)
+    if documentation.strip():
+        result += f"\n{documentation}"
+
+    result += f"""\n{indentation}{indentation}return await self.on_notification("{method}", timeout)\n"""
+
+    return result
+
+
+def generate_notification_func(
+    method: str, symbol_name: str, notification: Notification
+) -> str:
+    params = notification.get("params", {})
+    formatted_params = ["self"]
+    if params:
+        if isinstance(params, list):
+            raise NotImplementedError("Params of type list is not implemented")
 
         # ... I implemented the case when the params is a referenceS
         # "params": {
@@ -72,16 +100,15 @@ def generate_notification(notification: Notification) -> str:
         # },
         params_type = params.get("name")
         if not params_type:
-            raise Exception(
-                "I expected params to be of type _Type. But got: " + str(params)
-            )
-        formatted_params = f",  params: types.{params_type}"
-    result += f"{indentation}def {symbol_name}(self{formatted_params}):"
-    documentation = format_comment(
-        notification.get("documentation"), indentation + indentation
-    )
+            raise Exception(f"Expected params to have 'name', but got: {params!r}")
+        formatted_params += [f"params: types.{params_type}"]
+
+    result = f"{indentation}def {symbol_name}({', '.join(formatted_params)}):"
+
+    documentation = format_comment(notification.get("documentation"), 2 * indentation)
     if documentation.strip():
         result += f"\n{documentation}"
+
     result += f"""\n{indentation}{indentation}return self.dispatcher("{method}", {"params" if params else "None"})\n"""
 
     return result

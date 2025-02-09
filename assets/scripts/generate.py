@@ -76,7 +76,7 @@ from . import types
 RequestDispatcher = Callable[[str, types.LSPAny], Awaitable[Any]]
 
 
-class Request:
+class RequestFunctions:
 {indentation}def __init__(self, dispatcher: RequestDispatcher):
 {indentation}{indentation}self.dispatcher = dispatcher
 
@@ -84,11 +84,13 @@ class Request:
 
 
 NotificationDispatcher = Callable[[str, types.LSPAny], Awaitable[None]]
+NotificationHandler = Callable[[str, float | None], Awaitable[Union[types.LSPAny]]]
 
 
-class Notification:
-{indentation}def __init__(self, dispatcher: NotificationDispatcher):
+class NotificationFunctions:
+{indentation}def __init__(self, dispatcher: NotificationDispatcher, on_notification: NotificationHandler):
 {indentation}{indentation}self.dispatcher = dispatcher
+{indentation}{indentation}self.on_notification = on_notification
 
 {generated_notifs}"""
 

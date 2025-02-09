@@ -11,7 +11,7 @@ from . import types
 RequestDispatcher = Callable[[str, types.LSPAny], Awaitable[Any]]
 
 
-class Request:
+class RequestFunctions:
     def __init__(self, dispatcher: RequestDispatcher):
         self.dispatcher = dispatcher
 
@@ -365,65 +365,67 @@ class Request:
 
 
 NotificationDispatcher = Callable[[str, types.LSPAny], Awaitable[None]]
+NotificationHandler = Callable[[str, float | None], Awaitable[Union[types.LSPAny]]]
 
 
-class Notification:
-    def __init__(self, dispatcher: NotificationDispatcher):
+class NotificationFunctions:
+    def __init__(self, dispatcher: NotificationDispatcher, on_notification: NotificationHandler):
         self.dispatcher = dispatcher
+        self.on_notification = on_notification
 
-    def did_change_workspace_folders(self,  params: types.DidChangeWorkspaceFoldersParams):
+    def did_change_workspace_folders(self, params: types.DidChangeWorkspaceFoldersParams):
         """The `workspace/didChangeWorkspaceFolders` notification is sent from the client to the server when the workspace
         folder configuration changes."""
         return self.dispatcher("workspace/didChangeWorkspaceFolders", params)
 
-    def cancel_work_done_progress(self,  params: types.WorkDoneProgressCancelParams):
+    def cancel_work_done_progress(self, params: types.WorkDoneProgressCancelParams):
         """The `window/workDoneProgress/cancel` notification is sent from  the client to the server to cancel a progress
         initiated on the server side."""
         return self.dispatcher("window/workDoneProgress/cancel", params)
 
-    def did_create_files(self,  params: types.CreateFilesParams):
+    def did_create_files(self, params: types.CreateFilesParams):
         """The did create files notification is sent from the client to the server when
         files were created from within the client.
 
         @since 3.16.0"""
         return self.dispatcher("workspace/didCreateFiles", params)
 
-    def did_rename_files(self,  params: types.RenameFilesParams):
+    def did_rename_files(self, params: types.RenameFilesParams):
         """The did rename files notification is sent from the client to the server when
         files were renamed from within the client.
 
         @since 3.16.0"""
         return self.dispatcher("workspace/didRenameFiles", params)
 
-    def did_delete_files(self,  params: types.DeleteFilesParams):
+    def did_delete_files(self, params: types.DeleteFilesParams):
         """The will delete files request is sent from the client to the server before files are actually
         deleted as long as the deletion is triggered from within the client.
 
         @since 3.16.0"""
         return self.dispatcher("workspace/didDeleteFiles", params)
 
-    def did_open_notebook_document(self,  params: types.DidOpenNotebookDocumentParams):
+    def did_open_notebook_document(self, params: types.DidOpenNotebookDocumentParams):
         """A notification sent when a notebook opens.
 
         @since 3.17.0"""
         return self.dispatcher("notebookDocument/didOpen", params)
 
-    def did_change_notebook_document(self,  params: types.DidChangeNotebookDocumentParams):
+    def did_change_notebook_document(self, params: types.DidChangeNotebookDocumentParams):
         return self.dispatcher("notebookDocument/didChange", params)
 
-    def did_save_notebook_document(self,  params: types.DidSaveNotebookDocumentParams):
+    def did_save_notebook_document(self, params: types.DidSaveNotebookDocumentParams):
         """A notification sent when a notebook document is saved.
 
         @since 3.17.0"""
         return self.dispatcher("notebookDocument/didSave", params)
 
-    def did_close_notebook_document(self,  params: types.DidCloseNotebookDocumentParams):
+    def did_close_notebook_document(self, params: types.DidCloseNotebookDocumentParams):
         """A notification sent when a notebook closes.
 
         @since 3.17.0"""
         return self.dispatcher("notebookDocument/didClose", params)
 
-    def initialized(self,  params: types.InitializedParams):
+    def initialized(self, params: types.InitializedParams):
         """The initialized notification is sent from the client to the
         server after the client is fully initialized and the server
         is allowed to send requests from the server to the client."""
@@ -434,13 +436,28 @@ class Notification:
         ask the server to exit its process."""
         return self.dispatcher("exit", None)
 
-    def workspace_did_change_configuration(self,  params: types.DidChangeConfigurationParams):
+    def workspace_did_change_configuration(self, params: types.DidChangeConfigurationParams):
         """The configuration change notification is sent from the client to the server
         when the client's configuration has changed. The notification contains
         the changed configuration as defined by the language client."""
         return self.dispatcher("workspace/didChangeConfiguration", params)
 
-    def did_open_text_document(self,  params: types.DidOpenTextDocumentParams):
+    async def on_show_message(self, *, timeout: float | None = None) -> types.ShowMessageParams:
+        """The show message notification is sent from a server to a client to ask
+        the client to display a particular message in the user interface."""
+        return await self.on_notification("window/showMessage", timeout)
+
+    async def on_log_message(self, *, timeout: float | None = None) -> types.LogMessageParams:
+        """The log message notification is sent from the server to the client to ask
+        the client to log a particular message."""
+        return await self.on_notification("window/logMessage", timeout)
+
+    async def on_telemetry_event(self, *, timeout: float | None = None) -> types.LSPAny:
+        """The telemetry event notification is sent from the server to the client to ask
+        the client to log telemetry data."""
+        return await self.on_notification("telemetry/event", timeout)
+
+    def did_open_text_document(self, params: types.DidOpenTextDocumentParams):
         """The document open notification is sent from the client to the server to signal
         newly opened text documents. The document's truth is now managed by the client
         and the server must not try to read the document's truth using the document's
@@ -451,12 +468,12 @@ class Notification:
         is one."""
         return self.dispatcher("textDocument/didOpen", params)
 
-    def did_change_text_document(self,  params: types.DidChangeTextDocumentParams):
+    def did_change_text_document(self, params: types.DidChangeTextDocumentParams):
         """The document change notification is sent from the client to the server to signal
         changes to a text document."""
         return self.dispatcher("textDocument/didChange", params)
 
-    def did_close_text_document(self,  params: types.DidCloseTextDocumentParams):
+    def did_close_text_document(self, params: types.DidCloseTextDocumentParams):
         """The document close notification is sent from the client to the server when
         the document got closed in the client. The document's truth now exists where
         the document's uri points to (e.g. if the document's uri is a file uri the
@@ -466,26 +483,40 @@ class Notification:
         notification requires a previous open notification to be sent."""
         return self.dispatcher("textDocument/didClose", params)
 
-    def did_save_text_document(self,  params: types.DidSaveTextDocumentParams):
+    def did_save_text_document(self, params: types.DidSaveTextDocumentParams):
         """The document save notification is sent from the client to the server when
         the document got saved in the client."""
         return self.dispatcher("textDocument/didSave", params)
 
-    def will_save_text_document(self,  params: types.WillSaveTextDocumentParams):
+    def will_save_text_document(self, params: types.WillSaveTextDocumentParams):
         """A document will save notification is sent from the client to the server before
         the document is actually saved."""
         return self.dispatcher("textDocument/willSave", params)
 
-    def did_change_watched_files(self,  params: types.DidChangeWatchedFilesParams):
+    def did_change_watched_files(self, params: types.DidChangeWatchedFilesParams):
         """The watched files notification is sent from the client to the server when
         the client detects changes to file watched by the language client."""
         return self.dispatcher("workspace/didChangeWatchedFiles", params)
 
-    def set_trace(self,  params: types.SetTraceParams):
+    async def on_publish_diagnostics(self, *, timeout: float | None = None) -> types.PublishDiagnosticsParams:
+        """Diagnostics notification are sent from the server to the client to signal
+        results of validation runs."""
+        return await self.on_notification("textDocument/publishDiagnostics", timeout)
+
+    def set_trace(self, params: types.SetTraceParams):
         return self.dispatcher("$/setTrace", params)
 
-    def cancel_request(self,  params: types.CancelParams):
+    async def on_log_trace(self, *, timeout: float | None = None) -> types.LogTraceParams:
+        return await self.on_notification("$/logTrace", timeout)
+
+    async def on_cancel_request(self, *, timeout: float | None = None) -> types.CancelParams:
+        return await self.on_notification("$/cancelRequest", timeout)
+
+    def cancel_request(self, params: types.CancelParams):
         return self.dispatcher("$/cancelRequest", params)
 
-    def progress(self,  params: types.ProgressParams):
+    async def on_progress(self, *, timeout: float | None = None) -> types.ProgressParams:
+        return await self.on_notification("$/progress", timeout)
+
+    def progress(self, params: types.ProgressParams):
         return self.dispatcher("$/progress", params)

@@ -64,15 +64,17 @@ class LSPSession:
     def __init__(self, process_launch_info: ProcessLaunchInfo):
         self._process_launch_info = process_launch_info
         self._process: asyncio.subprocess.Process | None = None
-        self._notification_queue: asyncio.Queue[lsp_types.LSPObject] = asyncio.Queue()
+        self._notification_listeners: list[asyncio.Queue[lsp_types.LSPObject]] = []
         self._pending_requests: dict[int | str, asyncio.Future[Any]] = {}
         self._request_id_gen = itertools.count(1)
         self._tasks: list[asyncio.Task] = []
         self._shutdown = False
 
         # Maintain typed interface
-        self.send = lsp_types.Request(self._send_request)
-        self.notify = lsp_types.Notification(self._send_notification)
+        self.send = lsp_types.RequestFunctions(self._send_request)
+        self.notify = lsp_types.NotificationFunctions(
+            self._send_notification, self._on_notification
+        )
 
     async def __aenter__(self) -> "LSPSession":
         await self.start()
@@ -139,9 +141,15 @@ class LSPSession:
             async for notification in session.notifications():
                 # Process notification
         """
-        while True:
-            yield await self._notification_queue.get()
-            self._notification_queue.task_done()
+        queue: asyncio.Queue[lsp_types.LSPObject] = asyncio.Queue()
+        self._notification_listeners.append(queue)
+
+        try:
+            while True:
+                yield await queue.get()
+                queue.task_done()
+        finally:
+            self._notification_listeners.remove(queue)
 
     async def _send_request(self, method: str, params: lsp_types.LSPAny = None) -> Any:
         """Send a request to the server and await the response."""
@@ -174,6 +182,15 @@ class LSPSession:
         self._tasks.append(task)
 
         return task
+
+    async def _on_notification(
+        self, method: str, timeout: float | None = None
+    ) -> lsp_types.LSPAny:
+        """Wait for a specific notification from the server."""
+        # TODO: implement timeout
+        async for notification in self.notifications():
+            if notification["method"] == method:
+                return notification["params"]
 
     @staticmethod
     async def _send_payload(
@@ -226,7 +243,7 @@ class LSPSession:
                 # Handle message based on type
                 if "method" in payload:
                     # Server notification
-                    await self._notification_queue.put(payload)
+                    [q.put_nowait(payload) for q in self._notification_listeners]
                 elif "id" in payload:
                     # Response to client request
                     request_id = payload["id"]
