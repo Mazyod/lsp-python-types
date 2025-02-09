@@ -1,4 +1,6 @@
+import asyncio
 import os
+import datetime as dt
 
 import lsp_types as types
 from lsp_types.session import LSPSession, ProcessLaunchInfo
@@ -9,6 +11,20 @@ async def test_server_initialize():
     # * Note: pyright must be installed and accessible (e.g. npm i -g pyright)
     process_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
     async with LSPSession(process_info) as session:
+
+        async def wait_for_notification(
+            method: str, *, timeout: dt.timedelta = dt.timedelta(seconds=1)
+        ):
+            async def _notifications_iter():
+                async for notification in session.notifications():
+                    if notification["method"] == method:
+                        return notification
+                assert False, f"Notification {method} not received"
+
+            return await asyncio.wait_for(
+                _notifications_iter(), timeout.total_seconds()
+            )
+
         # Send initialize request
         initialize_params: types.InitializeParams = {
             # NOTE: If processId is set to `1` or something, the server will crash after ~3 seconds
@@ -66,6 +82,9 @@ async def test_server_initialize():
                 }
             }
         )
+
+        diagnostics = await wait_for_notification("textDocument/publishDiagnostics")
+        assert diagnostics["params"]["diagnostics"] == []
 
         # Simulate changing the document via didChange
 
