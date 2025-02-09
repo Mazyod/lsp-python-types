@@ -9,11 +9,15 @@ method_to_symbol_name = {
     "notebookDocument/didClose": "did_close_notebook_document",
     "notebookDocument/didOpen": "did_open_notebook_document",
     "notebookDocument/didSave": "did_save_notebook_document",
+    "telemetry/event": "telemetry_event",
     "textDocument/didChange": "did_change_text_document",
     "textDocument/didClose": "did_close_text_document",
     "textDocument/didOpen": "did_open_text_document",
     "textDocument/didSave": "did_save_text_document",
+    "textDocument/publishDiagnostics": "publish_diagnostics",
     "textDocument/willSave": "will_save_text_document",
+    "window/logMessage": "log_message",
+    "window/showMessage": "show_message",
     "window/workDoneProgress/cancel": "cancel_work_done_progress",
     "workspace/didChangeConfiguration": "workspace_did_change_configuration",
     "workspace/didChangeWatchedFiles": "did_change_watched_files",
@@ -22,20 +26,26 @@ method_to_symbol_name = {
     "workspace/didDeleteFiles": "did_delete_files",
     "workspace/didRenameFiles": "did_rename_files",
     "$/cancelRequest": "cancel_request",
-    "$/setTrace": "set_trace",
+    "$/logTrace": "log_trace",
     "$/progress": "progress",
+    "$/setTrace": "set_trace",
 }
 
 
 def generate_notifications(notifications: list[Notification]) -> list[str]:
-    def toString(notification: Notification) -> str:
-        return generate_notification(notification)
+    generated_notifications = []
+    failed = False
+    for notification in notifications:
+        try:
+            generated_notifications.append(generate_notification(notification))
+        except Exception as e:
+            print(f"Error generating notification: {e}")
+            failed = True
 
-    return [
-        toString(notification)
-        for notification in notifications
-        if notification["messageDirection"] in ["clientToServer", "both"]
-    ]
+    if failed:
+        raise Exception("Failed to generate notifications")
+
+    return generated_notifications
 
 
 def generate_notification(notification: Notification) -> str:

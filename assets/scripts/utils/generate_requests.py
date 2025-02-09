@@ -7,6 +7,8 @@ method_to_symbol_name = {
     "codeLens/resolve": "resolve_code_lens",
     "callHierarchy/incomingCalls": "incoming_calls",
     "callHierarchy/outgoingCalls": "outgoing_calls",
+    "client/registerCapability": "register_capability",
+    "client/unregisterCapability": "unregister_capability",
     "completionItem/resolve": "resolve_completion_item",
     "documentLink/resolve": "resolve_document_link",
     "initialize": "initialize",
@@ -49,26 +51,44 @@ method_to_symbol_name = {
     "textDocument/rangesFormatting": "ranges_formatting",
     "typeHierarchy/supertypes": "type_hierarchy_supertypes",
     "typeHierarchy/subtypes": "type_hierarchy_subtypes",
+    "window/workDoneProgress/create": "create_work_done_progress",
+    "window/showDocument": "show_document",
+    "window/showMessageRequest": "show_message_request",
+    "workspace/applyEdit": "apply_edit",
+    "workspace/codeLens/refresh": "code_lens_refresh",
+    "workspace/configuration": "workspace_configuration",
     "workspace/diagnostic": "workspace_diagnostic",
+    "workspace/diagnostic/refresh": "diagnostic_refresh",
     "workspace/executeCommand": "execute_command",
+    "workspace/inlayHint/refresh": "inlay_hint_refresh",
+    "workspace/inlineValue/refresh": "inline_value_refresh",
+    "workspace/foldingRange/refresh": "folding_range_refresh",
     "workspace/textDocumentContent": "workspace_text_document_content",
+    "workspace/textDocumentContent/refresh": "text_document_content_refresh",
     "workspace/willCreateFiles": "will_create_files",
     "workspace/willRenameFiles": "will_rename_files",
     "workspace/willDeleteFiles": "will_delete_files",
+    "workspace/workspaceFolders": "workspace_folders",
+    "workspace/semanticTokens/refresh": "semantic_tokens_refresh",
     "workspace/symbol": "workspace_symbol",
     "workspaceSymbol/resolve": "resolve_workspace_symbol",
 }
 
 
 def generate_requests(requests: list[Request]) -> list[str]:
-    def toString(request: Request) -> str:
-        return generate_request(request)
+    generated_requests = []
+    failed = False
+    for request in requests:
+        try:
+            generated_requests.append(generate_request(request))
+        except Exception as e:
+            print(f"Error generating request: {e}")
+            failed = True
 
-    return [
-        toString(request)
-        for request in requests
-        if request["messageDirection"] in ["clientToServer", "both"]
-    ]
+    if failed:
+        raise Exception("Failed to generate requests")
+
+    return generated_requests
 
 
 def generate_request(request: Request) -> str:
