@@ -42,7 +42,7 @@ async with LSPSession(process_info) as session:
     # Grab a typed listener
     diagnostics_listener = session.notify.on_publish_diagnostics(timeout=1.0)
 
-    # Send a notification
+    # Send a notification (`await` is optional. It ensures messages have been drained)
     await session.notify.did_open_text_document(...)
 
     # Wait for diagnostics to come in
