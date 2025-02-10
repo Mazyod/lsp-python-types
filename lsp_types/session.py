@@ -183,14 +183,25 @@ class LSPSession:
 
         return task
 
-    async def _on_notification(
+    def _on_notification(
         self, method: str, timeout: float | None = None
-    ) -> lsp_types.LSPAny:
+    ) -> asyncio.Future[lsp_types.LSPAny]:
         """Wait for a specific notification from the server."""
-        # TODO: implement timeout
-        async for notification in self.notifications():
-            if notification["method"] == method:
-                return notification["params"]
+
+        async def _wait_for_notification():
+            async for notification in self.notifications():
+                if notification["method"] == method:
+                    return notification["params"]
+
+        coroutine = _wait_for_notification()
+        if timeout is not None:
+            coroutine = asyncio.wait_for(coroutine, timeout)
+
+        wait_task = asyncio.create_task(coroutine)
+        self._tasks.append(wait_task)
+        wait_task.add_done_callback(self._tasks.remove)
+
+        return wait_task
 
     @staticmethod
     async def _send_payload(

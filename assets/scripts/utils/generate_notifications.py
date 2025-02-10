@@ -73,13 +73,14 @@ def generate_notification_handler(
             raise Exception(f"Expected params to have 'name', but got: {params!r}")
         return_type = f"types.{params_type}"
 
-    result = f"{indentation}async def on_{symbol_name}({', '.join(formatted_params)}) -> {return_type}:"
+    return_type = f"asyncio.Future[{return_type}]"
+    result = f"{indentation}def on_{symbol_name}({', '.join(formatted_params)}) -> {return_type}:"
 
     documentation = format_comment(notification.get("documentation"), 2 * indentation)
     if documentation.strip():
         result += f"\n{documentation}"
 
-    result += f"""\n{indentation}{indentation}return await self.on_notification("{method}", timeout)\n"""
+    result += f"""\n{indentation}{indentation}return self.on_notification("{method}", timeout)\n"""
 
     return result
 

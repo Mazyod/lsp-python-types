@@ -51,6 +51,9 @@ async def test_server_initialize():
         # Update settings via didChangeConfiguration
         await session.notify.workspace_did_change_configuration({"settings": {}})
 
+        # Prepare a diagnostics listener ahead of time
+        diagnostics_listener = session.notify.on_publish_diagnostics(timeout=1.0)
+
         # Simulate opening a document via didOpen
         document_uri = "file:///test.py"  # Test file path
         document_version = 1
@@ -67,7 +70,7 @@ async def test_server_initialize():
             }
         )
 
-        diagnostics = await session.notify.on_publish_diagnostics(timeout=1.0)
+        diagnostics = await diagnostics_listener
         assert diagnostics["diagnostics"] == []
 
         # Simulate changing the document via didChange

@@ -1,6 +1,9 @@
 # LSP Types
+_Publish the excellent work of [Sublime LSP](https://github.com/sublimelsp/lsp-python-types) as a PyPI package._
 
-Publish the excellent work of [Sublime LSP](https://github.com/sublimelsp/lsp-python-types) as a PyPI package.
+__LSP Types__ is a Python package that aims to provide a fully typed interface to Language Server Protocol (LSP) interactions. It can be used to simply utilize the types, or to interact with an LSP server over stdio.
+
+It is a goal to maintain zero-dependency status for as long as possible.
 
 ## Installation
 
@@ -28,12 +31,23 @@ process_info = ProcessLaunchInfo(cmd=[
 ])
 
 async with LSPSession(process_info) as session:
-    # Use the session
+    # Initialize the session
+    ...
+
+    # Grab a typed listener
+    diagnostics_listener = session.notify.on_publish_diagnostics(timeout=1.0)
+
+    # Send a notification
+    await session.notify.did_open_text_document(...)
+
+    # Wait for diagnostics to come in
+    diagnostics = await diagnostics_listener
 ```
 
 ## Development
 
-Requires Python 3.11+.
+- Requires Python 3.11+.
+- Requires `poetry` for dev dependencies.
 
 Generate latest types in one go:
 ```sh

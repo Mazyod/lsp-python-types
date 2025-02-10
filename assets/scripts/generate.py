@@ -69,6 +69,7 @@ def generate_python_requests(lsp_json: MetaModel, output: Path):
 # DO NOT EDIT.
 # LSP v{specification_version}
 
+import asyncio
 from typing import Any, Awaitable, Callable, Union
 from . import types
 
@@ -84,7 +85,7 @@ class RequestFunctions:
 
 
 NotificationDispatcher = Callable[[str, types.LSPAny], Awaitable[None]]
-NotificationHandler = Callable[[str, float | None], Awaitable[Union[types.LSPAny]]]
+NotificationHandler = Callable[[str, float | None], asyncio.Future[types.LSPAny]]
 
 
 class NotificationFunctions:

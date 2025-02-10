@@ -4,6 +4,7 @@ from __future__ import annotations
 # DO NOT EDIT.
 # LSP v3.17.0
 
+import asyncio
 from typing import Any, Awaitable, Callable, Union
 from . import types
 
@@ -365,7 +366,7 @@ class RequestFunctions:
 
 
 NotificationDispatcher = Callable[[str, types.LSPAny], Awaitable[None]]
-NotificationHandler = Callable[[str, float | None], Awaitable[Union[types.LSPAny]]]
+NotificationHandler = Callable[[str, float | None], asyncio.Future[types.LSPAny]]
 
 
 class NotificationFunctions:
@@ -442,20 +443,20 @@ class NotificationFunctions:
         the changed configuration as defined by the language client."""
         return self.dispatcher("workspace/didChangeConfiguration", params)
 
-    async def on_show_message(self, *, timeout: float | None = None) -> types.ShowMessageParams:
+    def on_show_message(self, *, timeout: float | None = None) -> asyncio.Future[types.ShowMessageParams]:
         """The show message notification is sent from a server to a client to ask
         the client to display a particular message in the user interface."""
-        return await self.on_notification("window/showMessage", timeout)
+        return self.on_notification("window/showMessage", timeout)
 
-    async def on_log_message(self, *, timeout: float | None = None) -> types.LogMessageParams:
+    def on_log_message(self, *, timeout: float | None = None) -> asyncio.Future[types.LogMessageParams]:
         """The log message notification is sent from the server to the client to ask
         the client to log a particular message."""
-        return await self.on_notification("window/logMessage", timeout)
+        return self.on_notification("window/logMessage", timeout)
 
-    async def on_telemetry_event(self, *, timeout: float | None = None) -> types.LSPAny:
+    def on_telemetry_event(self, *, timeout: float | None = None) -> asyncio.Future[types.LSPAny]:
         """The telemetry event notification is sent from the server to the client to ask
         the client to log telemetry data."""
-        return await self.on_notification("telemetry/event", timeout)
+        return self.on_notification("telemetry/event", timeout)
 
     def did_open_text_document(self, params: types.DidOpenTextDocumentParams):
         """The document open notification is sent from the client to the server to signal
@@ -498,25 +499,25 @@ class NotificationFunctions:
         the client detects changes to file watched by the language client."""
         return self.dispatcher("workspace/didChangeWatchedFiles", params)
 
-    async def on_publish_diagnostics(self, *, timeout: float | None = None) -> types.PublishDiagnosticsParams:
+    def on_publish_diagnostics(self, *, timeout: float | None = None) -> asyncio.Future[types.PublishDiagnosticsParams]:
         """Diagnostics notification are sent from the server to the client to signal
         results of validation runs."""
-        return await self.on_notification("textDocument/publishDiagnostics", timeout)
+        return self.on_notification("textDocument/publishDiagnostics", timeout)
 
     def set_trace(self, params: types.SetTraceParams):
         return self.dispatcher("$/setTrace", params)
 
-    async def on_log_trace(self, *, timeout: float | None = None) -> types.LogTraceParams:
-        return await self.on_notification("$/logTrace", timeout)
+    def on_log_trace(self, *, timeout: float | None = None) -> asyncio.Future[types.LogTraceParams]:
+        return self.on_notification("$/logTrace", timeout)
 
-    async def on_cancel_request(self, *, timeout: float | None = None) -> types.CancelParams:
-        return await self.on_notification("$/cancelRequest", timeout)
+    def on_cancel_request(self, *, timeout: float | None = None) -> asyncio.Future[types.CancelParams]:
+        return self.on_notification("$/cancelRequest", timeout)
 
     def cancel_request(self, params: types.CancelParams):
         return self.dispatcher("$/cancelRequest", params)
 
-    async def on_progress(self, *, timeout: float | None = None) -> types.ProgressParams:
-        return await self.on_notification("$/progress", timeout)
+    def on_progress(self, *, timeout: float | None = None) -> asyncio.Future[types.ProgressParams]:
+        return self.on_notification("$/progress", timeout)
 
     def progress(self, params: types.ProgressParams):
         return self.dispatcher("$/progress", params)
