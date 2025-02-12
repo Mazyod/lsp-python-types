@@ -24,6 +24,7 @@ class PyrightSession(lsp_types.Session):
         lsp_process = LSPProcess(proc_info)
         await lsp_process.start()
 
+        # TODO: ability to configure these options
         await lsp_process.send.initialize(
             {
                 "processId": None,
