@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import typing as t
 
 import lsp_types
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
@@ -8,14 +9,16 @@ from lsp_types.process import LSPProcess, ProcessLaunchInfo
 from .config_schema import Model as PyrightConfig
 
 
-class PyrightSession(Session):
+class PyrightSession(lsp_types.Session):
     """Pyright LSP session implementation"""
 
     @classmethod
     async def create(
         cls, *, initial_code: str = "", options: PyrightConfig = {}
-    ) -> "Session":
+    ) -> t.Self:
         """Create a new Pyright session"""
+        # TODO: synthesize a pyrightconfig.json file
+
         proc_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
         lsp_process = LSPProcess(proc_info)
         await lsp_process.start()
@@ -58,19 +61,91 @@ class PyrightSession(Session):
 
         return pyright_session
 
-    def __init__(self, lsp_session: LSPProcess):
-        self._session = lsp_session
+    def __init__(self, lsp_process: LSPProcess):
+        self._process = lsp_process
         self._document_uri = "file:///test.py"
         self._document_version = 1
+        self._document_text = ""
+
+    # region - Session methods
 
     async def shutdown(self) -> None:
         """Shutdown the session"""
-        await self._session.send.shutdown()
-        await self._session.notify.exit()
+        await self._process.send.shutdown()
+        await self._process.notify.exit()
+
+    async def update_code(self, code: str) -> int:
+        """Update the code in the current document"""
+        self._document_version += 1
+        self._document_text = code
+
+        document_version = self._document_version
+        await self._process.notify.did_change_text_document(
+            {
+                "textDocument": {
+                    "uri": self._document_uri,
+                    "version": self._document_version,
+                },
+                "contentChanges": [{"text": code}],
+            }
+        )
+
+        return document_version
+
+    async def get_diagnostics(self):
+        """Get diagnostics for the given code"""
+        # FIXME: riddled with race conditions
+        return await self._process.notify.on_publish_diagnostics()
+
+    async def get_hover_info(
+        self, position: lsp_types.Position
+    ) -> lsp_types.Hover | None:
+        """Get hover information at the given position"""
+        return await self._process.send.hover(
+            {"textDocument": {"uri": self._document_uri}, "position": position}
+        )
+
+    async def get_rename_edits(
+        self, position: lsp_types.Position, new_name: str
+    ) -> lsp_types.WorkspaceEdit | None:
+        """Get rename edits for the given position"""
+        return await self._process.send.rename(
+            {
+                "textDocument": {"uri": self._document_uri},
+                "position": position,
+                "newName": new_name,
+            }
+        )
+
+    async def get_signature_help(
+        self, position: lsp_types.Position
+    ) -> lsp_types.SignatureHelp | None:
+        """Get signature help at the given position"""
+        return await self._process.send.signature_help(
+            {"textDocument": {"uri": self._document_uri}, "position": position}
+        )
+
+    async def get_completion(
+        self, position: lsp_types.Position
+    ) -> lsp_types.CompletionList | list[lsp_types.CompletionItem] | None:
+        """Get completion items at the given position"""
+        return await self._process.send.completion(
+            {"textDocument": {"uri": self._document_uri}, "position": position}
+        )
+
+    async def resolve_completion(
+        self, completion_item: lsp_types.CompletionItem
+    ) -> lsp_types.CompletionItem:
+        """Resolve the given completion item"""
+        return await self._process.send.resolve_completion_item(completion_item)
+
+    # endregion
+
+    # Private methods
 
     async def _open_document(self, code: str) -> None:
         """Open a document with the given code"""
-        await self._session.notify.did_open_text_document(
+        await self._process.notify.did_open_text_document(
             {
                 "textDocument": {
                     "languageId": lsp_types.LanguageKind.Python,
@@ -80,56 +155,3 @@ class PyrightSession(Session):
                 }
             }
         )
-
-    async def get_diagnostics(self, code: str):
-        """Get diagnostics for the given code"""
-        # FIXME: riddled with race conditions
-        diagnostics_listener = self._session.notify.on_publish_diagnostics()
-        await self._open_document(code)
-        return await diagnostics_listener
-
-    async def get_hover_info(
-        self, code: str, position: lsp_types.Position
-    ) -> lsp_types.Hover | None:
-        """Get hover information at the given position"""
-        await self._open_document(code)
-        return await self._session.send.hover(
-            {"textDocument": {"uri": self._document_uri}, "position": position}
-        )
-
-    async def get_rename_edits(
-        self, code: str, position: lsp_types.Position, new_name: str
-    ) -> lsp_types.WorkspaceEdit | None:
-        """Get rename edits for the given position"""
-        await self._open_document(code)
-        return await self._session.send.rename(
-            {
-                "textDocument": {"uri": self._document_uri},
-                "position": position,
-                "newName": new_name,
-            }
-        )
-
-    async def get_signature_help(
-        self, code: str, position: lsp_types.Position
-    ) -> lsp_types.SignatureHelp | None:
-        """Get signature help at the given position"""
-        await self._open_document(code)
-        return await self._session.send.signature_help(
-            {"textDocument": {"uri": self._document_uri}, "position": position}
-        )
-
-    async def get_completion(
-        self, code: str, position: lsp_types.Position
-    ) -> lsp_types.CompletionList | list[lsp_types.CompletionItem] | None:
-        """Get completion items at the given position"""
-        await self._open_document(code)
-        return await self._session.send.completion(
-            {"textDocument": {"uri": self._document_uri}, "position": position}
-        )
-
-    async def resolve_completion(
-        self, completion_item: lsp_types.CompletionItem
-    ) -> lsp_types.CompletionItem:
-        """Resolve the given completion item"""
-        return await self._session.send.resolve_completion_item(completion_item)

@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any, cast as type_cast
 
-import lsp_types
+from . import types, requests
 
 CONTENT_LENGTH = "Content-Length: "
 ENCODING = "utf-8"
@@ -23,16 +23,16 @@ class ProcessLaunchInfo:
 
 
 class Error(Exception):
-    def __init__(self, code: lsp_types.ErrorCodes, message: str) -> None:
+    def __init__(self, code: types.ErrorCodes, message: str) -> None:
         super().__init__(message)
         self.code = code
 
-    def to_lsp(self) -> lsp_types.LSPObject:
+    def to_lsp(self) -> types.LSPObject:
         return {"code": self.code, "message": super().__str__()}
 
     @classmethod
-    def from_lsp(cls, d: lsp_types.LSPObject) -> "Error":
-        code = lsp_types.ErrorCodes(d["code"])
+    def from_lsp(cls, d: types.LSPObject) -> "Error":
+        code = types.ErrorCodes(d["code"])
         message = type_cast(str, d["message"])
         return Error(code, message)
 
@@ -64,15 +64,15 @@ class LSPProcess:
     def __init__(self, process_launch_info: ProcessLaunchInfo):
         self._process_launch_info = process_launch_info
         self._process: asyncio.subprocess.Process | None = None
-        self._notification_listeners: list[asyncio.Queue[lsp_types.LSPObject]] = []
+        self._notification_listeners: list[asyncio.Queue[types.LSPObject]] = []
         self._pending_requests: dict[int | str, asyncio.Future[Any]] = {}
         self._request_id_gen = itertools.count(1)
         self._tasks: list[asyncio.Task] = []
         self._shutdown = False
 
         # Maintain typed interface
-        self.send = lsp_types.RequestFunctions(self._send_request)
-        self.notify = lsp_types.NotificationFunctions(
+        self.send = requests.RequestFunctions(self._send_request)
+        self.notify = requests.NotificationFunctions(
             self._send_notification, self._on_notification
         )
 
@@ -141,7 +141,7 @@ class LSPProcess:
             async for notification in process.notifications():
                 # Process notification
         """
-        queue: asyncio.Queue[lsp_types.LSPObject] = asyncio.Queue()
+        queue: asyncio.Queue[types.LSPObject] = asyncio.Queue()
         self._notification_listeners.append(queue)
 
         try:
@@ -151,7 +151,7 @@ class LSPProcess:
         finally:
             self._notification_listeners.remove(queue)
 
-    async def _send_request(self, method: str, params: lsp_types.LSPAny = None) -> Any:
+    async def _send_request(self, method: str, params: types.LSPAny = None) -> Any:
         """Send a request to the server and await the response."""
         if not self._process or not self._process.stdin:
             raise RuntimeError("LSP process not available")
@@ -170,7 +170,7 @@ class LSPProcess:
             self._pending_requests.pop(request_id, None)
 
     def _send_notification(
-        self, method: str, params: lsp_types.LSPAny = None
+        self, method: str, params: types.LSPAny = None
     ) -> asyncio.Task[None]:
         """Send a notification to the server."""
         if not self._process or not self._process.stdin:
@@ -185,7 +185,7 @@ class LSPProcess:
 
     def _on_notification(
         self, method: str, timeout: float | None = None
-    ) -> asyncio.Future[lsp_types.LSPAny]:
+    ) -> asyncio.Future[types.LSPAny]:
         """Wait for a specific notification from the server."""
 
         async def _wait_for_notification():
@@ -205,7 +205,7 @@ class LSPProcess:
 
     @staticmethod
     async def _send_payload(
-        stream: asyncio.StreamWriter, payload: lsp_types.LSPObject
+        stream: asyncio.StreamWriter, payload: types.LSPObject
     ) -> None:
         """Send a payload to the server asynchronously."""
         logger.debug("Client -> Server: %s", payload)
@@ -267,7 +267,7 @@ class LSPProcess:
                         else:
                             future.set_exception(
                                 Error(
-                                    lsp_types.ErrorCodes.InvalidRequest,
+                                    types.ErrorCodes.InvalidRequest,
                                     "Invalid response",
                                 )
                             )
@@ -294,11 +294,11 @@ class LSPProcess:
             logger.exception("Client - Error reading stderr")
 
 
-def make_notification(method: str, params: lsp_types.LSPAny) -> lsp_types.LSPObject:
+def make_notification(method: str, params: types.LSPAny) -> types.LSPObject:
     return {"jsonrpc": "2.0", "method": method, "params": params}
 
 
 def make_request(
-    method: str, request_id: int | str, params: lsp_types.LSPAny
-) -> lsp_types.LSPObject:
+    method: str, request_id: int | str, params: types.LSPAny
+) -> types.LSPObject:
     return {"jsonrpc": "2.0", "method": method, "id": request_id, "params": params}
