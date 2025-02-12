@@ -1,14 +1,14 @@
 import os
 
 import lsp_types as types
-from lsp_types.session import LSPSession, ProcessLaunchInfo
+from lsp_types.process import LSPProcess, ProcessLaunchInfo
 
 
 async def test_server_initialize():
-    # Create an LSP Session with pyright-langserver
+    # Create an LSP Process with pyright-langserver
     # * Note: pyright must be installed and accessible (e.g. npm i -g pyright)
     process_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
-    async with LSPSession(process_info) as session:
+    async with LSPProcess(process_info) as process:
         # Send initialize request
         initialize_params: types.InitializeParams = {
             # NOTE: If processId is set to `1` or something, the server will crash after ~3 seconds
@@ -37,7 +37,7 @@ async def test_server_initialize():
             },
         }
 
-        result = await session.send.initialize(initialize_params)
+        result = await process.send.initialize(initialize_params)
 
         # Basic assertions about the response
         assert result is not None
@@ -49,17 +49,17 @@ async def test_server_initialize():
         assert result["capabilities"]["hoverProvider"] == {"workDoneProgress": True}
 
         # Update settings via didChangeConfiguration
-        await session.notify.workspace_did_change_configuration({"settings": {}})
+        await process.notify.workspace_did_change_configuration({"settings": {}})
 
         # Prepare a diagnostics listener ahead of time
-        diagnostics_listener = session.notify.on_publish_diagnostics(timeout=1.0)
+        diagnostics_listener = process.notify.on_publish_diagnostics(timeout=1.0)
 
         # Simulate opening a document via didOpen
         document_uri = "file:///test.py"  # Test file path
         document_version = 1
         document_text = "print('Correct code')"  # Simple test content
 
-        await session.notify.did_open_text_document(
+        await process.notify.did_open_text_document(
             {
                 "textDocument": {
                     "uri": document_uri,
@@ -78,7 +78,7 @@ async def test_server_initialize():
         document_text += "\nprint('New line')"
         document_version += 1
 
-        await session.notify.did_change_text_document(
+        await process.notify.did_change_text_document(
             {
                 "textDocument": {
                     "uri": document_uri,

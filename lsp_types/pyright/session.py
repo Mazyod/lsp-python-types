@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+import os
+
+import lsp_types
+from lsp_types.process import LSPProcess, ProcessLaunchInfo
+
+from .config_schema import Model as PyrightConfig
+
+
+class PyrightSession(Session):
+    """Pyright LSP session implementation"""
+
+    @classmethod
+    async def create(
+        cls, *, initial_code: str = "", options: PyrightConfig = {}
+    ) -> "Session":
+        """Create a new Pyright session"""
+        proc_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
+        lsp_process = LSPProcess(proc_info)
+        await lsp_process.start()
+
+        await lsp_process.send.initialize(
+            {
+                "processId": None,
+                "rootUri": f"file://{os.getcwd()}",
+                "rootPath": os.getcwd(),
+                "capabilities": {
+                    "textDocument": {
+                        "publishDiagnostics": {
+                            "versionSupport": True,
+                            "tagSupport": {
+                                "valueSet": [
+                                    lsp_types.DiagnosticTag.Unnecessary,
+                                    lsp_types.DiagnosticTag.Deprecated,
+                                ]
+                            },
+                        },
+                        "hover": {
+                            "contentFormat": [
+                                lsp_types.MarkupKind.Markdown,
+                                lsp_types.MarkupKind.PlainText,
+                            ],
+                        },
+                        "signatureHelp": {},
+                    }
+                },
+            }
+        )
+
+        # Update settings via didChangeConfiguration
+        await lsp_process.notify.workspace_did_change_configuration({"settings": {}})
+
+        pyright_session = cls(lsp_process)
+
+        # Simulate opening a document
+        await pyright_session._open_document(initial_code)
+
+        return pyright_session
+
+    def __init__(self, lsp_session: LSPProcess):
+        self._session = lsp_session
+        self._document_uri = "file:///test.py"
+        self._document_version = 1
+
+    async def shutdown(self) -> None:
+        """Shutdown the session"""
+        await self._session.send.shutdown()
+        await self._session.notify.exit()
+
+    async def _open_document(self, code: str) -> None:
+        """Open a document with the given code"""
+        await self._session.notify.did_open_text_document(
+            {
+                "textDocument": {
+                    "languageId": lsp_types.LanguageKind.Python,
+                    "version": self._document_version,
+                    "uri": self._document_uri,
+                    "text": code,
+                }
+            }
+        )
+
+    async def get_diagnostics(self, code: str):
+        """Get diagnostics for the given code"""
+        # FIXME: riddled with race conditions
+        diagnostics_listener = self._session.notify.on_publish_diagnostics()
+        await self._open_document(code)
+        return await diagnostics_listener
+
+    async def get_hover_info(
+        self, code: str, position: lsp_types.Position
+    ) -> lsp_types.Hover | None:
+        """Get hover information at the given position"""
+        await self._open_document(code)
+        return await self._session.send.hover(
+            {"textDocument": {"uri": self._document_uri}, "position": position}
+        )
+
+    async def get_rename_edits(
+        self, code: str, position: lsp_types.Position, new_name: str
+    ) -> lsp_types.WorkspaceEdit | None:
+        """Get rename edits for the given position"""
+        await self._open_document(code)
+        return await self._session.send.rename(
+            {
+                "textDocument": {"uri": self._document_uri},
+                "position": position,
+                "newName": new_name,
+            }
+        )
+
+    async def get_signature_help(
+        self, code: str, position: lsp_types.Position
+    ) -> lsp_types.SignatureHelp | None:
+        """Get signature help at the given position"""
+        await self._open_document(code)
+        return await self._session.send.signature_help(
+            {"textDocument": {"uri": self._document_uri}, "position": position}
+        )
+
+    async def get_completion(
+        self, code: str, position: lsp_types.Position
+    ) -> lsp_types.CompletionList | list[lsp_types.CompletionItem] | None:
+        """Get completion items at the given position"""
+        await self._open_document(code)
+        return await self._session.send.completion(
+            {"textDocument": {"uri": self._document_uri}, "position": position}
+        )
+
+    async def resolve_completion(
+        self, completion_item: lsp_types.CompletionItem
+    ) -> lsp_types.CompletionItem:
+        """Resolve the given completion item"""
+        return await self._session.send.resolve_completion_item(completion_item)

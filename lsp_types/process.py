@@ -40,22 +40,22 @@ class Error(Exception):
         return f"{super().__str__()} ({self.code})"
 
 
-class LSPSession:
+class LSPProcess:
     """
-    A session manager for Language Server Protocol communication.
+    A process manager for Language Server Protocol communication.
     Provides async/await interface for requests and notification queue for handling server messages.
 
     Usage:
-        async with LSPSession(process_info) as session:
+        async with LSPProcess(process_info) as process:
             # Send request and await response
-            init_result = await session.send.initialize(params)
+            init_result = await process.send.initialize(params)
 
             # Send notifications (awaiting is optional)
-            await session.send.did_open_text_document(params)
-            session.notify.did_change_text_document(params)
+            await process.send.did_open_text_document(params)
+            process.notify.did_change_text_document(params)
 
             # Process notifications from server
-            async for notification in session.notifications():
+            async for notification in process.notifications():
                 method = notification["method"]
                 params = notification["params"]
                 # Handle notification
@@ -76,7 +76,7 @@ class LSPSession:
             self._send_notification, self._on_notification
         )
 
-    async def __aenter__(self) -> "LSPSession":
+    async def __aenter__(self) -> "LSPProcess":
         await self.start()
         return self
 
@@ -138,7 +138,7 @@ class LSPSession:
         An async generator for processing server notifications.
 
         Usage:
-            async for notification in session.notifications():
+            async for notification in process.notifications():
                 # Process notification
         """
         queue: asyncio.Queue[lsp_types.LSPObject] = asyncio.Queue()

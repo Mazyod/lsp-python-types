@@ -26,24 +26,24 @@ import lsp_types
 # Use the types
 ```
 
-Using an LSP session through stdio:
+Using an LSP process through stdio:
 
 ```python
-from lsp_types.session import LSPSession, ProcessLaunchInfo
+from lsp_types.process import LSPProcess, ProcessLaunchInfo
 
 process_info = ProcessLaunchInfo(cmd=[
     "pyright-langserver", "--stdio"
 ])
 
-async with LSPSession(process_info) as session:
-    # Initialize the session
+async with LSPProcess(process_info) as process:
+    # Initialize the process
     ...
 
     # Grab a typed listener
-    diagnostics_listener = session.notify.on_publish_diagnostics(timeout=1.0)
+    diagnostics_listener = process.notify.on_publish_diagnostics(timeout=1.0)
 
     # Send a notification (`await` is optional. It ensures messages have been drained)
-    await session.notify.did_open_text_document(...)
+    await process.notify.did_open_text_document(...)
 
     # Wait for diagnostics to come in
     diagnostics = await diagnostics_listener
