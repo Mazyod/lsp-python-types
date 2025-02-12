@@ -19,6 +19,7 @@ class PyrightSession(lsp_types.Session):
         """Create a new Pyright session"""
         # TODO: synthesize a pyrightconfig.json file
 
+        # NOTE: requires node and pyright to be installed and accessible
         proc_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
         lsp_process = LSPProcess(proc_info)
         await lsp_process.start()
