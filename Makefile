@@ -1,6 +1,6 @@
 # Makefile for LSP Types Generator
 
-.PHONY: help generate-types download-schemas
+.PHONY: help download-schemas generate-lsp-schema generate-types generate-latest-types
 
 # Use bash for shell commands
 SHELL := /bin/bash
@@ -25,7 +25,7 @@ download-schemas: ## Download latest LSP schemas (run this before generate-types
 	python -m assets.scripts.download_schemas
 	echo "Done."
 
-generate-schema:
+generate-lsp-schema:
 	datamodel-codegen \
 		--input ./assets/lsprotocol/lsp.schema.json \
 		--output ./assets/scripts/lsp_schema.py \
@@ -39,9 +39,23 @@ generate-schema:
 # see: https://github.com/koxudaxi/datamodel-code-generator/issues/2314
 	python -m assets.scripts.postprocess_schema
 
+generate-pyright-schema:
+	datamodel-codegen \
+		--input ./assets/lsps/pyright.schema.json \
+		--output ./lsp_types/python/pyright.py \
+		--output-model-type "typing.TypedDict" \
+		--target-python-version "3.11" \
+		--input-file-type "jsonschema" \
+		--use-field-description \
+		--use-schema-description \
+		--use-double-quotes
+
+# see: https://github.com/koxudaxi/datamodel-code-generator/issues/2314
+# python -m assets.scripts.postprocess_schema
+
 generate-types: ## Generate LSP type definitions
 	echo "Generating LSP type definitions..."
 	python -m assets.scripts.generate
 	echo "Done."
 
-generate-latest-types: download-schemas generate-schema generate-types ## Download latest LSP schemas and generate type definitions
+generate-latest-types: download-schemas generate-lsp-schema generate-pyright-schema generate-types ## Download latest LSP schemas and generate type definitions
