@@ -72,3 +72,8 @@ make generate-schemas
 Copy the `lsp_types/types.py` file to your project.
 
 NOTE: Do not import types that begin with `__`. These types are internal types and are not meant to be used.
+
+### TODOs
+
+- Automate package releases on Github.
+- Support server request handlers.
