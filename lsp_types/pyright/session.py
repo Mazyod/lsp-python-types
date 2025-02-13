@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 import typing as t
 
 import lsp_types
@@ -14,10 +16,15 @@ class PyrightSession(lsp_types.Session):
 
     @classmethod
     async def create(
-        cls, *, initial_code: str = "", options: PyrightConfig = {}
+        cls,
+        *,
+        base_path: Path = Path("."),
+        initial_code: str = "",
+        options: PyrightConfig = {},
     ) -> t.Self:
         """Create a new Pyright session"""
-        # TODO: synthesize a pyrightconfig.json file
+        config_path = base_path / "pyrightconfig.json"
+        config_path.write_text(json.dumps(options, indent=2))
 
         # NOTE: requires node and pyright to be installed and accessible
         proc_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
