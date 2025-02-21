@@ -99,7 +99,8 @@ print(result)
         edit["newText"] == "say_hello"
         for change in changes
         if "edits" in change
-        for edit in change["edits"] if "newText" in edit
+        for edit in change["edits"]
+        if "newText" in edit
     ), "Expected to find 'say_hello' in changes"
 
     # Rename the variable
@@ -114,7 +115,8 @@ print(result)
         edit["newText"] == "greeting"
         for change in changes
         if "edits" in change
-        for edit in change["edits"] if "newText" in edit
+        for edit in change["edits"]
+        if "newText" in edit
     ), "Expected to find 'greeting' in changes"
 
     await pyright_session.shutdown()
@@ -133,7 +135,7 @@ complex_function(
 
     # Get signature help inside the function call
     sig_help = await pyright_session.get_signature_help(
-        lsp_types.Position(line=3, character=15)
+        lsp_types.Position(line=3, character=17)
     )
     assert sig_help is not None
     signatures = sig_help.get("signatures", [])

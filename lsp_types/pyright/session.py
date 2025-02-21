@@ -56,21 +56,7 @@ class PyrightSession(lsp_types.Session):
                             ],
                             # "dynamicRegistration": True,
                         },
-                        "signatureHelp": {
-                            "contextSupport": True,
-                            # "dynamicRegistration": True,
-                            "signatureInformation": {
-                                "activeParameterSupport": True,
-                                "noActiveParameterSupport": False,
-                                "parameterInformation": {
-                                    "labelOffsetSupport": True,
-                                },
-                                "documentationFormat": [
-                                    MarkupKind.Markdown,
-                                    MarkupKind.PlainText,
-                                ],
-                            },
-                        },
+                        "signatureHelp": {},
                     }
                 },
             }
