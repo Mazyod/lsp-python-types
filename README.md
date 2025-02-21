@@ -28,6 +28,9 @@ import lsp_types
 
 Using an LSP process through stdio:
 
+> [!TIP]
+> Recommend using [basedpyright](https://github.com/DetachHead/basedpyright) for extended features.
+
 ```python
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
 

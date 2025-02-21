@@ -7,6 +7,7 @@ import typing as t
 
 import lsp_types
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
+from lsp_types.types import MarkupKind
 
 from .config_schema import Model as PyrightConfig
 
@@ -26,7 +27,7 @@ class PyrightSession(lsp_types.Session):
         config_path = base_path / "pyrightconfig.json"
         config_path.write_text(json.dumps(options, indent=2))
 
-        # NOTE: requires node and pyright to be installed and accessible
+        # NOTE: requires node and basedpyright to be installed and accessible
         proc_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
         lsp_process = LSPProcess(proc_info)
         await lsp_process.start()
@@ -53,8 +54,23 @@ class PyrightSession(lsp_types.Session):
                                 lsp_types.MarkupKind.Markdown,
                                 lsp_types.MarkupKind.PlainText,
                             ],
+                            # "dynamicRegistration": True,
                         },
-                        "signatureHelp": {},
+                        "signatureHelp": {
+                            "contextSupport": True,
+                            # "dynamicRegistration": True,
+                            "signatureInformation": {
+                                "activeParameterSupport": True,
+                                "noActiveParameterSupport": False,
+                                "parameterInformation": {
+                                    "labelOffsetSupport": True,
+                                },
+                                "documentationFormat": [
+                                    MarkupKind.Markdown,
+                                    MarkupKind.PlainText,
+                                ],
+                            },
+                        },
                     }
                 },
             }
@@ -147,6 +163,12 @@ class PyrightSession(lsp_types.Session):
     ) -> lsp_types.CompletionItem:
         """Resolve the given completion item"""
         return await self._process.send.resolve_completion_item(completion_item)
+
+    async def get_semantic_tokens(self) -> lsp_types.SemanticTokens | None:
+        """Get semantic tokens for the current document"""
+        return await self._process.send.semantic_tokens_full(
+            {"textDocument": {"uri": self._document_uri}}
+        )
 
     # endregion
 
