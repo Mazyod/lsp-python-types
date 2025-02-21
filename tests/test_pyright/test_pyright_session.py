@@ -124,7 +124,7 @@ print(result)
 
 async def test_pyright_session_signature_help():
     """Test function signature help"""
-    # FIXME: Need to correctly configure LSP to get signature help
+
     code = """\
 def complex_function(a: int, b: str, c: float = 1.0) -> None:
     pass
