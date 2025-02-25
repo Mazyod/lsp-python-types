@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lsp-types"
-version = "0.7.2"
+version = "0.8.0"
 description = "Zero-dependency Python library for Language Server Protocol types"
 authors = ["Mazyad Alabduljaleel <mazjaleel@gmail.com>"]
 license = "MIT"
