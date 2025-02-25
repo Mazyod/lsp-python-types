@@ -6,7 +6,7 @@ async def test_pyright_session_diagnostics():
     """Test diagnostic reporting for type errors"""
     code = """\
 def greet(name: str) -> str:
-    return 123
+    return name + 123
 """
 
     pyright_session = await PyrightSession.create(initial_code=code)

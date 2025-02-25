@@ -42,7 +42,7 @@ generate-lsp-schema:
 generate-pyright-schema:
 	datamodel-codegen \
 		--input ./assets/lsps/pyright.schema.json \
-		--output ./lsp_types/python/pyright.py \
+		--output ./lsp_types/pyright/config_schema.py \
 		--output-model-type "typing.TypedDict" \
 		--target-python-version "3.11" \
 		--input-file-type "jsonschema" \

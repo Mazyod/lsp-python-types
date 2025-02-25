@@ -7,7 +7,6 @@ import typing as t
 
 import lsp_types
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
-from lsp_types.types import MarkupKind
 
 from .config_schema import Model as PyrightConfig
 
@@ -54,7 +53,6 @@ class PyrightSession(lsp_types.Session):
                                 lsp_types.MarkupKind.Markdown,
                                 lsp_types.MarkupKind.PlainText,
                             ],
-                            # "dynamicRegistration": True,
                         },
                         "signatureHelp": {},
                     }
