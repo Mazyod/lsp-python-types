@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
 import typing as t
+from pathlib import Path
 
 import lsp_types
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
@@ -12,7 +11,10 @@ from .config_schema import Model as PyrightConfig
 
 
 class PyrightSession(lsp_types.Session):
-    """Pyright LSP session implementation"""
+    """
+    Pyright LSP session implementation.
+    TODO: Move process initialization and config_path within the session instance
+    """
 
     @classmethod
     async def create(
@@ -23,6 +25,8 @@ class PyrightSession(lsp_types.Session):
         options: PyrightConfig = {},
     ) -> t.Self:
         """Create a new Pyright session"""
+        base_path = base_path.resolve()
+
         config_path = base_path / "pyrightconfig.json"
         config_path.write_text(json.dumps(options, indent=2))
 
@@ -35,8 +39,8 @@ class PyrightSession(lsp_types.Session):
         await lsp_process.send.initialize(
             {
                 "processId": None,
-                "rootUri": f"file://{os.getcwd()}",
-                "rootPath": os.getcwd(),
+                "rootUri": f"file://{base_path}",
+                "rootPath": str(base_path),
                 "capabilities": {
                     "textDocument": {
                         "publishDiagnostics": {

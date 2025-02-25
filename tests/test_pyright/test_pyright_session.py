@@ -1,5 +1,54 @@
-from lsp_types.pyright.session import PyrightSession
+from pathlib import Path
+
 import lsp_types
+from lsp_types.pyright.session import PyrightSession
+
+
+async def test_pyright_session_with_dynamic_environment():
+    """Test Pyright session with a dynamic temporary environment"""
+    import tempfile
+
+    # Create a temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        module_path = temp_path / "mymodule"
+        module_path.mkdir()
+
+        # Create a utils.py file with a simple function
+        utils_file = module_path / "utils.py"
+        utils_content = """\
+def add_numbers(a: int, b: int) -> int:
+    '''Add two numbers together.'''
+    return a + b
+"""
+        utils_file.write_text(utils_content)
+        module_path.joinpath("__init__.py").touch()
+
+        # Create code that imports from the utils.py file
+        code = """\
+from mymodule.utils import add_numbers
+
+result = add_numbers(5, 10)
+print(f"The result is: {result}")
+"""
+
+        # Create a Pyright session with the temporary directory as the base_path
+        pyright_session = await PyrightSession.create(
+            base_path=temp_path,
+            initial_code=code,
+            options={"include": ["."]},  # Include the current directory for imports
+        )
+
+        # Get diagnostics to check for any errors
+        diagnostics = await pyright_session.get_diagnostics()
+        diags = diagnostics.get("diagnostics", [])
+
+        # Verify no errors are reported
+        assert len(diags) == 0, f"Expected no diagnostics, but got: {diags}"
+
+        # Shutdown the Pyright session
+        await pyright_session.shutdown()
 
 
 async def test_pyright_session_diagnostics():
