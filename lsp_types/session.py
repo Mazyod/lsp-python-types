@@ -45,3 +45,7 @@ class Session(t.Protocol):
     ) -> types.CompletionItem:
         """Resolve the given completion item"""
         ...
+
+    async def get_semantic_tokens(self) -> types.SemanticTokens | None:
+        """Get semantic tokens for the current document"""
+        ...
