@@ -1,5 +1,5 @@
 from ..lsp_schema import TypeAlias
-from .helpers import format_comment, format_type, StructureKind
+from .helpers import StructureKind, format_comment, format_type
 
 
 def generate_type_aliases(type_aliases: list[TypeAlias]) -> list[str]:

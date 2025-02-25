@@ -1,7 +1,8 @@
+import keyword
 from enum import Enum
 from typing import Any, TypedDict, Union
-from ..lsp_schema import Type, BaseType, MapKeyType, Property
-import keyword
+
+from ..lsp_schema import BaseType, MapKeyType, Property, Type
 
 indentation = "    "
 

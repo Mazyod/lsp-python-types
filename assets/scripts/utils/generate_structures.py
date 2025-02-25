@@ -1,5 +1,8 @@
 from ..lsp_schema import Structure
-from .helpers import FormattedProperty, format_comment, indentation, format_class_properties, format_dict_properties, get_formatted_properties, has_invalid_property_name, StructureKind
+from .helpers import (FormattedProperty, StructureKind,
+                      format_class_properties, format_comment,
+                      format_dict_properties, get_formatted_properties,
+                      has_invalid_property_name, indentation)
 
 
 def generate_structures(structures: list[Structure]) -> list[str]:

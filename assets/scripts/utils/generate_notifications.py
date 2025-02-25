@@ -1,7 +1,6 @@
 from ..lsp_schema import Notification
 from .helpers import format_comment, indentation
 
-
 method_to_symbol_name = {
     "exit": "exit",
     "initialized": "initialized",

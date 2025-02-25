@@ -1,9 +1,9 @@
-from enum import Enum
-from ..lsp_schema import Enumeration, EnumerationEntry
-from typing import Literal
-from .helpers import capitalize, format_comment, indentation
 import keyword
+from enum import Enum
+from typing import Literal
 
+from ..lsp_schema import Enumeration, EnumerationEntry
+from .helpers import capitalize, format_comment, indentation
 
 ENUM_OVERRIDES: dict[str, Literal["StrEnum", "IntFlag"]] = {
     "CodeActionKind": "StrEnum",

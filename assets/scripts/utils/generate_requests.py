@@ -1,6 +1,7 @@
-from ..lsp_schema import Request
-from .helpers import format_comment, format_type, indentation, StructureKind
 import re
+
+from ..lsp_schema import Request
+from .helpers import StructureKind, format_comment, format_type, indentation
 
 method_to_symbol_name = {
     "codeAction/resolve": "resolve_code_action",

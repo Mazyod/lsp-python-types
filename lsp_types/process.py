@@ -4,9 +4,10 @@ import itertools
 import json
 import logging
 import os
-from typing import Any, cast as type_cast
+from typing import Any
+from typing import cast as type_cast
 
-from . import types, requests
+from . import requests, types
 
 CONTENT_LENGTH = "Content-Length: "
 ENCODING = "utf-8"
