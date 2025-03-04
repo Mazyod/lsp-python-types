@@ -84,8 +84,7 @@ class PyrightSession(lsp_types.Session):
 
     async def shutdown(self) -> None:
         """Shutdown the session"""
-        await self._process.send.shutdown()
-        await self._process.notify.exit()
+        await self._process.stop()
 
     async def update_code(self, code: str) -> int:
         """Update the code in the current document"""
