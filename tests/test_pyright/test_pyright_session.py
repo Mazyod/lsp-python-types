@@ -37,7 +37,6 @@ print(f"The result is: {result}")
         pyright_session = await PyrightSession.create(
             base_path=temp_path,
             initial_code=code,
-            options={"include": ["."]},  # Include the current directory for imports
         )
 
         # Get diagnostics to check for any errors

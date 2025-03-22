@@ -13,7 +13,9 @@ from .config_schema import Model as PyrightConfig
 class PyrightSession(lsp_types.Session):
     """
     Pyright LSP session implementation.
-    TODO: Move process initialization and config_path within the session instance
+    TODO:
+    - Move process initialization and config_path within the session instance
+    - Support session recycling by supporting subprocess reuse
     """
 
     @classmethod
