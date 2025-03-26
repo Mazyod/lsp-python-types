@@ -31,6 +31,20 @@ jobs:
     - name: Install dependencies
       run: |
         python -m poetry sync --all-extras
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v4.3.0
+      # with:
+      #   # Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.
+      #   cache: # optional
+
+    - name: Install basedpyright globally
+      run: npm install -g basedpyright
+      env:
+        NPM_CONFIG_PREFIX: ~/.npm-global
+
+    - name: Add npm global bin to PATH
+      run: echo "$HOME/.npm-global/bin" >> $GITHUB_PATH
+
     # - name: Lint with flake8
     #   run: |
     #     # stop the build if there are Python syntax errors or undefined names
