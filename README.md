@@ -6,6 +6,9 @@
 
 _Publish the excellent work of [Sublime LSP](https://github.com/sublimelsp/lsp-python-types) as a PyPI package._
 
+![image](https://github.com/user-attachments/assets/12b6016a-8e62-4058-8c74-26fcdee1122a)
+
+
 __LSP Types__ is a Python package that aims to provide a fully typed interface to Language Server Protocol (LSP) interactions. It can be used to simply utilize the types, or to interact with an LSP server over stdio.
 
 It is a goal to maintain zero-dependency status for as long as possible.
