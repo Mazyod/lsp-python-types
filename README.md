@@ -88,7 +88,7 @@ def greet(name: str) -> str:
 ## Development
 
 - Requires Python 3.11+.
-- Requires `poetry` for dev dependencies.
+- Requires `uv` for dev dependencies.
 
 Generate latest types in one go:
 ```sh
