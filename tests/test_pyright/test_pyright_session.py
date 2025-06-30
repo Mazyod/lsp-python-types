@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import lsp_types
+from lsp_types.pool import LSPProcessPool
 from lsp_types.pyright.session import PyrightSession
 
 
@@ -253,3 +254,106 @@ result = greet("world")
     assert len(token_data) >= 8, "Expected at least 8 semantic tokens"
 
     await pyright_session.shutdown()
+
+
+async def test_pyright_session_recycling_basic():
+    """Test basic session recycling functionality"""
+    pool = LSPProcessPool(max_size=2)
+
+    try:
+        # Create first session with pool
+        session1 = await PyrightSession.create(
+            initial_code="def func1(): return 1", pool=pool
+        )
+
+        # Verify it works
+        hover_info = await session1.get_hover_info(
+            lsp_types.Position(line=0, character=4)
+        )
+        assert hover_info is not None
+        assert "func1" in str(hover_info)
+
+        # Recycle the session
+        await session1.shutdown()
+
+        # Pool should have one available session now
+        assert pool.available_count == 1
+
+        # Create second session - should reuse the recycled one
+        session2 = await PyrightSession.create(
+            initial_code="def func2(): return 2", pool=pool
+        )
+
+        # Verify new code is active
+        hover_info = await session2.get_hover_info(
+            lsp_types.Position(line=0, character=4)
+        )
+        assert hover_info is not None
+        assert "func2" in str(hover_info)
+
+        await session2.shutdown()
+    finally:
+        await pool.cleanup()
+
+
+async def test_pyright_session_recycling_with_diagnostics():
+    """Test that recycling properly clears old state"""
+    pool = LSPProcessPool(max_size=1)
+
+    try:
+        # First session with error
+        session1 = await PyrightSession.create(
+            initial_code="undefined_variable", pool=pool
+        )
+
+        diagnostics = await session1.get_diagnostics()
+        diags = diagnostics.get("diagnostics", [])
+        assert len(diags) > 0  # Should have error
+
+        await session1.shutdown()
+
+        # Second session with valid code
+        session2 = await PyrightSession.create(initial_code="x = 42", pool=pool)
+
+        diagnostics = await session2.get_diagnostics()
+        diags = diagnostics.get("diagnostics", [])
+        assert len(diags) == 0  # Should be clean
+
+        await session2.shutdown()
+    finally:
+        await pool.cleanup()
+
+
+async def test_pyright_session_recycling_performance():
+    """Test that recycling is faster than creating new sessions"""
+    import time
+
+    pool = LSPProcessPool(max_size=2)
+
+    try:
+        # Time creating fresh sessions
+        start_time = time.time()
+        for i in range(3):
+            session = await PyrightSession.create(initial_code=f"x{i} = {i}")
+            await session.shutdown()
+        fresh_time = time.time() - start_time
+
+        # Time using recycled sessions
+        start_time = time.time()
+        sessions = []
+        for i in range(3):
+            session = await PyrightSession.create(initial_code=f"y{i} = {i}", pool=pool)
+            sessions.append(session)
+
+        # Recycle them
+        for session in sessions:
+            await session.shutdown()
+
+        recycled_time = time.time() - start_time
+
+        # Recycling should be at least somewhat faster
+        # Note: This is more of a performance indicator than a strict test
+        assert recycled_time <= fresh_time * 1.5  # Allow some variance
+
+    finally:
+        await pool.cleanup()

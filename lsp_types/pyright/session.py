@@ -5,6 +5,7 @@ import typing as t
 from pathlib import Path
 
 import lsp_types
+from lsp_types.pool import LSPProcessPool
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
 
 from .config_schema import Model as PyrightConfig
@@ -12,10 +13,7 @@ from .config_schema import Model as PyrightConfig
 
 class PyrightSession(lsp_types.Session):
     """
-    Pyright LSP session implementation.
-    TODO:
-    - Move process initialization and config_path within the session instance
-    - Support session recycling by supporting subprocess reuse
+    Pyright LSP session implementation with process pooling support.
     """
 
     @classmethod
@@ -25,68 +23,95 @@ class PyrightSession(lsp_types.Session):
         base_path: Path = Path("."),
         initial_code: str = "",
         options: PyrightConfig = {},
+        pool: LSPProcessPool | None = None,
     ) -> t.Self:
-        """Create a new Pyright session"""
+        """Create a new Pyright session using a process pool."""
         base_path = base_path.resolve()
+        base_path_str = str(base_path)
 
         config_path = base_path / "pyrightconfig.json"
         config_path.write_text(json.dumps(options, indent=2))
 
-        # NOTE: requires node and basedpyright to be installed and accessible
-        proc_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
-        lsp_process = LSPProcess(proc_info)
-        await lsp_process.start()
+        async def create_lsp_process():
+            # NOTE: requires node and basedpyright to be installed and accessible
+            proc_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
+            lsp_process = LSPProcess(proc_info)
+            await lsp_process.start()
 
-        # TODO: ability to configure these options
-        await lsp_process.send.initialize(
-            {
-                "processId": None,
-                "rootUri": f"file://{base_path}",
-                "rootPath": str(base_path),
-                "capabilities": {
-                    "textDocument": {
-                        "publishDiagnostics": {
-                            "versionSupport": True,
-                            "tagSupport": {
-                                "valueSet": [
-                                    lsp_types.DiagnosticTag.Unnecessary,
-                                    lsp_types.DiagnosticTag.Deprecated,
-                                ]
+            # TODO: ability to configure these options
+            await lsp_process.send.initialize(
+                {
+                    "processId": None,
+                    "rootUri": f"file://{base_path}",
+                    "rootPath": base_path_str,
+                    "capabilities": {
+                        "textDocument": {
+                            "publishDiagnostics": {
+                                "versionSupport": True,
+                                "tagSupport": {
+                                    "valueSet": [
+                                        lsp_types.DiagnosticTag.Unnecessary,
+                                        lsp_types.DiagnosticTag.Deprecated,
+                                    ]
+                                },
                             },
-                        },
-                        "hover": {
-                            "contentFormat": [
-                                lsp_types.MarkupKind.Markdown,
-                                lsp_types.MarkupKind.PlainText,
-                            ],
-                        },
-                        "signatureHelp": {},
-                    }
-                },
-            }
-        )
+                            "hover": {
+                                "contentFormat": [
+                                    lsp_types.MarkupKind.Markdown,
+                                    lsp_types.MarkupKind.PlainText,
+                                ],
+                            },
+                            "signatureHelp": {},
+                        }
+                    },
+                }
+            )
+
+            return lsp_process
+
+        # Use pool if provided, otherwise create a default non-pooling pool
+        if pool is None:
+            pool = LSPProcessPool(max_size=0)  # No recycling, immediate shutdown
+
+        lsp_process = await pool.acquire(create_lsp_process, base_path_str)
+        pyright_session = cls(lsp_process, pool=pool)
 
         # Update settings via didChangeConfiguration
-        await lsp_process.notify.workspace_did_change_configuration({"settings": {}})
-
-        pyright_session = cls(lsp_process)
+        await lsp_process.notify.workspace_did_change_configuration(
+            {"settings": options}
+        )
 
         # Simulate opening a document
         await pyright_session._open_document(initial_code)
 
         return pyright_session
 
-    def __init__(self, lsp_process: LSPProcess):
+    def __init__(
+        self,
+        lsp_process: LSPProcess,
+        *,
+        pool: LSPProcessPool,
+    ):
         self._process = lsp_process
         self._document_uri = "file:///test.py"
         self._document_version = 1
         self._document_text = ""
 
+        self._pool = pool
+
     # region - Session methods
 
     async def shutdown(self) -> None:
-        """Shutdown the session"""
-        await self._process.stop()
+        """Shutdown and recycle the session back to the pool"""
+        if self._pool is None:
+            return  # Already recycled
+
+        # Release back to pool (document cleanup handled by pool/process reset)
+        # For max_size=0 pools, this will immediately shutdown the process
+        await self._pool.release(self._process)
+
+        # Clear references to prevent further use
+        self._pool = None
 
     async def update_code(self, code: str) -> int:
         """Update the code in the current document"""
@@ -109,6 +134,8 @@ class PyrightSession(lsp_types.Session):
     async def get_diagnostics(self):
         """Get diagnostics for the given code"""
         # FIXME: riddled with race conditions
+        # As a bare minimum, cache the diagnostics per document version
+        # When diagnostics are requested twice, it would hang otherwise
         return await self._process.notify.on_publish_diagnostics()
 
     async def get_hover_info(
@@ -165,6 +192,7 @@ class PyrightSession(lsp_types.Session):
 
     async def _open_document(self, code: str) -> None:
         """Open a document with the given code"""
+        self._document_text = code
         await self._process.notify.did_open_text_document(
             {
                 "textDocument": {
@@ -175,3 +203,5 @@ class PyrightSession(lsp_types.Session):
                 }
             }
         )
+        # Track the opened document
+        self._process.track_document_open(self._document_uri)

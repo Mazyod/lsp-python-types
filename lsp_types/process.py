@@ -4,8 +4,7 @@ import itertools
 import json
 import logging
 import os
-from typing import Any
-from typing import cast as type_cast
+import typing as t
 
 from . import requests, types
 
@@ -34,7 +33,7 @@ class Error(Exception):
     @classmethod
     def from_lsp(cls, d: types.LSPObject) -> "Error":
         code = types.ErrorCodes(d["code"])
-        message = type_cast(str, d["message"])
+        message = t.cast(str, d["message"])
         return Error(code, message)
 
     def __str__(self) -> str:
@@ -66,10 +65,11 @@ class LSPProcess:
         self._process_launch_info = process_launch_info
         self._process: asyncio.subprocess.Process | None = None
         self._notification_listeners: list[asyncio.Queue[types.LSPObject]] = []
-        self._pending_requests: dict[int | str, asyncio.Future[Any]] = {}
+        self._pending_requests: dict[int | str, asyncio.Future[t.Any]] = {}
         self._request_id_gen = itertools.count(1)
         self._tasks: list[asyncio.Task] = []
         self._shutdown = False
+        self._open_documents: set[str] = set()
 
         # Maintain typed interface
         self.send = requests.RequestFunctions(self._send_request)
@@ -134,7 +134,35 @@ class LSPProcess:
                     pass
             self._process = None
 
-    async def notifications(self):
+    async def reset(self) -> None:
+        """Reset the LSP process state for reuse."""
+        # Close any open documents
+        for uri in self._open_documents:
+            try:
+                await self.notify.did_close_text_document(
+                    {"textDocument": {"uri": uri}}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to close document {uri} during reset: {e}")
+
+        self._open_documents.clear()
+
+        # Clear any pending requests (they should be completed or failed by now)
+        for request_id, future in self._pending_requests.items():
+            if not future.done():
+                future.cancel()
+        self._pending_requests.clear()
+
+        # Reset request ID generator to avoid conflicts
+        self._request_id_gen = itertools.count(1)
+
+        logger.debug("LSP process reset completed")
+
+    def track_document_open(self, uri: str) -> None:
+        """Track that a document has been opened."""
+        self._open_documents.add(uri)
+
+    async def _notifications(self):
         """
         An async generator for processing server notifications.
 
@@ -152,17 +180,17 @@ class LSPProcess:
         finally:
             self._notification_listeners.remove(queue)
 
-    async def _send_request(self, method: str, params: types.LSPAny = None) -> Any:
+    async def _send_request(self, method: str, params: types.LSPAny = None) -> t.Any:
         """Send a request to the server and await the response."""
         if not self._process or not self._process.stdin:
             raise RuntimeError("LSP process not available")
 
         request_id = next(self._request_id_gen)
 
-        future: asyncio.Future[Any] = asyncio.Future()
+        future: asyncio.Future[t.Any] = asyncio.Future()
         self._pending_requests[request_id] = future
 
-        payload = make_request(method, request_id, params)
+        payload = _make_request(method, request_id, params)
         await self._send_payload(self._process.stdin, payload)
 
         try:
@@ -178,7 +206,7 @@ class LSPProcess:
             logger.warning("LSP process not available: [%s]", method)
             return asyncio.create_task(asyncio.sleep(0))
 
-        payload = make_notification(method, params)
+        payload = _make_notification(method, params)
         task = asyncio.create_task(self._send_payload(self._process.stdin, payload))
         self._tasks.append(task)
 
@@ -190,7 +218,7 @@ class LSPProcess:
         """Wait for a specific notification from the server."""
 
         async def _wait_for_notification():
-            async for notification in self.notifications():
+            async for notification in self._notifications():
                 if notification["method"] == method:
                     return notification["params"]
 
@@ -295,11 +323,11 @@ class LSPProcess:
             logger.exception("Client - Error reading stderr")
 
 
-def make_notification(method: str, params: types.LSPAny) -> types.LSPObject:
+def _make_notification(method: str, params: types.LSPAny) -> types.LSPObject:
     return {"jsonrpc": "2.0", "method": method, "params": params}
 
 
-def make_request(
+def _make_request(
     method: str, request_id: int | str, params: types.LSPAny
 ) -> types.LSPObject:
     return {"jsonrpc": "2.0", "method": method, "id": request_id, "params": params}
