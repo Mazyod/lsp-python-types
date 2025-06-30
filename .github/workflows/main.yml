@@ -12,11 +12,11 @@ jobs:
   Lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@4
         with:
-          python-version: '3.8'
-      - run: pip3 install pyright==1.1.402  flake8==7.3.0 --user
-      - run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-      - run: pyright .
-      - run: flake8 .
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+      - run: uvx pyright .
+      - run: uvx ruff check .
