@@ -1,6 +1,6 @@
 version = 1
 revision = 2
-requires-python = ">=3.11, <4"
+requires-python = ">=3.11"
 
 [[package]]
 name = "annotated-types"
@@ -275,10 +275,10 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "datamodel-code-generator", specifier = ">=0.27.2,<0.28" },
-    { name = "httpx", specifier = ">=0.28.1,<0.29" },
+    { name = "datamodel-code-generator", specifier = ">=0.27.2" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=8.3.4,<9" },
-    { name = "pytest-asyncio", specifier = ">=0.25.3,<0.26" },
+    { name = "pytest-asyncio", specifier = ">=0.25.3" },
     { name = "pytest-cov", specifier = ">=6.0.0,<7" },
 ]
 
