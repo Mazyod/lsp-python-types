@@ -19,7 +19,9 @@ class PyrightBackend(LSPBackend):
         config_path = base_path / "pyrightconfig.json"
         config_path.write_text(json.dumps(options, indent=2))
 
-    def create_process_launch_info(self, base_path: Path, options: PyrightConfig) -> ProcessLaunchInfo:
+    def create_process_launch_info(
+        self, base_path: Path, options: PyrightConfig
+    ) -> ProcessLaunchInfo:
         """Create process launch info for Pyright LSP server"""
         # NOTE: requires node and basedpyright to be installed and accessible
         return ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"], cwd=base_path)

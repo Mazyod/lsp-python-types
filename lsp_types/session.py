@@ -16,7 +16,9 @@ class LSPBackend(t.Protocol):
         """Write backend-specific configuration file"""
         ...
 
-    def create_process_launch_info(self, base_path: Path, options: t.Mapping) -> ProcessLaunchInfo:
+    def create_process_launch_info(
+        self, base_path: Path, options: t.Mapping
+    ) -> ProcessLaunchInfo:
         """Create process launch info for the LSP server"""
         ...
 
@@ -24,7 +26,9 @@ class LSPBackend(t.Protocol):
         """Get LSP client capabilities"""
         ...
 
-    def get_workspace_settings(self, options: t.Mapping) -> types.DidChangeConfigurationParams:
+    def get_workspace_settings(
+        self, options: t.Mapping
+    ) -> types.DidChangeConfigurationParams:
         """Get workspace settings for didChangeConfiguration"""
         ...
 
@@ -162,9 +166,7 @@ class Session:
         # For 'unchanged' nothing is appended ⇒ return cached view if desired
         return diagnostics
 
-    async def get_hover_info(
-        self, position: types.Position
-    ) -> types.Hover | None:
+    async def get_hover_info(self, position: types.Position) -> types.Hover | None:
         """Get hover information at the given position"""
         return await self._process.send.hover(
             {"textDocument": {"uri": self._document_uri}, "position": position}

@@ -31,7 +31,9 @@ class PyreflyBackend(LSPBackend):
 
         config_path.write_text(toml_content)
 
-    def create_process_launch_info(self, base_path: Path, options: PyreflyConfig) -> ProcessLaunchInfo:
+    def create_process_launch_info(
+        self, base_path: Path, options: PyreflyConfig
+    ) -> ProcessLaunchInfo:
         """Create process launch info for Pyrefly LSP server"""
         # Build command args for Pyrefly LSP server
         cmd_args = ["pyrefly", "lsp"]

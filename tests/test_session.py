@@ -1,11 +1,12 @@
-from pathlib import Path
-import pytest
 import time
+from pathlib import Path
+
+import pytest
 
 import lsp_types
 from lsp_types.pool import LSPProcessPool
-from lsp_types.pyright.backend import PyrightBackend
 from lsp_types.pyrefly.backend import PyreflyBackend
+from lsp_types.pyright.backend import PyrightBackend
 
 
 @pytest.fixture(params=[PyrightBackend, PyreflyBackend])
@@ -22,7 +23,7 @@ def backend_name(lsp_backend):
 
 async def test_session_with_dynamic_environment(lsp_backend, tmp_path: Path):
     """Test LSP session with a dynamic temporary environment"""
- 
+
     module_path = tmp_path / "mymodule"
     module_path.mkdir()
 
@@ -109,9 +110,7 @@ result = greet("world")
     session = await lsp_types.Session.create(lsp_backend, initial_code=code)
 
     # Hover over the function name
-    hover_info = await session.get_hover_info(
-        lsp_types.Position(line=0, character=4)
-    )
+    hover_info = await session.get_hover_info(lsp_types.Position(line=0, character=4))
     assert hover_info is not None
 
     contents = hover_info.get("contents")
@@ -122,9 +121,7 @@ result = greet("world")
     assert "str" in hover_text
 
     # Hover over the variable
-    hover_info = await session.get_hover_info(
-        lsp_types.Position(line=3, character=0)
-    )
+    hover_info = await session.get_hover_info(lsp_types.Position(line=3, character=0))
     assert hover_info is not None
 
     contents = hover_info.get("contents")
@@ -161,10 +158,9 @@ print(result)
         assert "changes" in rename_edits
         changes = next(iter(rename_edits["changes"].values()))
 
-        assert any(
-            change["newText"] == "say_hello"
-            for change in changes
-        ), "Expected to find 'say_hello' in changes"
+        assert any(change["newText"] == "say_hello" for change in changes), (
+            "Expected to find 'say_hello' in changes"
+        )
     else:
         # Pyright uses "documentChanges" format
         assert "documentChanges" in rename_edits
@@ -190,10 +186,9 @@ print(result)
         assert "changes" in rename_edits
         changes = next(iter(rename_edits["changes"].values()))
 
-        assert any(
-            change["newText"] == "greeting"
-            for change in changes
-        ), "Expected to find 'greeting' in changes"
+        assert any(change["newText"] == "greeting" for change in changes), (
+            "Expected to find 'greeting' in changes"
+        )
     else:
         # Pyright uses "documentChanges" format
         assert "documentChanges" in rename_edits
@@ -250,9 +245,7 @@ obj.
     session = await lsp_types.Session.create(lsp_backend, initial_code=code)
 
     # Get completions after the dot
-    completions = await session.get_completion(
-        lsp_types.Position(line=5, character=4)
-    )
+    completions = await session.get_completion(lsp_types.Position(line=5, character=4))
     assert completions is not None
 
     # Should be either a CompletionList or list of CompletionItem
@@ -303,9 +296,7 @@ async def test_session_recycling_basic(lsp_backend):
     try:
         # Create first session with pool
         session1 = await lsp_types.Session.create(
-            lsp_backend,
-            initial_code="def func1(): return 1",
-            pool=pool
+            lsp_backend, initial_code="def func1(): return 1", pool=pool
         )
 
         # Verify it works
@@ -323,9 +314,7 @@ async def test_session_recycling_basic(lsp_backend):
 
         # Create second session - should reuse the recycled one
         session2 = await lsp_types.Session.create(
-            lsp_backend,
-            initial_code="def func2(): return 2",
-            pool=pool
+            lsp_backend, initial_code="def func2(): return 2", pool=pool
         )
 
         # Verify new code is active
@@ -347,9 +336,7 @@ async def test_session_recycling_with_diagnostics(lsp_backend):
     try:
         # First session with error
         session1 = await lsp_types.Session.create(
-            lsp_backend,
-            initial_code="undefined_variable",
-            pool=pool
+            lsp_backend, initial_code="undefined_variable", pool=pool
         )
 
         diagnostics = await session1.get_diagnostics()
@@ -359,9 +346,7 @@ async def test_session_recycling_with_diagnostics(lsp_backend):
 
         # Second session with valid code
         session2 = await lsp_types.Session.create(
-            lsp_backend,
-            initial_code="x = 42",
-            pool=pool
+            lsp_backend, initial_code="x = 42", pool=pool
         )
 
         diagnostics = await session2.get_diagnostics()
@@ -380,7 +365,9 @@ async def test_session_recycling_performance(lsp_backend):
         # Time creating fresh sessions
         start_time = time.time()
         for i in range(3):
-            session = await lsp_types.Session.create(lsp_backend, initial_code=f"x{i} = {i}")
+            session = await lsp_types.Session.create(
+                lsp_backend, initial_code=f"x{i} = {i}"
+            )
             await session.shutdown()
         fresh_time = time.time() - start_time
 
@@ -389,9 +376,7 @@ async def test_session_recycling_performance(lsp_backend):
         sessions = []
         for i in range(3):
             session = await lsp_types.Session.create(
-                lsp_backend,
-                initial_code=f"y{i} = {i}",
-                pool=pool
+                lsp_backend, initial_code=f"y{i} = {i}", pool=pool
             )
             sessions.append(session)
 
@@ -432,15 +417,11 @@ result = test_function(5)
 """
 
     session = await lsp_types.Session.create(
-        backend,
-        initial_code=code,
-        options=options
+        backend, initial_code=code, options=options
     )
 
     # Verify session works with options
-    hover_info = await session.get_hover_info(
-        lsp_types.Position(line=0, character=4)
-    )
+    hover_info = await session.get_hover_info(lsp_types.Position(line=0, character=4))
     assert hover_info is not None
     assert "test_function" in str(hover_info)
 
@@ -466,9 +447,7 @@ async def test_pyrefly_session_with_minimal_config():
     code = "x = 42"
 
     session = await lsp_types.Session.create(
-        backend,
-        initial_code=code,
-        options=options
+        backend, initial_code=code, options=options
     )
 
     # Basic functionality test

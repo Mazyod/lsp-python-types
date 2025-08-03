@@ -11,8 +11,8 @@ import pytest
 
 import lsp_types
 from lsp_types.pool import LSPProcessPool
-from lsp_types.pyright.backend import PyrightBackend
 from lsp_types.pyrefly.backend import PyreflyBackend
+from lsp_types.pyright.backend import PyrightBackend
 
 
 @pytest.fixture(params=[PyrightBackend, PyreflyBackend])
@@ -63,7 +63,9 @@ class TestLSPProcessPool:
         assert session_pool.available_count == 1
         assert session_pool.current_size == 1
 
-    async def test_session_recycling_with_different_code(self, session_pool, lsp_backend):
+    async def test_session_recycling_with_different_code(
+        self, session_pool, lsp_backend
+    ):
         """Test that recycled sessions work correctly with different code"""
         # First session with initial code
         session1 = await lsp_types.Session.create(
@@ -96,17 +98,21 @@ class TestLSPProcessPool:
 
         await session2.shutdown()
 
-    async def test_session_recycling_with_different_options(self, session_pool, lsp_backend, backend_name):
+    async def test_session_recycling_with_different_options(
+        self, session_pool, lsp_backend, backend_name
+    ):
         """Test recycling sessions with different options"""
 
         if backend_name == "pyright":
             from lsp_types.pyright.config_schema import Model as ConfigType
+
             options1: ConfigType = {"strict": ["reportUndefinedVariable"]}
             options2: ConfigType = {"strict": ["reportGeneralTypeIssues"]}
             code1 = "undefined_var = 1"
             code2 = "x: int = 'string'"  # Type error
         else:  # pyrefly
             from lsp_types.pyrefly.config_schema import Model as ConfigType
+
             options1: ConfigType = {"verbose": True, "threads": 1}
             options2: ConfigType = {"verbose": False, "threads": 2}
             code1 = "test_var = 1"
@@ -447,7 +453,9 @@ class TestLSPProcessPool:
 class TestLSPProcessPoolBenchmarks:
     """Benchmark tests comparing pooled vs non-pooled session performance"""
 
-    async def test_benchmark_session_creation_comparison(self, lsp_backend, backend_name):
+    async def test_benchmark_session_creation_comparison(
+        self, lsp_backend, backend_name
+    ):
         """Compare session creation times with and without pooling"""
         pool = LSPProcessPool(max_size=3)
 
@@ -551,7 +559,9 @@ class TestLSPProcessPoolBenchmarks:
         finally:
             await pool.cleanup()
 
-    async def test_benchmark_concurrent_session_creation(self, lsp_backend, backend_name):
+    async def test_benchmark_concurrent_session_creation(
+        self, lsp_backend, backend_name
+    ):
         """Compare concurrent session creation with and without pooling"""
         pool = LSPProcessPool(max_size=5)
 
@@ -580,7 +590,8 @@ class TestLSPProcessPoolBenchmarks:
 
             async def create_fresh_session(session_id: int):
                 session = await lsp_types.Session.create(
-                    lsp_backend, initial_code=f"fresh_concurrent_{session_id} = {session_id}"
+                    lsp_backend,
+                    initial_code=f"fresh_concurrent_{session_id} = {session_id}",
                 )
                 hover_info = await session.get_hover_info(
                     lsp_types.Position(line=0, character=0)
@@ -616,7 +627,7 @@ async def test_pyrefly_config_options_benchmark():
     # Test different threading configurations
     configs: list[PyreflyConfig] = [
         {"threads": 0, "verbose": False},  # Auto
-        {"threads": 1, "verbose": False},  # Sequential 
+        {"threads": 1, "verbose": False},  # Sequential
         {"threads": 2, "verbose": False},  # Parallel
         {"threads": 4, "verbose": False},  # More parallel
     ]
@@ -626,29 +637,29 @@ async def test_pyrefly_config_options_benchmark():
     try:
         for config in configs:
             config_times = []
-            
+
             for i in range(3):
                 start_time = time.perf_counter()
-                
+
                 session = await lsp_types.Session.create(
                     backend,
                     initial_code=f"def test_{i}(x: int) -> int: return x * 2\nresult = test_{i}(5)",
                     options=config,  # type: ignore
-                    pool=pool
+                    pool=pool,
                 )
-                
+
                 # Do some work to test performance
                 hover_info = await session.get_hover_info(
                     lsp_types.Position(line=0, character=4)
                 )
                 assert hover_info is not None
-                
+
                 diagnostics = await session.get_diagnostics()
                 await session.shutdown()
-                
+
                 end_time = time.perf_counter()
                 config_times.append(end_time - start_time)
-            
+
             avg_time = sum(config_times) / len(config_times)
             print(f"\nPyrefly Config {config}: Average time {avg_time:.3f}s")
 
