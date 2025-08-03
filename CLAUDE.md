@@ -41,10 +41,11 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 - Handles JSON-RPC protocol, message framing, and async request/response correlation
 - Provides `.send` (requests) and `.notify` (notifications) interfaces
 
-**Session Protocol (`lsp_types/session.py`)**
-- `Session`: Protocol defining standard LSP session interface
-- Abstract interface for `shutdown()`, `update_code()`, `get_diagnostics()`, etc.
-- Implemented by language-specific sessions like `PyrightSession`
+**Session System (`lsp_types/session.py`)**
+- `Session`: Concrete LSP session implementation using pluggable backends
+- `LSPBackend`: Protocol defining backend-specific operations (config, process launch, capabilities)
+- Consolidated implementation with common LSP functionality shared across all backends
+- Standard interface for `shutdown()`, `update_code()`, `get_diagnostics()`, etc.
 
 **Generic Process Pooling (`lsp_types/pool.py`)**
 - `LSPProcessPool`: Language-server agnostic process pooling for performance optimization
@@ -52,16 +53,26 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 - Reusable across different LSP implementations (not just Pyright)
 - Handles process lifecycle: creation, reuse, idle cleanup, and shutdown
 
+**Backend Integrations**
+
 **Pyright Integration (`lsp_types/pyright/`)**
-- `PyrightSession`: High-level Pyright LSP session implementation
+- `PyrightBackend`: Backend implementation for Pyright LSP server
 - `config_schema.py`: Auto-generated Pyright configuration types
-- **Key Design**: PyrightSession uses generic `LSPProcessPool` for session reuse
+- `session.py`: Factory functions and backward-compatible wrappers
+- **Key Design**: Uses consolidated `Session` class with `PyrightBackend` for specialization
+
+**Pyrefly Integration (`lsp_types/pyrefly/`)**
+- `PyreflyBackend`: Backend implementation for Pyrefly LSP server (Facebook's Rust-based type checker)
+- `config_schema.py`: Auto-generated Pyrefly configuration types
+- `session.py`: Factory functions and backward-compatible wrappers
+- **Key Design**: Uses consolidated `Session` class with `PyreflyBackend` for specialization
 
 ### Type Generation Pipeline
 
 **Schema Sources:**
 - `assets/lsprotocol/lsp.schema.json`: Official LSP protocol schema
 - `assets/lsps/pyright.schema.json`: Pyright-specific configuration schema
+- `assets/lsps/pyrefly.schema.json`: Pyrefly-specific configuration schema
 
 **Generation Process:**
 1. `download_schemas.py`: Fetches latest schemas from upstream
@@ -74,13 +85,17 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 **Process Pool Tests**
 - `tests/test_pool.py`: Direct `LSPProcessPool` testing with generic interface
 - `tests/test_pyright/test_session_pool.py`: Pool integration testing through Pyright sessions
+- `tests/test_pyrefly/test_session_pool.py`: Pool integration testing through Pyrefly sessions
 - Comprehensive pool behavior testing (creation, recycling, limits, cleanup)
 - Performance benchmarks comparing pooled vs non-pooled sessions
 - Concurrent usage scenarios and idle process management
 
-**Session Tests (`tests/test_pyright/test_pyright_session.py`)**
-- Core LSP functionality testing (diagnostics, hover, completion)
-- Integration testing with actual Pyright language server
+**Session Tests**
+- `tests/test_session.py`: Core consolidated Session class functionality
+- `tests/test_pyright/test_pyright_session.py`: Pyright-specific LSP functionality testing
+- `tests/test_pyrefly/test_pyrefly_session.py`: Pyrefly-specific LSP functionality testing
+- Integration testing with actual language servers (diagnostics, hover, completion)
+- Backend-specific configuration and behavior validation
 
 ### Dependencies
 
@@ -93,6 +108,14 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 ### Important Notes
 
 - Always prefix test commands with `uv run`
-- Pool tests require `pyright-langserver` binary available in PATH
+- Pool tests require `pyright-langserver` and/or `pyrefly` binaries available in PATH
 - Type generation requires Python 3.11+ for modern TypedDict features
 - Generated types should not be manually edited - regenerate from schemas
+
+### Architecture Design Patterns
+
+**Backend Pattern**: LSP server integrations use the `LSPBackend` protocol to separate backend-specific logic (configuration formats, command-line arguments, capabilities) from common session management. This enables:
+- Code reuse across different LSP implementations
+- Easy addition of new LSP backends
+- Consistent API while supporting diverse configuration needs
+- Testable isolation of backend-specific behavior

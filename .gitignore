@@ -1,3 +1,6 @@
+# FIXME: Created in tests
+/pyrefly.toml
+
 # Created by https://www.toptal.com/developers/gitignore/api/linux,macos,python,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,macos,python,visualstudiocode
 
@@ -23,7 +26,8 @@
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -240,4 +244,3 @@ pyrightconfig.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/linux,macos,python,visualstudiocode
-

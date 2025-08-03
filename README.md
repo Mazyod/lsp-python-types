@@ -69,10 +69,10 @@ def greet(name: str) -> str:
     return 123
 """
 
-    pyright_session = await PyrightSession.create(initial_code=code)
+    pyright_session = await Session.create(PyrightBackend(), initial_code=code)
     diagnostics = await pyright_session.get_diagnostics()
 
-    assert diagnostics["diagnostics"] != []
+    assert diagnostics != []
 
     code = """\
 def greet(name: str) -> str:
@@ -82,7 +82,7 @@ def greet(name: str) -> str:
     assert await pyright_session.update_code(code) == 2
 
     diagnostics = await pyright_session.get_diagnostics()
-    assert diagnostics["diagnostics"] == []
+    assert diagnostics == []
 ```
 
 ## Development

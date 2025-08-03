@@ -10,8 +10,21 @@ from pathlib import Path
 import pytest
 
 import lsp_types
-from lsp_types.pyright.config_schema import Model as PyrightConfig
-from lsp_types.pyright.session import PyrightSession
+from lsp_types.pool import LSPProcessPool
+from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.pyrefly.backend import PyreflyBackend
+
+
+@pytest.fixture(params=[PyrightBackend, PyreflyBackend])
+def lsp_backend(request):
+    """Parametrized fixture providing both Pyright and Pyrefly backends"""
+    return request.param()
+
+
+@pytest.fixture
+def backend_name(lsp_backend):
+    """Helper fixture to get the backend name for test identification"""
+    return lsp_backend.__class__.__name__.replace("Backend", "").lower()
 
 
 class TestLSPProcessPool:
@@ -20,8 +33,6 @@ class TestLSPProcessPool:
     @pytest.fixture
     async def session_pool(self):
         """Create a session pool for testing"""
-        from lsp_types.pool import LSPProcessPool
-
         pool = LSPProcessPool(max_size=3)
         yield pool
         await pool.cleanup()
@@ -32,10 +43,12 @@ class TestLSPProcessPool:
         assert session_pool.current_size == 0
         assert session_pool.available_count == 0
 
-    async def test_session_pool_acquire_and_recycle(self, session_pool):
+    async def test_session_pool_acquire_and_recycle(self, session_pool, lsp_backend):
         """Test basic session acquisition and recycling"""
         # Create a session using the pool
-        session = await PyrightSession.create(initial_code="x = 1", pool=session_pool)
+        session = await lsp_types.Session.create(
+            lsp_backend, initial_code="x = 1", pool=session_pool
+        )
 
         # Verify session works
         hover_info = await session.get_hover_info(
@@ -50,11 +63,11 @@ class TestLSPProcessPool:
         assert session_pool.available_count == 1
         assert session_pool.current_size == 1
 
-    async def test_session_recycling_with_different_code(self, session_pool):
+    async def test_session_recycling_with_different_code(self, session_pool, lsp_backend):
         """Test that recycled sessions work correctly with different code"""
         # First session with initial code
-        session1 = await PyrightSession.create(
-            initial_code="def func1(): pass", pool=session_pool
+        session1 = await lsp_types.Session.create(
+            lsp_backend, initial_code="def func1(): pass", pool=session_pool
         )
 
         # Check that the function exists
@@ -67,8 +80,8 @@ class TestLSPProcessPool:
         await session1.shutdown()
 
         # Second session with different code - should reuse the recycled session
-        session2 = await PyrightSession.create(
-            initial_code="def func2(): pass", pool=session_pool
+        session2 = await lsp_types.Session.create(
+            lsp_backend, initial_code="def func2(): pass", pool=session_pool
         )
 
         # Verify the session was recycled (same pool, different code)
@@ -83,38 +96,50 @@ class TestLSPProcessPool:
 
         await session2.shutdown()
 
-    async def test_session_recycling_with_different_options(self, session_pool):
-        """Test recycling sessions with different pyright options"""
-        options1: PyrightConfig = {"strict": ["reportUndefinedVariable"]}
-        options2: PyrightConfig = {"strict": ["reportGeneralTypeIssues"]}
+    async def test_session_recycling_with_different_options(self, session_pool, lsp_backend, backend_name):
+        """Test recycling sessions with different options"""
 
-        # First session with strict undefined variable checking
-        session1 = await PyrightSession.create(
-            initial_code="undefined_var = 1", options=options1, pool=session_pool
+        if backend_name == "pyright":
+            from lsp_types.pyright.config_schema import Model as ConfigType
+            options1: ConfigType = {"strict": ["reportUndefinedVariable"]}
+            options2: ConfigType = {"strict": ["reportGeneralTypeIssues"]}
+            code1 = "undefined_var = 1"
+            code2 = "x: int = 'string'"  # Type error
+        else:  # pyrefly
+            from lsp_types.pyrefly.config_schema import Model as ConfigType
+            options1: ConfigType = {"verbose": True, "threads": 1}
+            options2: ConfigType = {"verbose": False, "threads": 2}
+            code1 = "test_var = 1"
+            code2 = "x: int = 42"
+
+        # First session with first options
+        session1 = await lsp_types.Session.create(
+            lsp_backend, initial_code=code1, options=options1, pool=session_pool
         )
 
         await session1.shutdown()
 
         # Second session with different options - should update configuration
-        session2 = await PyrightSession.create(
-            initial_code="x: int = 'string'",  # Type error
+        session2 = await lsp_types.Session.create(
+            lsp_backend,
+            initial_code=code2,
             options=options2,
             pool=session_pool,
         )
 
         # Warm up the session with new code
-        await session2.update_code("x: int = 'string'")
+        await session2.update_code(code2)
 
         await session2.shutdown()
 
-    async def test_session_pool_max_size_limit(self, session_pool):
+    async def test_session_pool_max_size_limit(self, session_pool, lsp_backend):
         """Test that pool respects max size limit"""
         sessions = []
 
         # Create sessions up to max size
         for i in range(session_pool.max_size):
-            session = await PyrightSession.create(
-                initial_code=f"x{i} = {i}", pool=session_pool
+            session = await lsp_types.Session.create(
+                lsp_backend, initial_code=f"x{i} = {i}", pool=session_pool
             )
             sessions.append(session)
 
@@ -122,8 +147,8 @@ class TestLSPProcessPool:
         assert session_pool.current_size == 3
 
         # Try to create one more session - should create a new process (not pooled)
-        extra_session = await PyrightSession.create(
-            initial_code="extra = 999", pool=session_pool
+        extra_session = await lsp_types.Session.create(
+            lsp_backend, initial_code="extra = 999", pool=session_pool
         )
         sessions.append(extra_session)
 
@@ -132,16 +157,14 @@ class TestLSPProcessPool:
 
         # Clean up all sessions
         for session in sessions:
-            if hasattr(session, "recycle"):
-                await session.shutdown()
-            else:
-                await session.shutdown()
+            await session.shutdown()
 
-    async def test_concurrent_session_usage(self, session_pool):
+    async def test_concurrent_session_usage(self, session_pool, lsp_backend):
         """Test concurrent session acquisition and usage"""
 
         async def use_session(session_id: int):
-            session = await PyrightSession.create(
+            session = await lsp_types.Session.create(
+                lsp_backend,
                 initial_code=f"def func_{session_id}(): return {session_id}",
                 pool=session_pool,
             )
@@ -168,11 +191,11 @@ class TestLSPProcessPool:
         # Pool should have recycled sessions available
         assert session_pool.available_count > 0
 
-    async def test_session_warmup_on_recycle(self, session_pool):
+    async def test_session_warmup_on_recycle(self, session_pool, lsp_backend):
         """Test that recycled sessions are properly warmed up with new code"""
         # Create session with initial code
-        session1 = await PyrightSession.create(
-            initial_code="old_var = 'old_value'", pool=session_pool
+        session1 = await lsp_types.Session.create(
+            lsp_backend, initial_code="old_var = 'old_value'", pool=session_pool
         )
 
         # Verify old code is present
@@ -186,7 +209,9 @@ class TestLSPProcessPool:
 
         # Create new session with different code
         new_code = "new_var = 'new_value'"
-        session2 = await PyrightSession.create(initial_code=new_code, pool=session_pool)
+        session2 = await lsp_types.Session.create(
+            lsp_backend, initial_code=new_code, pool=session_pool
+        )
 
         # Verify new code is present and old code is gone
         hover_info = await session2.get_hover_info(
@@ -200,19 +225,18 @@ class TestLSPProcessPool:
         # Update code to reference old variable - should cause error
         await session2.update_code("print(old_var)")
         diagnostics = await session2.get_diagnostics()
-        diags = diagnostics.get("diagnostics", [])
 
         # Should have error about undefined variable
-        assert len(diags) > 0
-        assert any("old_var" in diag.get("message", "") for diag in diags)
+        assert len(diagnostics) > 0
+        assert any("old_var" in diag.get("message", "") for diag in diagnostics)
 
         await session2.shutdown()
 
-    async def test_session_pool_cleanup(self, session_pool):
+    async def test_session_pool_cleanup(self, session_pool, lsp_backend):
         """Test proper cleanup of session pool resources"""
         # Create and recycle a session
-        session = await PyrightSession.create(
-            initial_code="test_var = 42", pool=session_pool
+        session = await lsp_types.Session.create(
+            lsp_backend, initial_code="test_var = 42", pool=session_pool
         )
         await session.shutdown()
 
@@ -227,10 +251,8 @@ class TestLSPProcessPool:
         assert session_pool.available_count == 0
         assert session_pool.current_size == 0
 
-    async def test_session_pool_with_temp_directory(self):
+    async def test_session_pool_with_temp_directory(self, lsp_backend):
         """Test session pool works with temporary directories"""
-        from lsp_types.pool import LSPProcessPool
-
         pool = LSPProcessPool(max_size=2)
 
         try:
@@ -246,41 +268,41 @@ class TestLSPProcessPool:
                 module_path.joinpath("__init__.py").touch()
 
                 # First session
-                session1 = await PyrightSession.create(
+                session1 = await lsp_types.Session.create(
+                    lsp_backend,
                     base_path=temp_path,
                     initial_code="from mymodule.utils import helper\nresult = helper()",
                     pool=pool,
                 )
 
                 diagnostics = await session1.get_diagnostics()
-                diags = diagnostics.get("diagnostics", [])
-                assert len(diags) == 0  # No import errors
+                assert len(diagnostics) == 0  # No import errors
 
                 await session1.shutdown()
 
                 # Second session with same base path
-                session2 = await PyrightSession.create(
+                session2 = await lsp_types.Session.create(
+                    lsp_backend,
                     base_path=temp_path,
                     initial_code="from mymodule.utils import helper\nprint(helper())",
                     pool=pool,
                 )
 
                 diagnostics = await session2.get_diagnostics()
-                diags = diagnostics.get("diagnostics", [])
-                assert len(diags) == 0  # No import errors
+                assert len(diagnostics) == 0  # No import errors
 
                 await session2.shutdown()
 
         finally:
             await pool.cleanup()
 
-    async def test_pool_exhaustion_fallback(self, session_pool):
+    async def test_pool_exhaustion_fallback(self, session_pool, lsp_backend):
         """Test that pool exhaustion gracefully falls back to new sessions"""
         # Fill up the pool
         active_sessions = []
         for i in range(session_pool.max_size):
-            session = await PyrightSession.create(
-                initial_code=f"x{i} = {i}", pool=session_pool
+            session = await lsp_types.Session.create(
+                lsp_backend, initial_code=f"x{i} = {i}", pool=session_pool
             )
             active_sessions.append(session)
 
@@ -289,8 +311,8 @@ class TestLSPProcessPool:
         assert session_pool.available_count == 0
 
         # Create additional session - should work but not use pool
-        extra_session = await PyrightSession.create(
-            initial_code="extra = 'not_pooled'", pool=session_pool
+        extra_session = await lsp_types.Session.create(
+            lsp_backend, initial_code="extra = 'not_pooled'", pool=session_pool
         )
 
         # Should work fine
@@ -304,10 +326,8 @@ class TestLSPProcessPool:
         for session in active_sessions:
             await session.shutdown()
 
-    async def test_idle_process_cleanup(self):
+    async def test_idle_process_cleanup(self, lsp_backend):
         """Test that idle processes are automatically removed from the pool"""
-        from lsp_types.pool import LSPProcessPool
-
         # Create pool with very short idle time and cleanup interval for fast test
         pool = LSPProcessPool(
             max_size=3,
@@ -317,8 +337,8 @@ class TestLSPProcessPool:
 
         try:
             # Create and recycle a session to get a process in the pool
-            session = await PyrightSession.create(
-                initial_code="test_var = 42", pool=pool
+            session = await lsp_types.Session.create(
+                lsp_backend, initial_code="test_var = 42", pool=pool
             )
             await session.shutdown()
 
@@ -340,10 +360,8 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_idle_cleanup_preserves_active_processes(self):
+    async def test_idle_cleanup_preserves_active_processes(self, lsp_backend):
         """Test that idle cleanup only removes available processes, not active ones"""
-        from lsp_types.pool import LSPProcessPool
-
         pool = LSPProcessPool(
             max_size=3,
             max_idle_time=0.1,  # 100ms idle time
@@ -352,11 +370,15 @@ class TestLSPProcessPool:
 
         try:
             # Create and recycle one session to get it in the available pool
-            session1 = await PyrightSession.create(initial_code="var1 = 1", pool=pool)
+            session1 = await lsp_types.Session.create(
+                lsp_backend, initial_code="var1 = 1", pool=pool
+            )
             await session1.shutdown()
 
             # Now create another session that will reuse the available process
-            session2 = await PyrightSession.create(initial_code="var2 = 2", pool=pool)
+            session2 = await lsp_types.Session.create(
+                lsp_backend, initial_code="var2 = 2", pool=pool
+            )
             # Don't recycle session2, keep it active
 
             # Pool should have 0 available, 1 active (1 total) since the process was reused
@@ -389,10 +411,8 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_idle_cleanup_timing_precision(self):
+    async def test_idle_cleanup_timing_precision(self, lsp_backend):
         """Test that idle cleanup respects the max_idle_time precisely"""
-        from lsp_types.pool import LSPProcessPool
-
         pool = LSPProcessPool(
             max_size=2,
             max_idle_time=0.15,  # 150ms idle time
@@ -401,8 +421,8 @@ class TestLSPProcessPool:
 
         try:
             # Create and recycle a session
-            session = await PyrightSession.create(
-                initial_code="test_var = 42", pool=pool
+            session = await lsp_types.Session.create(
+                lsp_backend, initial_code="test_var = 42", pool=pool
             )
             await session.shutdown()
 
@@ -427,10 +447,8 @@ class TestLSPProcessPool:
 class TestLSPProcessPoolBenchmarks:
     """Benchmark tests comparing pooled vs non-pooled session performance"""
 
-    async def test_benchmark_session_creation_comparison(self):
+    async def test_benchmark_session_creation_comparison(self, lsp_backend, backend_name):
         """Compare session creation times with and without pooling"""
-        from lsp_types.pool import LSPProcessPool
-
         pool = LSPProcessPool(max_size=3)
 
         try:
@@ -438,8 +456,8 @@ class TestLSPProcessPoolBenchmarks:
             pooled_times = []
             for i in range(3):
                 start_time = time.perf_counter()
-                session = await PyrightSession.create(
-                    initial_code=f"pooled_var_{i} = {i}", pool=pool
+                session = await lsp_types.Session.create(
+                    lsp_backend, initial_code=f"pooled_var_{i} = {i}", pool=pool
                 )
                 await session.shutdown()
                 end_time = time.perf_counter()
@@ -449,8 +467,8 @@ class TestLSPProcessPoolBenchmarks:
             non_pooled_times = []
             for i in range(3):
                 start_time = time.perf_counter()
-                session = await PyrightSession.create(
-                    initial_code=f"non_pooled_var_{i} = {i}"
+                session = await lsp_types.Session.create(
+                    lsp_backend, initial_code=f"non_pooled_var_{i} = {i}"
                 )
                 await session.shutdown()
                 end_time = time.perf_counter()
@@ -460,7 +478,7 @@ class TestLSPProcessPoolBenchmarks:
             avg_pooled = sum(pooled_times) / len(pooled_times)
             avg_non_pooled = sum(non_pooled_times) / len(non_pooled_times)
 
-            print("\nBenchmark Results:")
+            print(f"\n{backend_name.title()} Benchmark Results:")
             print(f"Average session creation time with pooling: {avg_pooled:.3f}s")
             print(
                 f"Average session creation time without pooling: {avg_non_pooled:.3f}s"
@@ -478,16 +496,14 @@ class TestLSPProcessPoolBenchmarks:
         finally:
             await pool.cleanup()
 
-    async def test_benchmark_session_reuse_performance(self):
+    async def test_benchmark_session_reuse_performance(self, lsp_backend, backend_name):
         """Compare session reuse performance vs fresh creation"""
-        from lsp_types.pool import LSPProcessPool
-
         pool = LSPProcessPool(max_size=3)
 
         try:
             # Pre-warm the pool
-            warmup_session = await PyrightSession.create(
-                initial_code="warmup = True", pool=pool
+            warmup_session = await lsp_types.Session.create(
+                lsp_backend, initial_code="warmup = True", pool=pool
             )
             await warmup_session.shutdown()
 
@@ -495,8 +511,8 @@ class TestLSPProcessPoolBenchmarks:
             reuse_times = []
             for i in range(5):
                 start_time = time.perf_counter()
-                session = await PyrightSession.create(
-                    initial_code=f"reused_var_{i} = {i}", pool=pool
+                session = await lsp_types.Session.create(
+                    lsp_backend, initial_code=f"reused_var_{i} = {i}", pool=pool
                 )
                 # Do some work
                 hover_info = await session.get_hover_info(
@@ -511,8 +527,8 @@ class TestLSPProcessPoolBenchmarks:
             fresh_times = []
             for i in range(3):
                 start_time = time.perf_counter()
-                session = await PyrightSession.create(
-                    initial_code=f"fresh_var_{i} = {i}"
+                session = await lsp_types.Session.create(
+                    lsp_backend, initial_code=f"fresh_var_{i} = {i}"
                 )
                 hover_info = await session.get_hover_info(
                     lsp_types.Position(line=0, character=0)
@@ -525,7 +541,7 @@ class TestLSPProcessPoolBenchmarks:
             avg_reuse = sum(reuse_times) / len(reuse_times)
             avg_fresh = sum(fresh_times) / len(fresh_times)
 
-            print("\nSession Reuse Benchmark:")
+            print(f"\n{backend_name.title()} Session Reuse Benchmark:")
             print(f"Average reused session time: {avg_reuse:.3f}s")
             print(f"Average fresh session time: {avg_fresh:.3f}s")
             print(
@@ -535,10 +551,8 @@ class TestLSPProcessPoolBenchmarks:
         finally:
             await pool.cleanup()
 
-    async def test_benchmark_concurrent_session_creation(self):
+    async def test_benchmark_concurrent_session_creation(self, lsp_backend, backend_name):
         """Compare concurrent session creation with and without pooling"""
-        from lsp_types.pool import LSPProcessPool
-
         pool = LSPProcessPool(max_size=5)
 
         try:
@@ -546,7 +560,8 @@ class TestLSPProcessPoolBenchmarks:
             start_time = time.perf_counter()
 
             async def create_pooled_session(session_id: int):
-                session = await PyrightSession.create(
+                session = await lsp_types.Session.create(
+                    lsp_backend,
                     initial_code=f"pooled_concurrent_{session_id} = {session_id}",
                     pool=pool,
                 )
@@ -564,8 +579,8 @@ class TestLSPProcessPoolBenchmarks:
             start_time = time.perf_counter()
 
             async def create_fresh_session(session_id: int):
-                session = await PyrightSession.create(
-                    initial_code=f"fresh_concurrent_{session_id} = {session_id}"
+                session = await lsp_types.Session.create(
+                    lsp_backend, initial_code=f"fresh_concurrent_{session_id} = {session_id}"
                 )
                 hover_info = await session.get_hover_info(
                     lsp_types.Position(line=0, character=0)
@@ -577,7 +592,7 @@ class TestLSPProcessPoolBenchmarks:
             fresh_results = await asyncio.gather(*tasks)
             fresh_time = time.perf_counter() - start_time
 
-            print("\nConcurrent Session Creation Benchmark:")
+            print(f"\n{backend_name.title()} Concurrent Session Creation Benchmark:")
             print(f"3 pooled sessions time: {pooled_time:.3f}s")
             print(f"3 fresh sessions time: {fresh_time:.3f}s")
             print(
@@ -589,3 +604,53 @@ class TestLSPProcessPoolBenchmarks:
 
         finally:
             await pool.cleanup()
+
+
+# Pyrefly-specific configuration benchmark test
+async def test_pyrefly_config_options_benchmark():
+    """Benchmark different Pyrefly configuration options"""
+    # Only run for Pyrefly backend
+    backend = PyreflyBackend()
+    from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
+
+    # Test different threading configurations
+    configs: list[PyreflyConfig] = [
+        {"threads": 0, "verbose": False},  # Auto
+        {"threads": 1, "verbose": False},  # Sequential 
+        {"threads": 2, "verbose": False},  # Parallel
+        {"threads": 4, "verbose": False},  # More parallel
+    ]
+
+    pool = LSPProcessPool(max_size=2)
+
+    try:
+        for config in configs:
+            config_times = []
+            
+            for i in range(3):
+                start_time = time.perf_counter()
+                
+                session = await lsp_types.Session.create(
+                    backend,
+                    initial_code=f"def test_{i}(x: int) -> int: return x * 2\nresult = test_{i}(5)",
+                    options=config,  # type: ignore
+                    pool=pool
+                )
+                
+                # Do some work to test performance
+                hover_info = await session.get_hover_info(
+                    lsp_types.Position(line=0, character=4)
+                )
+                assert hover_info is not None
+                
+                diagnostics = await session.get_diagnostics()
+                await session.shutdown()
+                
+                end_time = time.perf_counter()
+                config_times.append(end_time - start_time)
+            
+            avg_time = sum(config_times) / len(config_times)
+            print(f"\nPyrefly Config {config}: Average time {avg_time:.3f}s")
+
+    finally:
+        await pool.cleanup()

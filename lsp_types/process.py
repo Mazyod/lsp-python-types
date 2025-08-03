@@ -4,6 +4,7 @@ import itertools
 import json
 import logging
 import os
+from pathlib import Path
 import typing as t
 
 from . import requests, types
@@ -19,7 +20,7 @@ logger = logging.getLogger("lsp-types")
 class ProcessLaunchInfo:
     cmd: list[str]
     env: dict[str, str] = dc.field(default_factory=dict)
-    cwd: str = os.getcwd()
+    cwd: Path = Path(".")
 
 
 class Error(Exception):
@@ -90,6 +91,7 @@ class LSPProcess:
             raise RuntimeError("LSP process already started")
 
         child_proc_env = os.environ.copy()
+        child_proc_env.pop("PYTHONPATH", None)
         child_proc_env.update(self._process_launch_info.env)
 
         self._process = await asyncio.create_subprocess_exec(
@@ -124,8 +126,9 @@ class LSPProcess:
 
         if self._process:
             try:
+                self._process.terminate()
                 return_code = await asyncio.wait_for(self._process.wait(), timeout=5.0)
-                if return_code != 0:
+                if return_code not in (0, -15):
                     logger.warning("Server exited with return code: %d", return_code)
             except asyncio.TimeoutError:
                 try:
