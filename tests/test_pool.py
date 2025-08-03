@@ -3,6 +3,7 @@ Tests for session pool functionality.
 """
 
 import asyncio
+import logging
 import tempfile
 import time
 from pathlib import Path
@@ -486,20 +487,28 @@ class TestLSPProcessPoolBenchmarks:
             avg_pooled = sum(pooled_times) / len(pooled_times)
             avg_non_pooled = sum(non_pooled_times) / len(non_pooled_times)
 
-            print(f"\n{backend_name.title()} Benchmark Results:")
-            print(f"Average session creation time with pooling: {avg_pooled:.3f}s")
-            print(
+            logging.info(f"\n{backend_name.title()} Benchmark Results:")
+            logging.info(
+                f"Average session creation time with pooling: {avg_pooled:.3f}s"
+            )
+            logging.info(
                 f"Average session creation time without pooling: {avg_non_pooled:.3f}s"
             )
-            print(
+            logging.info(
                 f"Performance improvement: {((avg_non_pooled - avg_pooled) / avg_non_pooled * 100):.1f}%"
             )
 
             # The second and third pooled sessions should be faster (reusing processes)
             if len(pooled_times) >= 2:
-                print(f"First pooled session (new process): {pooled_times[0]:.3f}s")
-                print(f"Second pooled session (reused process): {pooled_times[1]:.3f}s")
-                print(f"Third pooled session (reused process): {pooled_times[2]:.3f}s")
+                logging.info(
+                    f"First pooled session (new process): {pooled_times[0]:.3f}s"
+                )
+                logging.info(
+                    f"Second pooled session (reused process): {pooled_times[1]:.3f}s"
+                )
+                logging.info(
+                    f"Third pooled session (reused process): {pooled_times[2]:.3f}s"
+                )
 
         finally:
             await pool.cleanup()
@@ -549,10 +558,10 @@ class TestLSPProcessPoolBenchmarks:
             avg_reuse = sum(reuse_times) / len(reuse_times)
             avg_fresh = sum(fresh_times) / len(fresh_times)
 
-            print(f"\n{backend_name.title()} Session Reuse Benchmark:")
-            print(f"Average reused session time: {avg_reuse:.3f}s")
-            print(f"Average fresh session time: {avg_fresh:.3f}s")
-            print(
+            logging.info(f"\n{backend_name.title()} Session Reuse Benchmark:")
+            logging.info(f"Average reused session time: {avg_reuse:.3f}s")
+            logging.info(f"Average fresh session time: {avg_fresh:.3f}s")
+            logging.info(
                 f"Reuse performance improvement: {((avg_fresh - avg_reuse) / avg_fresh * 100):.1f}%"
             )
 
@@ -603,10 +612,12 @@ class TestLSPProcessPoolBenchmarks:
             fresh_results = await asyncio.gather(*tasks)
             fresh_time = time.perf_counter() - start_time
 
-            print(f"\n{backend_name.title()} Concurrent Session Creation Benchmark:")
-            print(f"3 pooled sessions time: {pooled_time:.3f}s")
-            print(f"3 fresh sessions time: {fresh_time:.3f}s")
-            print(
+            logging.info(
+                f"\n{backend_name.title()} Concurrent Session Creation Benchmark:"
+            )
+            logging.info(f"3 pooled sessions time: {pooled_time:.3f}s")
+            logging.info(f"3 fresh sessions time: {fresh_time:.3f}s")
+            logging.info(
                 f"Pooling improvement: {((fresh_time - pooled_time) / fresh_time * 100):.1f}%"
             )
 
@@ -661,7 +672,7 @@ async def test_pyrefly_config_options_benchmark():
                 config_times.append(end_time - start_time)
 
             avg_time = sum(config_times) / len(config_times)
-            print(f"\nPyrefly Config {config}: Average time {avg_time:.3f}s")
+            logging.info(f"\nPyrefly Config {config}: Average time {avg_time:.3f}s")
 
     finally:
         await pool.cleanup()
