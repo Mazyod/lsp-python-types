@@ -34,6 +34,11 @@ Homepage = "https://github.com/mazyod/lsp-python-types"
 Repository = "https://github.com/mazyod/lsp-python-types"
 Documentation = "https://github.com/mazyod/lsp-python-types#readme"
 
+[project.optional-dependencies]
+pyrefly = [
+  "pyrefly>=0.32.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.0,<10",
