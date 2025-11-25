@@ -7,8 +7,8 @@ import pytest
 import lsp_types
 from lsp_types.pool import LSPProcessPool
 from lsp_types.pyrefly.backend import PyreflyBackend
-from lsp_types.pyright.backend import PyrightBackend
 from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
+from lsp_types.pyright.backend import PyrightBackend
 
 
 @pytest.fixture(params=[PyrightBackend, PyreflyBackend])
@@ -468,14 +468,17 @@ async def test_pyrefly_arbitrary_config_fields(tmp_path):
         "threads": 4,
     }
 
-    config |= t.cast(PyreflyConfig, {
-        "custom_field": "test_value",  # Arbitrary field
-        "experimental_flag": True,  # Arbitrary field
-        "nested_config": {  # Arbitrary nested field
-            "mode": "test",
-            "value": 42,
+    config |= t.cast(
+        PyreflyConfig,
+        {
+            "custom_field": "test_value",  # Arbitrary field
+            "experimental_flag": True,  # Arbitrary field
+            "nested_config": {  # Arbitrary nested field
+                "mode": "test",
+                "value": 42,
+            },
         },
-    })
+    )
 
     # Write config file
     backend.write_config(tmp_path, config)
@@ -581,8 +584,9 @@ async def test_pyrefly_comprehensive_config_options(tmp_path):
 async def test_pyrefly_search_path_configuration():
     """Test that search_path configuration enables custom import resolution"""
     backend = PyreflyBackend()
-    from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
     import tempfile
+
+    from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
