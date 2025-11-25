@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import tomli_w
+
 import lsp_types
 from lsp_types import types
 from lsp_types.process import ProcessLaunchInfo
@@ -14,21 +16,18 @@ class PyreflyBackend(LSPBackend):
     """Pyrefly-specific LSP backend implementation"""
 
     def write_config(self, base_path: Path, options: PyreflyConfig) -> None:
-        """Write pyrefly.toml configuration file"""
+        """
+        Write pyrefly.toml configuration file.
+
+        Accepts any mapping (including PyreflyConfig TypedDict and plain dicts
+        with arbitrary fields). Field names are converted from snake_case to
+        kebab-case to match Pyrefly's official TOML format.
+        """
+        # Convert snake_case keys to kebab-case for TOML file
+        kebab_options = {key.replace("_", "-"): value for key, value in options.items()}
+
         config_path = base_path / "pyrefly.toml"
-
-        # Convert options to TOML format (basic implementation)
-        # Note: Pyrefly's config format is still evolving, so we keep it minimal
-        toml_content = ""
-        if options.get("verbose"):
-            toml_content += "verbose = true\n"
-        if "threads" in options and options["threads"] is not None:
-            toml_content += f"threads = {options['threads']}\n"
-        if "color" in options:
-            toml_content += f'color = "{options["color"]}"\n'
-        if "indexing_mode" in options:
-            toml_content += f'indexing-mode = "{options["indexing_mode"]}"\n'
-
+        toml_content = tomli_w.dumps(kebab_options)
         config_path.write_text(toml_content)
 
     def create_process_launch_info(

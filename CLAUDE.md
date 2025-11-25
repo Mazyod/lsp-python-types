@@ -63,9 +63,10 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 
 **Pyrefly Integration (`lsp_types/pyrefly/`)**
 - `PyreflyBackend`: Backend implementation for Pyrefly LSP server (Facebook's Rust-based type checker)
-- `config_schema.py`: Auto-generated Pyrefly configuration types
+- `config_schema.py`: Pyrefly configuration types (TypedDict with known fields)
 - `session.py`: Factory functions and backward-compatible wrappers
 - **Key Design**: Uses consolidated `Session` class with `PyreflyBackend` for specialization
+- **Config Flexibility**: Supports arbitrary configuration fields via TOML serialization (using `tomli-w`)
 
 ### Type Generation Pipeline
 
@@ -99,17 +100,21 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 
 ### Dependencies
 
-**Runtime:** Zero dependencies (core design goal)
+**Runtime:**
+- `tomli-w>=1.0.0` - TOML writing support for Pyrefly configuration serialization
+
 **Development:** uv-managed dependencies in `pyproject.toml`
 - `pytest` with async support for testing
 - `datamodel-code-generator` for type generation
 - `httpx` for schema downloading
 
+**Note:** Previously a zero-dependency library. Added `tomli-w` to support arbitrary configuration fields in Pyrefly backend.
+
 ### Important Notes
 
 - Always prefix test commands with `uv run`
 - Pool tests require `pyright-langserver` and/or `pyrefly` binaries available in PATH
-- Type generation requires Python 3.11+ for modern TypedDict features
+- Type generation requires Python 3.12+ for modern TypedDict features
 - Generated types should not be manually edited - regenerate from schemas
 
 ### Architecture Design Patterns

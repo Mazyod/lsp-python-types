@@ -1,4 +1,5 @@
 import time
+import typing as t
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ import lsp_types
 from lsp_types.pool import LSPProcessPool
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 
 
 @pytest.fixture(params=[PyrightBackend, PyreflyBackend])
@@ -399,7 +401,6 @@ async def test_pyrefly_session_with_config_options():
     """Test Pyrefly session creation with various configuration options"""
     # Only run for Pyrefly backend
     backend = PyreflyBackend()
-    from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 
     # Test with verbose and threading options
     options: PyreflyConfig = {
@@ -455,3 +456,183 @@ async def test_pyrefly_session_with_minimal_config():
     assert len(diagnostics) == 0, "Expected no diagnostics for simple valid code"
 
     await session.shutdown()
+
+
+async def test_pyrefly_arbitrary_config_fields(tmp_path):
+    """Test Pyrefly backend supports arbitrary configuration fields"""
+    backend = PyreflyBackend()
+
+    # Config with both known and arbitrary fields
+    config: PyreflyConfig = {
+        "verbose": True,
+        "threads": 4,
+    }
+
+    config |= t.cast(PyreflyConfig, {
+        "custom_field": "test_value",  # Arbitrary field
+        "experimental_flag": True,  # Arbitrary field
+        "nested_config": {  # Arbitrary nested field
+            "mode": "test",
+            "value": 42,
+        },
+    })
+
+    # Write config file
+    backend.write_config(tmp_path, config)
+
+    # Verify TOML file was created and contains all fields
+    config_path = tmp_path / "pyrefly.toml"
+    assert config_path.exists(), "Config file should be created"
+
+    # Parse TOML to verify correctness
+    import tomllib
+
+    parsed = tomllib.loads(config_path.read_text())
+
+    # Verify known fields
+    assert parsed["verbose"] == True
+    assert parsed["threads"] == 4
+
+    # Verify arbitrary fields were serialized (now in kebab-case)
+    assert parsed["custom-field"] == "test_value"
+    assert parsed["experimental-flag"] == True
+
+    # Verify nested config (keys converted to kebab-case)
+    assert parsed["nested-config"]["mode"] == "test"
+    assert parsed["nested-config"]["value"] == 42
+
+
+async def test_pyrefly_comprehensive_config_options(tmp_path):
+    """Test Pyrefly session with comprehensive configuration options"""
+    backend = PyreflyBackend()
+    from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
+
+    # Test comprehensive config covering all major categories
+    options: PyreflyConfig = {
+        # Core options
+        "verbose": True,
+        "threads": 4,
+        "color": "always",
+        # LSP options
+        "indexing_mode": "lazy-blocking",
+        "disable_type_errors_in_ide": False,
+        # File selection
+        "project_includes": ["**/*.py", "**/*.pyi"],
+        "project_excludes": ["**/tests/**", "**/venv/**"],
+        "use_ignore_files": True,
+        # Python environment (USER REQUESTED)
+        "search_path": ["./src", "./lib"],
+        "python_version": "3.12.0",
+        "python_platform": "linux",
+        "site_package_path": ["./site-packages"],
+        "disable_search_path_heuristics": False,
+        # Type checking behavior
+        "untyped_def_behavior": "check-and-infer-return-type",
+        "infer_with_first_use": True,
+        "ignore_errors_in_generated_code": True,
+        "permissive_ignores": False,
+        "enabled_ignores": ["type", "pyrefly"],
+        # Import handling
+        "ignore_missing_imports": ["external_*", "legacy_*"],
+        "replace_imports_with_any": ["deprecated_module"],
+        "ignore_missing_source": False,
+        # Error configuration
+        "errors": {
+            "bad-assignment": False,
+            "bad-return": True,
+            "undefined-variable": True,
+        },
+        # Advanced
+        "typeshed_path": "/custom/typeshed",
+    }
+
+    # Write config and verify TOML serialization
+    backend.write_config(tmp_path, options)
+    config_path = tmp_path / "pyrefly.toml"
+    assert config_path.exists(), "Config file should be created"
+
+    # Parse and verify fields
+    import tomllib
+
+    parsed = tomllib.loads(config_path.read_text())
+
+    # Verify user-requested fields (now in kebab-case)
+    assert parsed["search-path"] == ["./src", "./lib"]
+    assert parsed["python-version"] == "3.12.0"
+    assert parsed["python-platform"] == "linux"
+
+    # Verify file selection (now in kebab-case)
+    assert parsed["project-includes"] == ["**/*.py", "**/*.pyi"]
+    assert parsed["project-excludes"] == ["**/tests/**", "**/venv/**"]
+
+    # Verify type checking (now in kebab-case)
+    assert parsed["untyped-def-behavior"] == "check-and-infer-return-type"
+    assert parsed["infer-with-first-use"] == True
+
+    # Verify error config (unchanged - dict keys not affected)
+    assert parsed["errors"]["bad-assignment"] == False
+    assert parsed["errors"]["bad-return"] == True
+
+    # Verify import handling (now in kebab-case)
+    assert parsed["ignore-missing-imports"] == ["external_*", "legacy_*"]
+    assert parsed["replace-imports-with-any"] == ["deprecated_module"]
+
+
+async def test_pyrefly_search_path_configuration():
+    """Test that search_path configuration enables custom import resolution"""
+    backend = PyreflyBackend()
+    from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+
+        # Create custom module directory outside base path
+        lib_path = tmp_path / "custom_lib"
+        lib_path.mkdir()
+        (lib_path / "__init__.py").touch()
+
+        # Create custom module
+        custom_module = lib_path / "my_utils.py"
+        custom_module.write_text("""
+def helper_function(x: int) -> str:
+    '''Convert int to string.'''
+    return str(x)
+""")
+
+        # Code that imports from custom location
+        code = """
+from my_utils import helper_function
+
+result = helper_function(42)
+print(result)
+"""
+
+        # Configure with search_path pointing to lib directory
+        options: PyreflyConfig = {
+            "search_path": [str(lib_path)],
+            "verbose": False,
+        }
+
+        session = await lsp_types.Session.create(
+            backend,
+            base_path=tmp_path,
+            initial_code=code,
+            options=options,
+        )
+
+        # Verify no import errors
+        diagnostics = await session.get_diagnostics()
+        import_errors = [
+            d
+            for d in diagnostics
+            if "import" in d.get("message", "").lower()
+            or "module" in d.get("message", "").lower()
+        ]
+
+        # Should succeed because search_path includes lib/
+        assert len(import_errors) == 0, (
+            f"Expected no import errors with search_path configured, got: {import_errors}"
+        )
+
+        await session.shutdown()

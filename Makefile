@@ -30,7 +30,7 @@ generate-lsp-schema:
 		--input ./assets/lsprotocol/lsp.schema.json \
 		--output ./assets/scripts/lsp_schema.py \
 		--output-model-type "typing.TypedDict" \
-		--target-python-version "3.11" \
+		--target-python-version "3.12" \
 		--input-file-type "jsonschema" \
 		--use-field-description \
 		--use-schema-description \
@@ -44,7 +44,7 @@ generate-pyright-schema:
 		--input ./assets/lsps/pyright.schema.json \
 		--output ./lsp_types/pyright/config_schema.py \
 		--output-model-type "typing.TypedDict" \
-		--target-python-version "3.11" \
+		--target-python-version "3.12" \
 		--input-file-type "jsonschema" \
 		--use-field-description \
 		--use-schema-description \

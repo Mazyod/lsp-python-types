@@ -9,15 +9,15 @@ from .pool import LSPProcessPool
 from .process import LSPProcess, ProcessLaunchInfo
 
 
-class LSPBackend(t.Protocol):
+class LSPBackend[TConfig: t.Mapping](t.Protocol):
     """Protocol defining backend-specific LSP operations"""
 
-    def write_config(self, base_path: Path, options: t.Mapping) -> None:
+    def write_config(self, base_path: Path, options: TConfig) -> None:
         """Write backend-specific configuration file"""
         ...
 
     def create_process_launch_info(
-        self, base_path: Path, options: t.Mapping
+        self, base_path: Path, options: TConfig
     ) -> ProcessLaunchInfo:
         """Create process launch info for the LSP server"""
         ...
@@ -27,7 +27,7 @@ class LSPBackend(t.Protocol):
         ...
 
     def get_workspace_settings(
-        self, options: t.Mapping
+        self, options: TConfig
     ) -> types.DidChangeConfigurationParams:
         """Get workspace settings for didChangeConfiguration"""
         ...
