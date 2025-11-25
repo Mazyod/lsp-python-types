@@ -24,7 +24,7 @@ class ProcessLaunchInfo:
 
 
 class Error(Exception):
-    def __init__(self, code: types.ErrorCodes, message: str) -> None:
+    def __init__(self, code: types.ErrorCodes | int, message: str) -> None:
         super().__init__(message)
         self.code = code
 
@@ -33,7 +33,11 @@ class Error(Exception):
 
     @classmethod
     def from_lsp(cls, d: types.LSPObject) -> "Error":
-        code = types.ErrorCodes(d["code"])
+        try:
+            code = types.ErrorCodes(d["code"])
+        except ValueError:
+            code = int(d["code"])
+
         message = t.cast(str, d["message"])
         return Error(code, message)
 
