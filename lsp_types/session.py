@@ -50,6 +50,7 @@ class Session:
         base_path: Path = Path("."),
         initial_code: str = "",
         options: t.Mapping = {},
+        initialize_params: types.InitializeParams | None = None,
         pool: LSPProcessPool | None = None,
     ) -> t.Self:
         """Create a new LSP session using the provided backend"""
@@ -65,14 +66,19 @@ class Session:
             await lsp_process.start()
 
             # Initialize LSP connection
-            await lsp_process.send.initialize(
-                {
-                    "processId": None,
-                    "rootUri": f"file://{base_path}",
-                    "rootPath": base_path_str,
-                    "capabilities": backend.get_lsp_capabilities(),
-                }
-            )
+            resolved_initialize_params: types.InitializeParams = {
+                "processId": None,
+                "rootUri": f"file://{base_path}",
+                "rootPath": base_path_str,
+                "capabilities": backend.get_lsp_capabilities(),
+            }
+
+            if initialize_params is not None:
+                resolved_initialize_params = (
+                    resolved_initialize_params | initialize_params
+                )
+
+            await lsp_process.send.initialize(resolved_initialize_params)
 
             # Send initialized notification (required by LSP spec)
             await lsp_process.notify.initialized({})
