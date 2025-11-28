@@ -1,7 +1,7 @@
 # LSP Types
 
-[![PyPI version](https://badge.fury.io/py/lsp-types.svg)](https://badge.fury.io/py/lsp-types)
-[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![PyPI version](https://img.shields.io/pypi/v/lsp-types.svg?logo=pypi&logoColor=white)](https://pypi.org/project/lsp-types/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![Tests](https://github.com/Mazyod/lsp-python-types/actions/workflows/python-tests.yml/badge.svg)](https://github.com/Mazyod/lsp-python-types/actions/workflows/python-tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
