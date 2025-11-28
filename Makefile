@@ -22,11 +22,11 @@ help: ## Show this help message
 
 download-schemas: ## Download latest LSP schemas (run this before generate-types)
 	echo "Downloading latest LSP schemas..."
-	python -m assets.scripts.download_schemas
+	uv run python -m assets.scripts.download_schemas
 	echo "Done."
 
 generate-lsp-schema:
-	datamodel-codegen \
+	uv run datamodel-codegen \
 		--input ./assets/lsprotocol/lsp.schema.json \
 		--output ./assets/scripts/lsp_schema.py \
 		--output-model-type "typing.TypedDict" \
@@ -36,11 +36,8 @@ generate-lsp-schema:
 		--use-schema-description \
 		--use-double-quotes
 
-# see: https://github.com/koxudaxi/datamodel-code-generator/issues/2314
-	python -m assets.scripts.postprocess_schema
-
 generate-pyright-schema:
-	datamodel-codegen \
+	uv run datamodel-codegen \
 		--input ./assets/lsps/pyright.schema.json \
 		--output ./lsp_types/pyright/config_schema.py \
 		--output-model-type "typing.TypedDict" \
@@ -50,12 +47,9 @@ generate-pyright-schema:
 		--use-schema-description \
 		--use-double-quotes
 
-# see: https://github.com/koxudaxi/datamodel-code-generator/issues/2314
-# python -m assets.scripts.postprocess_schema
-
 generate-types: ## Generate LSP type definitions
 	echo "Generating LSP type definitions..."
-	python -m assets.scripts.generate
+	uv run python -m assets.scripts.generate
 	echo "Done."
 
 generate-latest-types: download-schemas generate-lsp-schema generate-pyright-schema generate-types ## Download latest LSP schemas and generate type definitions

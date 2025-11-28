@@ -78,8 +78,7 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 **Generation Process:**
 1. `download_schemas.py`: Fetches latest schemas from upstream
 2. `datamodel-codegen`: Converts JSON schema to TypedDict definitions
-3. `postprocess_schema.py`: Applies fixes for codegen limitations
-4. `generate.py`: Orchestrates final type file generation with utilities in `assets/scripts/utils/`
+3. `generate.py`: Orchestrates final type file generation with utilities in `assets/scripts/utils/`
 
 ### Testing Strategy
 
