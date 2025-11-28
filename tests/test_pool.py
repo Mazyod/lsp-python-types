@@ -6,6 +6,7 @@ import asyncio
 import logging
 import tempfile
 import time
+import typing as t
 from pathlib import Path
 
 import pytest
@@ -104,18 +105,20 @@ class TestLSPProcessPool:
     ):
         """Test recycling sessions with different options"""
 
+        options1: t.Mapping[str, t.Any]
+        options2: t.Mapping[str, t.Any]
         if backend_name == "pyright":
             from lsp_types.pyright.config_schema import Model as ConfigType
 
-            options1: ConfigType = {"strict": ["reportUndefinedVariable"]}
-            options2: ConfigType = {"strict": ["reportGeneralTypeIssues"]}
+            options1 = ConfigType(strict=["reportUndefinedVariable"])
+            options2 = ConfigType(strict=["reportGeneralTypeIssues"])
             code1 = "undefined_var = 1"
             code2 = "x: int = 'string'"  # Type error
         else:  # pyrefly
             from lsp_types.pyrefly.config_schema import Model as ConfigType
 
-            options1: ConfigType = {"verbose": True, "threads": 1}
-            options2: ConfigType = {"verbose": False, "threads": 2}
+            options1 = ConfigType(verbose=True, threads=1)
+            options2 = ConfigType(verbose=False, threads=2)
             code1 = "test_var = 1"
             code2 = "x: int = 42"
 
