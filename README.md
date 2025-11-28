@@ -60,7 +60,10 @@ async with LSPProcess(process_info) as process:
 
 The following LSPs are available out of the box:
 
-### Pyright
+- [Pyright](https://github.com/microsoft/pyright)
+- [Pyrefly](https://github.com/facebook/pyrefly)
+
+### Pyright Example
 
 ```python
 async def test_pyright_session():
@@ -111,5 +114,4 @@ NOTE: Do not import types that begin with `__`. These types are internal types a
 
 ### TODOs
 
-- Automate package releases on Github.
 - Support server request handlers.
