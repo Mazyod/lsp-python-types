@@ -12,11 +12,22 @@ jobs:
   Lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-      - run: uvx pyright .
-      - run: uvx ruff check .
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run Pyright
+        run: uvx pyright --pythonpath .venv/bin/python .
+
+      - name: Run Ruff
+        run: uvx ruff check .
