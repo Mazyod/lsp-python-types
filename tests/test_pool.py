@@ -668,7 +668,7 @@ async def test_pyrefly_config_options_benchmark():
                 )
                 assert hover_info is not None
 
-                diagnostics = await session.get_diagnostics()
+                _diagnostics = await session.get_diagnostics()
                 await session.shutdown()
 
                 end_time = time.perf_counter()

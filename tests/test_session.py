@@ -498,12 +498,12 @@ async def test_pyrefly_arbitrary_config_fields(tmp_path):
     parsed = tomllib.loads(config_path.read_text())
 
     # Verify known fields
-    assert parsed["verbose"] == True
+    assert parsed["verbose"] is True
     assert parsed["threads"] == 4
 
     # Verify arbitrary fields were serialized (now in kebab-case)
     assert parsed["custom-field"] == "test_value"
-    assert parsed["experimental-flag"] == True
+    assert parsed["experimental-flag"] is True
 
     # Verify nested config (keys converted to kebab-case)
     assert parsed["nested-config"]["mode"] == "test"
@@ -575,11 +575,11 @@ async def test_pyrefly_comprehensive_config_options(tmp_path):
 
     # Verify type checking (now in kebab-case)
     assert parsed["untyped-def-behavior"] == "check-and-infer-return-type"
-    assert parsed["infer-with-first-use"] == True
+    assert parsed["infer-with-first-use"] is True
 
     # Verify error config (unchanged - dict keys not affected)
-    assert parsed["errors"]["bad-assignment"] == False
-    assert parsed["errors"]["bad-return"] == True
+    assert parsed["errors"]["bad-assignment"] is False
+    assert parsed["errors"]["bad-return"] is True
 
     # Verify import handling (now in kebab-case)
     assert parsed["ignore-missing-imports"] == ["external_*", "legacy_*"]
