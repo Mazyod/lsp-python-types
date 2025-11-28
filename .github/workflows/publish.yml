@@ -59,3 +59,13 @@ jobs:
         with:
           # No token needed - uses OIDC trusted publishing
           print-hash: true
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ env.NEW_VERSION }}" \
+            --repo="${{ github.repository }}" \
+            --title="v${{ env.NEW_VERSION }}" \
+            --generate-notes \
+            ./dist/*
