@@ -136,6 +136,7 @@ class LSPProcess:
                     logger.warning("Server exited with return code: %d", return_code)
             except asyncio.TimeoutError:
                 try:
+                    logger.warning("Killing process")
                     self._process.kill()
                 except ProcessLookupError:
                     pass
