@@ -9,9 +9,9 @@ Always use `uv` for Python operations:
 ```bash
 # Run tests
 uv run pytest                                  # All tests
-uv run pytest tests/test_pool.py               # Generic pool tests
-uv run pytest tests/test_pyright/              # Pyright-specific tests  
-uv run pytest tests/test_pool.py::TestLSPProcessPool::test_name -v  # Single pool test
+uv run pytest tests/test_pool.py               # Pool tests
+uv run pytest tests/test_session.py            # Session tests
+uv run pytest tests/test_pool.py::TestLSPProcessPool::test_name -v  # Single test
 
 # Generate latest LSP types (full pipeline)
 make generate-latest-types                     # Downloads schemas + generates all types
@@ -25,7 +25,7 @@ make generate-types                            # Generate final type definitions
 
 ## Architecture Overview
 
-This is a zero-dependency Python library providing typed LSP (Language Server Protocol) interfaces with optional process management.
+This is a minimal-dependency Python library providing typed LSP (Language Server Protocol) interfaces with optional process management.
 
 ### Core Components
 
@@ -47,6 +47,12 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 - Consolidated implementation with common LSP functionality shared across all backends
 - Standard interface for `shutdown()`, `update_code()`, `get_diagnostics()`, etc.
 
+**Request/Notification Functions (`lsp_types/requests.py`)**
+- `RequestFunctions`: Typed async methods for all LSP requests (initialize, hover, completion, etc.)
+- `NotificationFunctions`: Typed methods for LSP notifications (initialized, didOpen, didChange, etc.)
+- Auto-generated from LSP schema to provide full protocol coverage
+- Used internally by `LSPProcess.send` and `LSPProcess.notify` interfaces
+
 **Generic Process Pooling (`lsp_types/pool.py`)**
 - `LSPProcessPool`: Language-server agnostic process pooling for performance optimization
 - `PooledLSPProcess`: Wrapper for `LSPProcess` with recycling state management
@@ -56,15 +62,13 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 **Backend Integrations**
 
 **Pyright Integration (`lsp_types/pyright/`)**
-- `PyrightBackend`: Backend implementation for Pyright LSP server
+- `backend.py`: `PyrightBackend` implementation for Pyright LSP server
 - `config_schema.py`: Auto-generated Pyright configuration types
-- `session.py`: Factory functions and backward-compatible wrappers
 - **Key Design**: Uses consolidated `Session` class with `PyrightBackend` for specialization
 
 **Pyrefly Integration (`lsp_types/pyrefly/`)**
-- `PyreflyBackend`: Backend implementation for Pyrefly LSP server (Facebook's Rust-based type checker)
+- `backend.py`: `PyreflyBackend` implementation for Pyrefly LSP server (Facebook's Rust-based type checker)
 - `config_schema.py`: Pyrefly configuration types (TypedDict with known fields)
-- `session.py`: Factory functions and backward-compatible wrappers
 - **Key Design**: Uses consolidated `Session` class with `PyreflyBackend` for specialization
 - **Config Flexibility**: Supports arbitrary configuration fields via TOML serialization (using `tomli-w`)
 
@@ -73,7 +77,7 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 **Schema Sources:**
 - `assets/lsprotocol/lsp.schema.json`: Official LSP protocol schema
 - `assets/lsps/pyright.schema.json`: Pyright-specific configuration schema
-- `assets/lsps/pyrefly.schema.json`: Pyrefly-specific configuration schema
+- `assets/lsps/pyrefly-guide.md`: Pyrefly configuration documentation (manually defined types)
 
 **Generation Process:**
 1. `download_schemas.py`: Fetches latest schemas from upstream
@@ -82,20 +86,21 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 
 ### Testing Strategy
 
-**Process Pool Tests**
-- `tests/test_pool.py`: Direct `LSPProcessPool` testing with generic interface
-- `tests/test_pyright/test_session_pool.py`: Pool integration testing through Pyright sessions
-- `tests/test_pyrefly/test_session_pool.py`: Pool integration testing through Pyrefly sessions
+**Tests are parametrized to run against multiple backends (Pyright and Pyrefly).**
+
+**Process Pool Tests (`tests/test_pool.py`)**
+- Direct `LSPProcessPool` testing with generic interface
+- Parametrized fixtures for testing both Pyright and Pyrefly backends
 - Comprehensive pool behavior testing (creation, recycling, limits, cleanup)
 - Performance benchmarks comparing pooled vs non-pooled sessions
 - Concurrent usage scenarios and idle process management
 
-**Session Tests**
-- `tests/test_session.py`: Core consolidated Session class functionality
-- `tests/test_pyright/test_pyright_session.py`: Pyright-specific LSP functionality testing
-- `tests/test_pyrefly/test_pyrefly_session.py`: Pyrefly-specific LSP functionality testing
+**Session Tests (`tests/test_session.py`)**
+- Core consolidated Session class functionality
+- Parametrized fixtures for testing both Pyright and Pyrefly backends
 - Integration testing with actual language servers (diagnostics, hover, completion)
-- Backend-specific configuration and behavior validation
+- Dynamic environment testing with temporary directories
+- Backend-agnostic tests that validate common LSP operations
 
 ### Dependencies
 
@@ -108,6 +113,12 @@ This is a zero-dependency Python library providing typed LSP (Language Server Pr
 - `httpx` for schema downloading
 
 **Note:** Previously a zero-dependency library. Added `tomli-w` to support arbitrary configuration fields in Pyrefly backend.
+
+### Examples
+
+The `examples/` directory contains demo scripts showing library usage:
+- `pyrefly_diagnostics_completion.py`: Demonstrates diagnostics and code completion with Pyrefly
+- `pyrefly_circular_imports.py`: Example of detecting circular import issues
 
 ### Important Notes
 

@@ -12,7 +12,7 @@ _Publish the excellent work of [Sublime LSP](https://github.com/sublimelsp/lsp-p
 
 __LSP Types__ is a Python package that aims to provide a fully typed interface to Language Server Protocol (LSP) interactions. It can be used to simply utilize the types, or to interact with an LSP server over stdio.
 
-It is a goal to maintain zero-dependency status for as long as possible.
+The library has minimal dependencies (`tomli-w` for TOML config serialization).
 
 ## Installation
 
@@ -66,14 +66,17 @@ The following LSPs are available out of the box:
 ### Pyright Example
 
 ```python
+from lsp_types import Session
+from lsp_types.pyright.backend import PyrightBackend
+
 async def test_pyright_session():
     code = """\
 def greet(name: str) -> str:
     return 123
 """
 
-    pyright_session = await Session.create(PyrightBackend(), initial_code=code)
-    diagnostics = await pyright_session.get_diagnostics()
+    session = await Session.create(PyrightBackend(), initial_code=code)
+    diagnostics = await session.get_diagnostics()
 
     assert diagnostics != []
 
@@ -82,10 +85,11 @@ def greet(name: str) -> str:
     return f"Hello, {name}"
 """
 
-    assert await pyright_session.update_code(code) == 2
-
-    diagnostics = await pyright_session.get_diagnostics()
+    await session.update_code(code)
+    diagnostics = await session.get_diagnostics()
     assert diagnostics == []
+
+    await session.shutdown()
 ```
 
 ## Development
@@ -105,7 +109,7 @@ make download-schemas
 
 Generate the types:
 ```sh
-make generate-schemas
+make generate-types
 ```
 
 Copy the `lsp_types/types.py` file to your project.
