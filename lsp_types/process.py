@@ -130,6 +130,11 @@ class LSPProcess:
             task.cancel()
 
         if self._process:
+            # Close stdin before terminating to prevent "Event loop is closed"
+            # errors during garbage collection
+            if self._process.stdin:
+                self._process.stdin.close()
+
             try:
                 self._process.terminate()
                 return_code = await asyncio.wait_for(self._process.wait(), timeout=5.0)
