@@ -95,7 +95,9 @@ class Session:
 
             # Update settings via didChangeConfiguration
             workspace_settings = backend.get_workspace_settings(options)
-            await lsp_process.notify.workspace_did_change_configuration(workspace_settings)
+            await lsp_process.notify.workspace_did_change_configuration(
+                workspace_settings
+            )
 
             # Simulate opening a document
             await session._open_document(initial_code)

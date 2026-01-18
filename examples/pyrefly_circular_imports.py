@@ -30,13 +30,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-import lsp_types
 from rich.console import Console
 from rich.markdown import Markdown
+
+import lsp_types
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyright.backend import PyrightBackend
 
 console = Console()
+
 
 # Simple structured logging helpers
 def log_step(title: str) -> None:
@@ -49,6 +51,7 @@ def log_result(label: str, value) -> None:
         console.print(Markdown(value))
     else:
         console.print(f"{label}: {value}")
+
 
 PKGB_B = dedent(
     """\
@@ -108,10 +111,19 @@ def prepare_workspace(pkgb_dir: Path, pkgc_dir: Path) -> None:
     pkgc.joinpath("c.py").write_text(PKGC_C)
 
 
-async def run_backend(backend_name: str, backend, options_key: str, root: Path, external_pkgb: Path, external_pkgc: Path) -> None:
+async def run_backend(
+    backend_name: str,
+    backend,
+    options_key: str,
+    root: Path,
+    external_pkgb: Path,
+    external_pkgc: Path,
+) -> None:
     """Run the circular imports test for a specific backend."""
-    console.rule(f"[bold cyan]{backend_name.upper()} Backend[/bold cyan]", characters="=")
-    
+    console.rule(
+        f"[bold cyan]{backend_name.upper()} Backend[/bold cyan]", characters="="
+    )
+
     session = await lsp_types.Session.create(
         backend,
         base_path=root,
@@ -147,9 +159,11 @@ async def run_backend(backend_name: str, backend, options_key: str, root: Path, 
 
 
 async def main() -> None:
-    with TemporaryDirectory(prefix="circular-root-") as tmp_root, TemporaryDirectory(
-        prefix="circular-pkgb-"
-    ) as tmp_pkgb, TemporaryDirectory(prefix="circular-pkgc-") as tmp_pkgc:
+    with (
+        TemporaryDirectory(prefix="circular-root-") as tmp_root,
+        TemporaryDirectory(prefix="circular-pkgb-") as tmp_pkgb,
+        TemporaryDirectory(prefix="circular-pkgc-") as tmp_pkgc,
+    ):
         root = Path(tmp_root)
         external_pkgb = Path(tmp_pkgb)
         external_pkgc = Path(tmp_pkgc)
@@ -160,12 +174,26 @@ async def main() -> None:
         console.print()
 
         # Run Pyrefly backend
-        await run_backend("pyrefly", PyreflyBackend(), "search_path", root, external_pkgb, external_pkgc)
-        
+        await run_backend(
+            "pyrefly",
+            PyreflyBackend(),
+            "search_path",
+            root,
+            external_pkgb,
+            external_pkgc,
+        )
+
         console.print("\n")
-        
+
         # Run Pyright backend
-        await run_backend("pyright", PyrightBackend(), "extraPaths", root, external_pkgb, external_pkgc)
+        await run_backend(
+            "pyright",
+            PyrightBackend(),
+            "extraPaths",
+            root,
+            external_pkgb,
+            external_pkgc,
+        )
 
 
 if __name__ == "__main__":

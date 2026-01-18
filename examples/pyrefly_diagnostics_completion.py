@@ -236,9 +236,7 @@ async def run_backend(backend_name: str, backend, workspace: Path) -> None:
         render_diagnostics(diagnostics)
 
         user_print("[bold]Step 1.1:[/] Hover on compile_report in initial code")
-        hover_initial = await controller.hover(
-            "compile_report", label="Initial hover"
-        )
+        hover_initial = await controller.hover("compile_report", label="Initial hover")
         user_print(f"Hover (initial) received: {hover_initial is not None}")
 
         user_print("[bold]Step 1.2:[/] Semantic tokens snapshot (initial code)")
@@ -300,9 +298,7 @@ async def run_backend(backend_name: str, backend, workspace: Path) -> None:
             )
 
         user_print("[bold]Step 5:[/] Second completion request (same cursor)")
-        completions_second = await controller.completion(
-            label="Completion request 2"
-        )
+        completions_second = await controller.completion(label="Completion request 2")
         if completions_second is None:
             user_print("[yellow]No completion items returned[/]")
         else:
@@ -312,9 +308,7 @@ async def run_backend(backend_name: str, backend, workspace: Path) -> None:
                 else completions_second
             )
             top_labels = [item.get("label") for item in items[:3]]
-            user_print(
-                f"Completion count: {len(items)}; sample labels: {top_labels}"
-            )
+            user_print(f"Completion count: {len(items)}; sample labels: {top_labels}")
 
         user_print("[bold]Step 6:[/] Finish completion snippet and verify diagnostics")
         await controller.write_code(
@@ -355,19 +349,13 @@ async def run_backend(backend_name: str, backend, workspace: Path) -> None:
             hover_loop = await controller.hover(
                 f"stress_helper_{idx}", label=f"Stress hover {loop_id}"
             )
-            user_print(
-                f"Hover (stress {loop_id}) received: {hover_loop is not None}"
-            )
+            user_print(f"Hover (stress {loop_id}) received: {hover_loop is not None}")
 
             tokens_loop = await controller.semantic_tokens(
                 label=f"Stress semantic tokens {loop_id}"
             )
-            token_count_loop = (
-                len(tokens_loop.get("data", [])) if tokens_loop else 0
-            )
-            user_print(
-                f"Semantic tokens (stress {loop_id}) count: {token_count_loop}"
-            )
+            token_count_loop = len(tokens_loop.get("data", [])) if tokens_loop else 0
+            user_print(f"Semantic tokens (stress {loop_id}) count: {token_count_loop}")
 
             await controller.write_code(
                 f"\nstress_completion_{idx} = current.",
@@ -446,9 +434,9 @@ async def main() -> None:
 
         # Run Pyrefly backend
         await run_backend("pyrefly", PyreflyBackend(), workspace)
-        
+
         console.print("\n\n")
-        
+
         # Run Pyright backend
         await run_backend("pyright", PyrightBackend(node_flags=["--prof"]), workspace)
 

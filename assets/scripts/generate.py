@@ -9,8 +9,11 @@ from .utils.generate_notifications import generate_notifications
 from .utils.generate_requests import generate_requests
 from .utils.generate_structures import generate_structures
 from .utils.generate_type_aliases import generate_type_aliases
-from .utils.helpers import (get_new_literal_structures, indentation,
-                            reset_new_literal_structures)
+from .utils.helpers import (
+    get_new_literal_structures,
+    indentation,
+    reset_new_literal_structures,
+)
 
 
 def generate_python_types(lsp_json: MetaModel, output: Path):

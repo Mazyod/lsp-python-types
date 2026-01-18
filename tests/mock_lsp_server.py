@@ -98,14 +98,16 @@ class MockLSPServer:
             return
 
         if method == self.error_on and not is_notification:
-            self.write_message({
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "error": {
-                    "code": self.error_code,
-                    "message": self.error_message,
+            self.write_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": self.error_code,
+                        "message": self.error_message,
+                    },
                 }
-            })
+            )
             return
 
         # Handle standard LSP methods
@@ -124,37 +126,31 @@ class MockLSPServer:
 
     def _handle_initialize(self, request_id: int | str) -> None:
         """Handle the initialize request."""
-        self.write_message({
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "result": {
-                "capabilities": {
-                    "textDocumentSync": 1,
-                    "hoverProvider": True,
-                    "completionProvider": {},
+        self.write_message(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "capabilities": {
+                        "textDocumentSync": 1,
+                        "hoverProvider": True,
+                        "completionProvider": {},
+                    },
+                    "serverInfo": {
+                        "name": "mock-lsp-server",
+                        "version": "1.0.0",
+                    },
                 },
-                "serverInfo": {
-                    "name": "mock-lsp-server",
-                    "version": "1.0.0",
-                }
             }
-        })
+        )
 
     def _handle_shutdown(self, request_id: int | str) -> None:
         """Handle the shutdown request."""
-        self.write_message({
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "result": None
-        })
+        self.write_message({"jsonrpc": "2.0", "id": request_id, "result": None})
 
     def _handle_default(self, request_id: int | str, method: str) -> None:
         """Handle unknown requests with empty/null response."""
-        self.write_message({
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "result": None
-        })
+        self.write_message({"jsonrpc": "2.0", "id": request_id, "result": None})
 
     def run(self) -> None:
         """Main loop: read and handle messages until exit."""

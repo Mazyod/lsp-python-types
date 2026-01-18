@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from ..lsp_schema import MetaModel, Notification, Request
+from ..lsp_schema import MetaModel
 
 
 def method_to_enum_name(method: str) -> str:

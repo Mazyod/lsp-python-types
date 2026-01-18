@@ -12,15 +12,14 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from lsp_types import types
 from lsp_types.pool import LSPProcessPool
-from lsp_types.process import LSPProcess, ProcessLaunchInfo, Error
-from lsp_types.session import LSPBackend, Session
-
+from lsp_types.process import Error, LSPProcess, ProcessLaunchInfo
+from lsp_types.session import Session
 
 # Path to the mock LSP server script
 MOCK_SERVER_PATH = Path(__file__).parent / "mock_lsp_server.py"
@@ -40,11 +39,13 @@ async def test_timeout_when_server_hangs():
 
     async with LSPProcess(launch_info) as process:
         # Initialize should work normally
-        init_result = await process.send.initialize({
-            "processId": None,
-            "capabilities": {},
-            "rootUri": None,
-        })
+        init_result = await process.send.initialize(
+            {
+                "processId": None,
+                "capabilities": {},
+                "rootUri": None,
+            }
+        )
         assert init_result is not None
         assert "capabilities" in init_result
 
@@ -53,10 +54,12 @@ async def test_timeout_when_server_hangs():
         # Hover request should timeout since server hangs on it
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(
-                process.send.hover({
-                    "textDocument": {"uri": "file:///test.py"},
-                    "position": {"line": 0, "character": 0},
-                }),
+                process.send.hover(
+                    {
+                        "textDocument": {"uri": "file:///test.py"},
+                        "position": {"line": 0, "character": 0},
+                    }
+                ),
                 timeout=0.5,  # Short timeout for testing
             )
 
@@ -66,29 +69,36 @@ async def test_error_response_handling():
     # Launch mock server that returns errors on hover requests
     launch_info = ProcessLaunchInfo(
         cmd=get_mock_server_cmd(
-            "--error-on", "textDocument/hover",
-            "--error-code", "-32600",
-            "--error-message", "Test error from mock server",
+            "--error-on",
+            "textDocument/hover",
+            "--error-code",
+            "-32600",
+            "--error-message",
+            "Test error from mock server",
         ),
     )
 
     async with LSPProcess(launch_info) as process:
         # Initialize should work normally
-        init_result = await process.send.initialize({
-            "processId": None,
-            "capabilities": {},
-            "rootUri": None,
-        })
+        init_result = await process.send.initialize(
+            {
+                "processId": None,
+                "capabilities": {},
+                "rootUri": None,
+            }
+        )
         assert init_result is not None
 
         await process.notify.initialized({})
 
         # Hover request should raise an Error exception
         with pytest.raises(Error) as exc_info:
-            await process.send.hover({
-                "textDocument": {"uri": "file:///test.py"},
-                "position": {"line": 0, "character": 0},
-            })
+            await process.send.hover(
+                {
+                    "textDocument": {"uri": "file:///test.py"},
+                    "position": {"line": 0, "character": 0},
+                }
+            )
 
         error = exc_info.value
         assert error.code == -32600
@@ -106,20 +116,24 @@ async def test_shutdown_after_timeout():
 
     try:
         # Initialize
-        await process.send.initialize({
-            "processId": None,
-            "capabilities": {},
-            "rootUri": None,
-        })
+        await process.send.initialize(
+            {
+                "processId": None,
+                "capabilities": {},
+                "rootUri": None,
+            }
+        )
         await process.notify.initialized({})
 
         # Request that will timeout
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(
-                process.send.completion({
-                    "textDocument": {"uri": "file:///test.py"},
-                    "position": {"line": 0, "character": 0},
-                }),
+                process.send.completion(
+                    {
+                        "textDocument": {"uri": "file:///test.py"},
+                        "position": {"line": 0, "character": 0},
+                    }
+                ),
                 timeout=0.3,
             )
 
@@ -147,7 +161,9 @@ class FailingBackend:
     def get_lsp_capabilities(self) -> types.ClientCapabilities:
         return {}
 
-    def get_workspace_settings(self, options: dict) -> types.DidChangeConfigurationParams:
+    def get_workspace_settings(
+        self, options: dict
+    ) -> types.DidChangeConfigurationParams:
         if self.fail_on == "get_workspace_settings":
             raise RuntimeError("Simulated get_workspace_settings failure")
         return {"settings": {}}
@@ -162,7 +178,9 @@ async def test_session_create_releases_process_on_failure(tmp_path: Path):
 
     try:
         # Attempt to create a session - this should fail
-        with pytest.raises(RuntimeError, match="Simulated get_workspace_settings failure"):
+        with pytest.raises(
+            RuntimeError, match="Simulated get_workspace_settings failure"
+        ):
             await Session.create(
                 backend,
                 base_path=tmp_path,
@@ -197,7 +215,9 @@ async def test_session_create_cleanup_without_pool(tmp_path: Path):
 
     with patch.object(LSPProcess, "stop", tracking_stop):
         # Attempt to create a session without a pool - this should fail
-        with pytest.raises(RuntimeError, match="Simulated get_workspace_settings failure"):
+        with pytest.raises(
+            RuntimeError, match="Simulated get_workspace_settings failure"
+        ):
             await Session.create(
                 backend,
                 base_path=tmp_path,
@@ -206,4 +226,6 @@ async def test_session_create_cleanup_without_pool(tmp_path: Path):
             )
 
         # Verify process.stop was called (cleanup happened)
-        assert len(stop_called) == 1, "Process should be stopped when no pool and creation fails"
+        assert len(stop_called) == 1, (
+            "Process should be stopped when no pool and creation fails"
+        )

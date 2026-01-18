@@ -3,12 +3,10 @@ from __future__ import annotations
 # Generated code.
 # DO NOT EDIT.
 # LSP v3.17.0
-
 import asyncio
 from typing import Any, Awaitable, Callable, Union
-from . import methods
-from . import types
 
+from . import methods, types
 
 RequestDispatcher = Callable[[str, types.LSPAny], Awaitable[Any]]
 
@@ -17,91 +15,147 @@ class RequestFunctions:
     def __init__(self, dispatcher: RequestDispatcher):
         self.dispatcher = dispatcher
 
-    async def implementation(self, params: types.ImplementationParams) -> Union[types.Definition, list[types.LocationLink], None]:
+    async def implementation(
+        self, params: types.ImplementationParams
+    ) -> Union[types.Definition, list[types.LocationLink], None]:
         """A request to resolve the implementation locations of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPositionParams}
         the response is of type {@link Definition} or a Thenable that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_IMPLEMENTATION, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_IMPLEMENTATION, params
+        )
 
-    async def type_definition(self, params: types.TypeDefinitionParams) -> Union[types.Definition, list[types.LocationLink], None]:
+    async def type_definition(
+        self, params: types.TypeDefinitionParams
+    ) -> Union[types.Definition, list[types.LocationLink], None]:
         """A request to resolve the type definition locations of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPositionParams}
         the response is of type {@link Definition} or a Thenable that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_TYPE_DEFINITION, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_TYPE_DEFINITION, params
+        )
 
-    async def document_color(self, params: types.DocumentColorParams) -> list[types.ColorInformation]:
+    async def document_color(
+        self, params: types.DocumentColorParams
+    ) -> list[types.ColorInformation]:
         """A request to list all color symbols found in a given text document. The request's
         parameter is of type {@link DocumentColorParams} the
         response is of type {@link ColorInformation ColorInformation[]} or a Thenable
         that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DOCUMENT_COLOR, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_DOCUMENT_COLOR, params
+        )
 
-    async def color_presentation(self, params: types.ColorPresentationParams) -> list[types.ColorPresentation]:
+    async def color_presentation(
+        self, params: types.ColorPresentationParams
+    ) -> list[types.ColorPresentation]:
         """A request to list all presentation for a color. The request's
         parameter is of type {@link ColorPresentationParams} the
         response is of type {@link ColorInformation ColorInformation[]} or a Thenable
         that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_COLOR_PRESENTATION, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_COLOR_PRESENTATION, params
+        )
 
-    async def folding_range(self, params: types.FoldingRangeParams) -> Union[list[types.FoldingRange], None]:
+    async def folding_range(
+        self, params: types.FoldingRangeParams
+    ) -> Union[list[types.FoldingRange], None]:
         """A request to provide folding ranges in a document. The request's
         parameter is of type {@link FoldingRangeParams}, the
         response is of type {@link FoldingRangeList} or a Thenable
         that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_FOLDING_RANGE, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_FOLDING_RANGE, params
+        )
 
-    async def declaration(self, params: types.DeclarationParams) -> Union[types.Declaration, list[types.LocationLink], None]:
+    async def declaration(
+        self, params: types.DeclarationParams
+    ) -> Union[types.Declaration, list[types.LocationLink], None]:
         """A request to resolve the type definition locations of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPositionParams}
         the response is of type {@link Declaration} or a typed array of {@link DeclarationLink}
         or a Thenable that resolves to such."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DECLARATION, params)
 
-    async def selection_range(self, params: types.SelectionRangeParams) -> Union[list[types.SelectionRange], None]:
+    async def selection_range(
+        self, params: types.SelectionRangeParams
+    ) -> Union[list[types.SelectionRange], None]:
         """A request to provide selection ranges in a document. The request's
         parameter is of type {@link SelectionRangeParams}, the
         response is of type {@link SelectionRange SelectionRange[]} or a Thenable
         that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_SELECTION_RANGE, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_SELECTION_RANGE, params
+        )
 
-    async def prepare_call_hierarchy(self, params: types.CallHierarchyPrepareParams) -> Union[list[types.CallHierarchyItem], None]:
+    async def prepare_call_hierarchy(
+        self, params: types.CallHierarchyPrepareParams
+    ) -> Union[list[types.CallHierarchyItem], None]:
         """A request to result a `CallHierarchyItem` in a document at a given position.
         Can be used as an input to an incoming or outgoing call hierarchy.
 
         @since 3.16.0"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_PREPARE_CALL_HIERARCHY, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_PREPARE_CALL_HIERARCHY, params
+        )
 
-    async def incoming_calls(self, params: types.CallHierarchyIncomingCallsParams) -> Union[list[types.CallHierarchyIncomingCall], None]:
+    async def incoming_calls(
+        self, params: types.CallHierarchyIncomingCallsParams
+    ) -> Union[list[types.CallHierarchyIncomingCall], None]:
         """A request to resolve the incoming calls for a given `CallHierarchyItem`.
 
         @since 3.16.0"""
-        return await self.dispatcher(methods.Request.CALL_HIERARCHY_INCOMING_CALLS, params)
+        return await self.dispatcher(
+            methods.Request.CALL_HIERARCHY_INCOMING_CALLS, params
+        )
 
-    async def outgoing_calls(self, params: types.CallHierarchyOutgoingCallsParams) -> Union[list[types.CallHierarchyOutgoingCall], None]:
+    async def outgoing_calls(
+        self, params: types.CallHierarchyOutgoingCallsParams
+    ) -> Union[list[types.CallHierarchyOutgoingCall], None]:
         """A request to resolve the outgoing calls for a given `CallHierarchyItem`.
 
         @since 3.16.0"""
-        return await self.dispatcher(methods.Request.CALL_HIERARCHY_OUTGOING_CALLS, params)
+        return await self.dispatcher(
+            methods.Request.CALL_HIERARCHY_OUTGOING_CALLS, params
+        )
 
-    async def semantic_tokens_full(self, params: types.SemanticTokensParams) -> Union[types.SemanticTokens, None]:
+    async def semantic_tokens_full(
+        self, params: types.SemanticTokensParams
+    ) -> Union[types.SemanticTokens, None]:
         """@since 3.16.0"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL, params
+        )
 
-    async def semantic_tokens_delta(self, params: types.SemanticTokensDeltaParams) -> Union[types.SemanticTokens, types.SemanticTokensDelta, None]:
+    async def semantic_tokens_delta(
+        self, params: types.SemanticTokensDeltaParams
+    ) -> Union[types.SemanticTokens, types.SemanticTokensDelta, None]:
         """@since 3.16.0"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL_DELTA, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL_DELTA, params
+        )
 
-    async def semantic_tokens_range(self, params: types.SemanticTokensRangeParams) -> Union[types.SemanticTokens, None]:
+    async def semantic_tokens_range(
+        self, params: types.SemanticTokensRangeParams
+    ) -> Union[types.SemanticTokens, None]:
         """@since 3.16.0"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_SEMANTIC_TOKENS_RANGE, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_SEMANTIC_TOKENS_RANGE, params
+        )
 
-    async def linked_editing_range(self, params: types.LinkedEditingRangeParams) -> Union[types.LinkedEditingRanges, None]:
+    async def linked_editing_range(
+        self, params: types.LinkedEditingRangeParams
+    ) -> Union[types.LinkedEditingRanges, None]:
         """A request to provide ranges that can be edited together.
 
         @since 3.16.0"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_LINKED_EDITING_RANGE, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_LINKED_EDITING_RANGE, params
+        )
 
-    async def will_create_files(self, params: types.CreateFilesParams) -> Union[types.WorkspaceEdit, None]:
+    async def will_create_files(
+        self, params: types.CreateFilesParams
+    ) -> Union[types.WorkspaceEdit, None]:
         """The will create files request is sent from the client to the server before files are actually
         created as long as the creation is triggered from within the client.
 
@@ -110,48 +164,70 @@ class RequestFunctions:
         to be created.
 
         @since 3.16.0"""
-        return await self.dispatcher(methods.Request.WORKSPACE_WILL_CREATE_FILES, params)
+        return await self.dispatcher(
+            methods.Request.WORKSPACE_WILL_CREATE_FILES, params
+        )
 
-    async def will_rename_files(self, params: types.RenameFilesParams) -> Union[types.WorkspaceEdit, None]:
+    async def will_rename_files(
+        self, params: types.RenameFilesParams
+    ) -> Union[types.WorkspaceEdit, None]:
         """The will rename files request is sent from the client to the server before files are actually
         renamed as long as the rename is triggered from within the client.
 
         @since 3.16.0"""
-        return await self.dispatcher(methods.Request.WORKSPACE_WILL_RENAME_FILES, params)
+        return await self.dispatcher(
+            methods.Request.WORKSPACE_WILL_RENAME_FILES, params
+        )
 
-    async def will_delete_files(self, params: types.DeleteFilesParams) -> Union[types.WorkspaceEdit, None]:
+    async def will_delete_files(
+        self, params: types.DeleteFilesParams
+    ) -> Union[types.WorkspaceEdit, None]:
         """The did delete files notification is sent from the client to the server when
         files were deleted from within the client.
 
         @since 3.16.0"""
-        return await self.dispatcher(methods.Request.WORKSPACE_WILL_DELETE_FILES, params)
+        return await self.dispatcher(
+            methods.Request.WORKSPACE_WILL_DELETE_FILES, params
+        )
 
-    async def moniker(self, params: types.MonikerParams) -> Union[list[types.Moniker], None]:
+    async def moniker(
+        self, params: types.MonikerParams
+    ) -> Union[list[types.Moniker], None]:
         """A request to get the moniker of a symbol at a given text document position.
         The request parameter is of type {@link TextDocumentPositionParams}.
         The response is of type {@link Moniker Moniker[]} or `null`."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_MONIKER, params)
 
-    async def prepare_type_hierarchy(self, params: types.TypeHierarchyPrepareParams) -> Union[list[types.TypeHierarchyItem], None]:
+    async def prepare_type_hierarchy(
+        self, params: types.TypeHierarchyPrepareParams
+    ) -> Union[list[types.TypeHierarchyItem], None]:
         """A request to result a `TypeHierarchyItem` in a document at a given position.
         Can be used as an input to a subtypes or supertypes type hierarchy.
 
         @since 3.17.0"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_PREPARE_TYPE_HIERARCHY, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_PREPARE_TYPE_HIERARCHY, params
+        )
 
-    async def type_hierarchy_supertypes(self, params: types.TypeHierarchySupertypesParams) -> Union[list[types.TypeHierarchyItem], None]:
+    async def type_hierarchy_supertypes(
+        self, params: types.TypeHierarchySupertypesParams
+    ) -> Union[list[types.TypeHierarchyItem], None]:
         """A request to resolve the supertypes for a given `TypeHierarchyItem`.
 
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.TYPE_HIERARCHY_SUPERTYPES, params)
 
-    async def type_hierarchy_subtypes(self, params: types.TypeHierarchySubtypesParams) -> Union[list[types.TypeHierarchyItem], None]:
+    async def type_hierarchy_subtypes(
+        self, params: types.TypeHierarchySubtypesParams
+    ) -> Union[list[types.TypeHierarchyItem], None]:
         """A request to resolve the subtypes for a given `TypeHierarchyItem`.
 
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.TYPE_HIERARCHY_SUBTYPES, params)
 
-    async def inline_value(self, params: types.InlineValueParams) -> Union[list[types.InlineValue], None]:
+    async def inline_value(
+        self, params: types.InlineValueParams
+    ) -> Union[list[types.InlineValue], None]:
         """A request to provide inline values in a document. The request's parameter is of
         type {@link InlineValueParams}, the response is of type
         {@link InlineValue InlineValue[]} or a Thenable that resolves to such.
@@ -159,7 +235,9 @@ class RequestFunctions:
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_INLINE_VALUE, params)
 
-    async def inlay_hint(self, params: types.InlayHintParams) -> Union[list[types.InlayHint], None]:
+    async def inlay_hint(
+        self, params: types.InlayHintParams
+    ) -> Union[list[types.InlayHint], None]:
         """A request to provide inlay hints in a document. The request's parameter is of
         type {@link InlayHintsParams}, the response is of type
         {@link InlayHint InlayHint[]} or a Thenable that resolves to such.
@@ -175,36 +253,50 @@ class RequestFunctions:
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.INLAY_HINT_RESOLVE, params)
 
-    async def text_document_diagnostic(self, params: types.DocumentDiagnosticParams) -> types.DocumentDiagnosticReport:
+    async def text_document_diagnostic(
+        self, params: types.DocumentDiagnosticParams
+    ) -> types.DocumentDiagnosticReport:
         """The document diagnostic request definition.
 
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DIAGNOSTIC, params)
 
-    async def workspace_diagnostic(self, params: types.WorkspaceDiagnosticParams) -> types.WorkspaceDiagnosticReport:
+    async def workspace_diagnostic(
+        self, params: types.WorkspaceDiagnosticParams
+    ) -> types.WorkspaceDiagnosticReport:
         """The workspace diagnostic request definition.
 
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.WORKSPACE_DIAGNOSTIC, params)
 
-    async def inline_completion(self, params: types.InlineCompletionParams) -> Union[types.InlineCompletionList, list[types.InlineCompletionItem], None]:
+    async def inline_completion(
+        self, params: types.InlineCompletionParams
+    ) -> Union[types.InlineCompletionList, list[types.InlineCompletionItem], None]:
         """A request to provide inline completions in a document. The request's parameter is of
         type {@link InlineCompletionParams}, the response is of type
         {@link InlineCompletion InlineCompletion[]} or a Thenable that resolves to such.
 
         @since 3.18.0
         @proposed"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_INLINE_COMPLETION, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_INLINE_COMPLETION, params
+        )
 
-    async def workspace_text_document_content(self, params: types.TextDocumentContentParams) -> types.TextDocumentContentResult:
+    async def workspace_text_document_content(
+        self, params: types.TextDocumentContentParams
+    ) -> types.TextDocumentContentResult:
         """The `workspace/textDocumentContent` request is sent from the client to the
         server to request the content of a text document.
 
         @since 3.18.0
         @proposed"""
-        return await self.dispatcher(methods.Request.WORKSPACE_TEXT_DOCUMENT_CONTENT, params)
+        return await self.dispatcher(
+            methods.Request.WORKSPACE_TEXT_DOCUMENT_CONTENT, params
+        )
 
-    async def initialize(self, params: types.InitializeParams) -> types.InitializeResult:
+    async def initialize(
+        self, params: types.InitializeParams
+    ) -> types.InitializeResult:
         """The initialize request is sent from the client to the server.
         It is sent once as the request after starting up the server.
         The requests parameter is of type {@link InitializeParams}
@@ -219,16 +311,22 @@ class RequestFunctions:
         is the exit event."""
         return await self.dispatcher(methods.Request.SHUTDOWN, None)
 
-    async def will_save_wait_until(self, params: types.WillSaveTextDocumentParams) -> Union[list[types.TextEdit], None]:
+    async def will_save_wait_until(
+        self, params: types.WillSaveTextDocumentParams
+    ) -> Union[list[types.TextEdit], None]:
         """A document will save request is sent from the client to the server before
         the document is actually saved. The request can return an array of TextEdits
         which will be applied to the text document before it is saved. Please note that
         clients might drop results if computing the text edits took too long or if a
         server constantly fails on this request. This is done to keep the save fast and
         reliable."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_WILL_SAVE_WAIT_UNTIL, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_WILL_SAVE_WAIT_UNTIL, params
+        )
 
-    async def completion(self, params: types.CompletionParams) -> Union[list[types.CompletionItem], types.CompletionList, None]:
+    async def completion(
+        self, params: types.CompletionParams
+    ) -> Union[list[types.CompletionItem], types.CompletionList, None]:
         """Request to request completion at a given text document position. The request's
         parameter is of type {@link TextDocumentPosition} the response
         is of type {@link CompletionItem CompletionItem[]} or {@link CompletionList}
@@ -240,7 +338,9 @@ class RequestFunctions:
         `filterText`, `insertText`, and `textEdit`, must not be changed during resolve."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_COMPLETION, params)
 
-    async def resolve_completion_item(self, params: types.CompletionItem) -> types.CompletionItem:
+    async def resolve_completion_item(
+        self, params: types.CompletionItem
+    ) -> types.CompletionItem:
         """Request to resolve additional information for a given completion item.The request's
         parameter is of type {@link CompletionItem} the response
         is of type {@link CompletionItem} or a Thenable that resolves to such."""
@@ -252,38 +352,56 @@ class RequestFunctions:
         type {@link Hover} or a Thenable that resolves to such."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_HOVER, params)
 
-    async def signature_help(self, params: types.SignatureHelpParams) -> Union[types.SignatureHelp, None]:
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_SIGNATURE_HELP, params)
+    async def signature_help(
+        self, params: types.SignatureHelpParams
+    ) -> Union[types.SignatureHelp, None]:
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_SIGNATURE_HELP, params
+        )
 
-    async def definition(self, params: types.DefinitionParams) -> Union[types.Definition, list[types.LocationLink], None]:
+    async def definition(
+        self, params: types.DefinitionParams
+    ) -> Union[types.Definition, list[types.LocationLink], None]:
         """A request to resolve the definition location of a symbol at a given text
         document position. The request's parameter is of type {@link TextDocumentPosition}
         the response is of either type {@link Definition} or a typed array of
         {@link DefinitionLink} or a Thenable that resolves to such."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DEFINITION, params)
 
-    async def references(self, params: types.ReferenceParams) -> Union[list[types.Location], None]:
+    async def references(
+        self, params: types.ReferenceParams
+    ) -> Union[list[types.Location], None]:
         """A request to resolve project-wide references for the symbol denoted
         by the given text document position. The request's parameter is of
         type {@link ReferenceParams} the response is of type
         {@link Location Location[]} or a Thenable that resolves to such."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_REFERENCES, params)
 
-    async def document_highlight(self, params: types.DocumentHighlightParams) -> Union[list[types.DocumentHighlight], None]:
+    async def document_highlight(
+        self, params: types.DocumentHighlightParams
+    ) -> Union[list[types.DocumentHighlight], None]:
         """Request to resolve a {@link DocumentHighlight} for a given
         text document position. The request's parameter is of type {@link TextDocumentPosition}
         the request response is an array of type {@link DocumentHighlight}
         or a Thenable that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT, params
+        )
 
-    async def document_symbol(self, params: types.DocumentSymbolParams) -> Union[list[types.SymbolInformation], list[types.DocumentSymbol], None]:
+    async def document_symbol(
+        self, params: types.DocumentSymbolParams
+    ) -> Union[list[types.SymbolInformation], list[types.DocumentSymbol], None]:
         """A request to list all symbols found in a given text document. The request's
         parameter is of type {@link TextDocumentIdentifier} the
         response is of type {@link SymbolInformation SymbolInformation[]} or a Thenable
         that resolves to such."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DOCUMENT_SYMBOL, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_DOCUMENT_SYMBOL, params
+        )
 
-    async def code_action(self, params: types.CodeActionParams) -> Union[list[Union[types.Command, types.CodeAction]], None]:
+    async def code_action(
+        self, params: types.CodeActionParams
+    ) -> Union[list[Union[types.Command, types.CodeAction]], None]:
         """A request to provide commands for the given text document and range."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_CODE_ACTION, params)
 
@@ -293,7 +411,9 @@ class RequestFunctions:
         is of type {@link CodeAction} or a Thenable that resolves to such."""
         return await self.dispatcher(methods.Request.CODE_ACTION_RESOLVE, params)
 
-    async def workspace_symbol(self, params: types.WorkspaceSymbolParams) -> Union[list[types.SymbolInformation], list[types.WorkspaceSymbol], None]:
+    async def workspace_symbol(
+        self, params: types.WorkspaceSymbolParams
+    ) -> Union[list[types.SymbolInformation], list[types.WorkspaceSymbol], None]:
         """A request to list project-wide symbols matching the query string given
         by the {@link WorkspaceSymbolParams}. The response is
         of type {@link SymbolInformation SymbolInformation[]} or a Thenable that
@@ -302,17 +422,21 @@ class RequestFunctions:
         @since 3.17.0 - support for WorkspaceSymbol in the returned data. Clients
          need to advertise support for WorkspaceSymbols via the client capability
          `workspace.symbol.resolveSupport`.
-"""
+        """
         return await self.dispatcher(methods.Request.WORKSPACE_SYMBOL, params)
 
-    async def resolve_workspace_symbol(self, params: types.WorkspaceSymbol) -> types.WorkspaceSymbol:
+    async def resolve_workspace_symbol(
+        self, params: types.WorkspaceSymbol
+    ) -> types.WorkspaceSymbol:
         """A request to resolve the range inside the workspace
         symbol's location.
 
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.WORKSPACE_SYMBOL_RESOLVE, params)
 
-    async def code_lens(self, params: types.CodeLensParams) -> Union[list[types.CodeLens], None]:
+    async def code_lens(
+        self, params: types.CodeLensParams
+    ) -> Union[list[types.CodeLens], None]:
         """A request to provide code lens for the given text document."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_CODE_LENS, params)
 
@@ -320,50 +444,77 @@ class RequestFunctions:
         """A request to resolve a command for a given code lens."""
         return await self.dispatcher(methods.Request.CODE_LENS_RESOLVE, params)
 
-    async def document_link(self, params: types.DocumentLinkParams) -> Union[list[types.DocumentLink], None]:
+    async def document_link(
+        self, params: types.DocumentLinkParams
+    ) -> Union[list[types.DocumentLink], None]:
         """A request to provide document links"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DOCUMENT_LINK, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_DOCUMENT_LINK, params
+        )
 
-    async def resolve_document_link(self, params: types.DocumentLink) -> types.DocumentLink:
+    async def resolve_document_link(
+        self, params: types.DocumentLink
+    ) -> types.DocumentLink:
         """Request to resolve additional information for a given document link. The request's
         parameter is of type {@link DocumentLink} the response
         is of type {@link DocumentLink} or a Thenable that resolves to such."""
         return await self.dispatcher(methods.Request.DOCUMENT_LINK_RESOLVE, params)
 
-    async def formatting(self, params: types.DocumentFormattingParams) -> Union[list[types.TextEdit], None]:
+    async def formatting(
+        self, params: types.DocumentFormattingParams
+    ) -> Union[list[types.TextEdit], None]:
         """A request to format a whole document."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_FORMATTING, params)
 
-    async def range_formatting(self, params: types.DocumentRangeFormattingParams) -> Union[list[types.TextEdit], None]:
+    async def range_formatting(
+        self, params: types.DocumentRangeFormattingParams
+    ) -> Union[list[types.TextEdit], None]:
         """A request to format a range in a document."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_RANGE_FORMATTING, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_RANGE_FORMATTING, params
+        )
 
-    async def ranges_formatting(self, params: types.DocumentRangesFormattingParams) -> Union[list[types.TextEdit], None]:
+    async def ranges_formatting(
+        self, params: types.DocumentRangesFormattingParams
+    ) -> Union[list[types.TextEdit], None]:
         """A request to format ranges in a document.
 
         @since 3.18.0
         @proposed"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_RANGES_FORMATTING, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_RANGES_FORMATTING, params
+        )
 
-    async def on_type_formatting(self, params: types.DocumentOnTypeFormattingParams) -> Union[list[types.TextEdit], None]:
+    async def on_type_formatting(
+        self, params: types.DocumentOnTypeFormattingParams
+    ) -> Union[list[types.TextEdit], None]:
         """A request to format a document on type."""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_ON_TYPE_FORMATTING, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_ON_TYPE_FORMATTING, params
+        )
 
-    async def rename(self, params: types.RenameParams) -> Union[types.WorkspaceEdit, None]:
+    async def rename(
+        self, params: types.RenameParams
+    ) -> Union[types.WorkspaceEdit, None]:
         """A request to rename a symbol."""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_RENAME, params)
 
-    async def prepare_rename(self, params: types.PrepareRenameParams) -> Union[types.PrepareRenameResult, None]:
+    async def prepare_rename(
+        self, params: types.PrepareRenameParams
+    ) -> Union[types.PrepareRenameResult, None]:
         """A request to test and perform the setup necessary for a rename.
 
         @since 3.16 - support for default behavior"""
-        return await self.dispatcher(methods.Request.TEXT_DOCUMENT_PREPARE_RENAME, params)
+        return await self.dispatcher(
+            methods.Request.TEXT_DOCUMENT_PREPARE_RENAME, params
+        )
 
-    async def execute_command(self, params: types.ExecuteCommandParams) -> Union[types.LSPAny, None]:
+    async def execute_command(
+        self, params: types.ExecuteCommandParams
+    ) -> Union[types.LSPAny, None]:
         """A request send from the client to the server to execute a command. The request might return
         a workspace edit which the client will apply to the workspace."""
         return await self.dispatcher(methods.Request.WORKSPACE_EXECUTE_COMMAND, params)
-
 
 
 NotificationDispatcher = Callable[[str, types.LSPAny], Awaitable[None]]
@@ -371,19 +522,27 @@ NotificationHandler = Callable[[str, float | None], asyncio.Future[types.LSPAny]
 
 
 class NotificationFunctions:
-    def __init__(self, dispatcher: NotificationDispatcher, on_notification: NotificationHandler):
+    def __init__(
+        self, dispatcher: NotificationDispatcher, on_notification: NotificationHandler
+    ):
         self.dispatcher = dispatcher
         self.on_notification = on_notification
 
-    def did_change_workspace_folders(self, params: types.DidChangeWorkspaceFoldersParams):
+    def did_change_workspace_folders(
+        self, params: types.DidChangeWorkspaceFoldersParams
+    ):
         """The `workspace/didChangeWorkspaceFolders` notification is sent from the client to the server when the workspace
         folder configuration changes."""
-        return self.dispatcher(methods.Notification.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS, params)
+        return self.dispatcher(
+            methods.Notification.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS, params
+        )
 
     def cancel_work_done_progress(self, params: types.WorkDoneProgressCancelParams):
         """The `window/workDoneProgress/cancel` notification is sent from  the client to the server to cancel a progress
         initiated on the server side."""
-        return self.dispatcher(methods.Notification.WINDOW_WORK_DONE_PROGRESS_CANCEL, params)
+        return self.dispatcher(
+            methods.Notification.WINDOW_WORK_DONE_PROGRESS_CANCEL, params
+        )
 
     def did_create_files(self, params: types.CreateFilesParams):
         """The did create files notification is sent from the client to the server when
@@ -412,8 +571,12 @@ class NotificationFunctions:
         @since 3.17.0"""
         return self.dispatcher(methods.Notification.NOTEBOOK_DOCUMENT_DID_OPEN, params)
 
-    def did_change_notebook_document(self, params: types.DidChangeNotebookDocumentParams):
-        return self.dispatcher(methods.Notification.NOTEBOOK_DOCUMENT_DID_CHANGE, params)
+    def did_change_notebook_document(
+        self, params: types.DidChangeNotebookDocumentParams
+    ):
+        return self.dispatcher(
+            methods.Notification.NOTEBOOK_DOCUMENT_DID_CHANGE, params
+        )
 
     def did_save_notebook_document(self, params: types.DidSaveNotebookDocumentParams):
         """A notification sent when a notebook document is saved.
@@ -438,23 +601,33 @@ class NotificationFunctions:
         ask the server to exit its process."""
         return self.dispatcher(methods.Notification.EXIT, None)
 
-    def workspace_did_change_configuration(self, params: types.DidChangeConfigurationParams):
+    def workspace_did_change_configuration(
+        self, params: types.DidChangeConfigurationParams
+    ):
         """The configuration change notification is sent from the client to the server
         when the client's configuration has changed. The notification contains
         the changed configuration as defined by the language client."""
-        return self.dispatcher(methods.Notification.WORKSPACE_DID_CHANGE_CONFIGURATION, params)
+        return self.dispatcher(
+            methods.Notification.WORKSPACE_DID_CHANGE_CONFIGURATION, params
+        )
 
-    def on_show_message(self, *, timeout: float | None = None) -> asyncio.Future[types.ShowMessageParams]:
+    def on_show_message(
+        self, *, timeout: float | None = None
+    ) -> asyncio.Future[types.ShowMessageParams]:
         """The show message notification is sent from a server to a client to ask
         the client to display a particular message in the user interface."""
         return self.on_notification("window/showMessage", timeout)
 
-    def on_log_message(self, *, timeout: float | None = None) -> asyncio.Future[types.LogMessageParams]:
+    def on_log_message(
+        self, *, timeout: float | None = None
+    ) -> asyncio.Future[types.LogMessageParams]:
         """The log message notification is sent from the server to the client to ask
         the client to log a particular message."""
         return self.on_notification("window/logMessage", timeout)
 
-    def on_telemetry_event(self, *, timeout: float | None = None) -> asyncio.Future[types.LSPAny]:
+    def on_telemetry_event(
+        self, *, timeout: float | None = None
+    ) -> asyncio.Future[types.LSPAny]:
         """The telemetry event notification is sent from the server to the client to ask
         the client to log telemetry data."""
         return self.on_notification("telemetry/event", timeout)
@@ -498,9 +671,13 @@ class NotificationFunctions:
     def did_change_watched_files(self, params: types.DidChangeWatchedFilesParams):
         """The watched files notification is sent from the client to the server when
         the client detects changes to file watched by the language client."""
-        return self.dispatcher(methods.Notification.WORKSPACE_DID_CHANGE_WATCHED_FILES, params)
+        return self.dispatcher(
+            methods.Notification.WORKSPACE_DID_CHANGE_WATCHED_FILES, params
+        )
 
-    def on_publish_diagnostics(self, *, timeout: float | None = None) -> asyncio.Future[types.PublishDiagnosticsParams]:
+    def on_publish_diagnostics(
+        self, *, timeout: float | None = None
+    ) -> asyncio.Future[types.PublishDiagnosticsParams]:
         """Diagnostics notification are sent from the server to the client to signal
         results of validation runs."""
         return self.on_notification("textDocument/publishDiagnostics", timeout)
@@ -508,16 +685,22 @@ class NotificationFunctions:
     def set_trace(self, params: types.SetTraceParams):
         return self.dispatcher(methods.Notification.SET_TRACE, params)
 
-    def on_log_trace(self, *, timeout: float | None = None) -> asyncio.Future[types.LogTraceParams]:
+    def on_log_trace(
+        self, *, timeout: float | None = None
+    ) -> asyncio.Future[types.LogTraceParams]:
         return self.on_notification("$/logTrace", timeout)
 
-    def on_cancel_request(self, *, timeout: float | None = None) -> asyncio.Future[types.CancelParams]:
+    def on_cancel_request(
+        self, *, timeout: float | None = None
+    ) -> asyncio.Future[types.CancelParams]:
         return self.on_notification("$/cancelRequest", timeout)
 
     def cancel_request(self, params: types.CancelParams):
         return self.dispatcher(methods.Notification.CANCEL_REQUEST, params)
 
-    def on_progress(self, *, timeout: float | None = None) -> asyncio.Future[types.ProgressParams]:
+    def on_progress(
+        self, *, timeout: float | None = None
+    ) -> asyncio.Future[types.ProgressParams]:
         return self.on_notification("$/progress", timeout)
 
     def progress(self, params: types.ProgressParams):
