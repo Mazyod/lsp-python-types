@@ -87,7 +87,7 @@ The following LSPs are available out of the box:
 | Completion Resolution | :white_check_mark: | :x: | :white_check_mark: | Pyrefly: not yet supported |
 | Signature Help | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | Rename | :white_check_mark: | :warning: | :warning: | Pyrefly: disabled for external files; ty: requires files on disk |
-| Semantic Tokens | :white_check_mark:\* | :white_check_mark: | :white_check_mark: | \*basedpyright recommended for extended features |
+| Semantic Tokens | :white_check_mark:\* | :white_check_mark:\*\* | :white_check_mark: | \*basedpyright recommended; \*\*Pyrefly: legend not advertised (see docs) |
 | Go to Definition | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
 | Find References | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
 | Code Actions | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
@@ -95,7 +95,8 @@ The following LSPs are available out of the box:
 
 > See [Feature Verification Guide](docs/FEATURE_VERIFICATION.md) for methodology on maintaining this table.
 
-For detailed backend limitations:
+For detailed documentation:
+- [Semantic Tokens Reference](docs/SEMANTIC_TOKENS.md) - Token types and modifiers for Monaco/editor integration
 - [Pyrefly Known Limitations](lsp_types/pyrefly/KNOWN_LIMITATIONS.md)
 - [ty Known Limitations](lsp_types/ty/KNOWN_LIMITATIONS.md)
 
