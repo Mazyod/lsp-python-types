@@ -90,16 +90,22 @@ class Session:
             pool = LSPProcessPool(max_size=0)  # No recycling, immediate shutdown
 
         lsp_process = await pool.acquire(create_lsp_process, base_path_str)
-        session = cls(lsp_process, backend, base_path, pool=pool)
+        try:
+            session = cls(lsp_process, backend, base_path, pool=pool)
 
-        # Update settings via didChangeConfiguration
-        workspace_settings = backend.get_workspace_settings(options)
-        await lsp_process.notify.workspace_did_change_configuration(workspace_settings)
+            # Update settings via didChangeConfiguration
+            workspace_settings = backend.get_workspace_settings(options)
+            await lsp_process.notify.workspace_did_change_configuration(workspace_settings)
 
-        # Simulate opening a document
-        await session._open_document(initial_code)
+            # Simulate opening a document
+            await session._open_document(initial_code)
 
-        return session
+            return session
+        except Exception:
+            # Release the process back to the pool (or shutdown for non-pooled)
+            # to avoid resource leaks on initialization failure
+            await pool.release(lsp_process)
+            raise
 
     def __init__(
         self,

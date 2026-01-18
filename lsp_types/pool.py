@@ -62,7 +62,7 @@ class LSPProcessPool:
         if compatible_process:
             self._available.remove(compatible_process)
             self._active.add(compatible_process)
-            await self._reset_process(compatible_process, base_path)
+            await self._reset_process(compatible_process)
             logger.debug("Reusing compatible process from pool")
             return compatible_process
 
@@ -115,18 +115,16 @@ class LSPProcessPool:
 
         logger.debug("Pool cleanup completed")
 
-    async def _reset_process(self, process: LSPProcess, new_base_path: str) -> None:
-        """Reset a process for reuse with new configuration"""
+    async def _reset_process(self, process: LSPProcess) -> None:
+        """Reset a process for reuse.
+
+        Note: This method is only called after acquire() has already filtered
+        for processes with a matching base_path. The rootUri is set at LSP
+        initialization and cannot be changed, so we only reuse processes
+        with the same base_path.
+        """
         # Reset the underlying LSP process (handles document cleanup)
         await process.reset()
-
-        metadata = self._metadata[process]
-
-        # Update base path if changed
-        if new_base_path != metadata["base_path"]:
-            metadata["base_path"] = new_base_path
-            # Note: We can't change the rootUri after initialization,
-            # but we can update our tracking of it
 
     async def _cleanup_idle_processes(self) -> None:
         """Background task to clean up idle processes"""

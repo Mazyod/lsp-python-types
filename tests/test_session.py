@@ -141,8 +141,7 @@ async def test_session_rename(lsp_backend, backend_name):
 
     # FIXME: Pyrefly detects file as external and disables rename edits
     if backend_name == "pyrefly":
-        pytest.skip("Pyrefly detects file as external and disables rename edits")
-        return
+        pytest.xfail("Pyrefly detects file as external and disables rename edits")
 
     code = """\
 def greet(name: str) -> str:

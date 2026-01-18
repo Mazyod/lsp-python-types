@@ -75,6 +75,7 @@ class LSPProcess:
         self._tasks: list[asyncio.Task] = []
         self._shutdown = False
         self._open_documents: set[str] = set()
+        self._write_lock = asyncio.Lock()
 
         # Maintain typed interface
         self.send = requests.RequestFunctions(self._send_request)
@@ -240,9 +241,8 @@ class LSPProcess:
 
         return wait_task
 
-    @staticmethod
     async def _send_payload(
-        stream: asyncio.StreamWriter, payload: types.LSPObject
+        self, stream: asyncio.StreamWriter, payload: types.LSPObject
     ) -> None:
         """Send a payload to the server asynchronously."""
         logger.debug("Client -> Server: %s", payload)
@@ -255,9 +255,9 @@ class LSPProcess:
             "Content-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n",
         )
 
-        # TODO: Maybe use a lock to avoid interleaving messages?
-        stream.writelines([part.encode(ENCODING) for part in message] + [body])
-        await stream.drain()
+        async with self._write_lock:
+            stream.writelines([part.encode(ENCODING) for part in message] + [body])
+            await stream.drain()
 
     async def _read_stdout(self) -> None:
         """Read and process messages from the server's stdout."""
