@@ -18,6 +18,12 @@ uvx pyright                                    # Run pyright type checker
 uvx pyright lsp_types/                         # Check only library code
 uvx pyright tests/                             # Check only test code
 
+# Linting and formatting (required before committing)
+uvx ruff check .                               # Check for linting errors
+uvx ruff check . --fix                         # Auto-fix linting errors
+uvx ruff format .                              # Format code
+uvx ruff check . --select I --fix              # Sort imports
+
 # Generate latest LSP types (full pipeline)
 make generate-latest-types                     # Downloads schemas + generates all types
 
@@ -128,7 +134,7 @@ The `examples/` directory contains demo scripts showing library usage:
 ### Important Notes
 
 - Always prefix test commands with `uv run`
-- **Before committing**: Run both tests (`uv run pytest`) AND type checking (`uvx pyright`) - CI will fail if either has errors
+- **Before committing**: Run tests (`uv run pytest`), type checking (`uvx pyright`), and linting (`uvx ruff check .`) - CI will fail if any have errors
 - Pool tests require `pyright-langserver` and/or `pyrefly` binaries available in PATH
 - Type generation requires Python 3.12+ for modern TypedDict features
 - Generated types should not be manually edited - regenerate from schemas
