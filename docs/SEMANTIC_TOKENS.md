@@ -205,6 +205,65 @@ The token types and modifiers must be registered in the **exact same order** as 
 
 ---
 
+## Normalized Semantic Tokens API
+
+The library provides a **normalized tokens API** that remaps token indices to a canonical legend. This allows Monaco/editors to use a single fixed legend regardless of which backend is active.
+
+### The Problem
+
+Each backend has different legend ordering:
+
+| Token | Pyright Index | Pyrefly Index | ty Index |
+|-------|---------------|---------------|----------|
+| `namespace` | 0 | 0 | 0 |
+| `class` | 2 | 2 | 1 |
+| `variable` | 6 | 8 | 5 |
+| `function` | 9 | 12 | 7 |
+
+A Monaco client configured with one legend breaks when switching backends.
+
+### The Solution
+
+Use the `normalize=True` parameter to get tokens with indices remapped to the canonical legend:
+
+```python
+from lsp_types import Session, CANONICAL_LEGEND
+from lsp_types.pyright.backend import PyrightBackend
+
+session = await Session.create(PyrightBackend(), initial_code="x = 1")
+
+# Original tokens (backend-specific indices)
+raw = await session.get_semantic_tokens()
+
+# Normalized tokens (canonical indices matching CANONICAL_LEGEND)
+normalized = await session.get_semantic_tokens(normalize=True)
+
+# Monaco uses one fixed legend for all backends
+monaco_legend = CANONICAL_LEGEND
+```
+
+### Available Properties
+
+```python
+session.canonical_legend   # The canonical legend (fixed, same for all backends)
+session.backend_legend     # The original legend from the server/backend
+```
+
+### Canonical Legend Order
+
+The canonical legend follows LSP standard ordering, with backend-specific tokens appended:
+
+**Token Types (index 0-26):**
+- 0-22: LSP standard types (namespace, type, class, enum, interface, struct, typeParameter, parameter, variable, property, enumMember, event, function, method, macro, keyword, modifier, comment, string, number, regexp, operator, decorator)
+- 23: label (LSP standard)
+- 24-26: Backend-specific (selfParameter, clsParameter, builtinConstant)
+
+**Token Modifiers (bit 0-12):**
+- 0-9: LSP standard modifiers (declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation, defaultLibrary)
+- 10-12: Backend-specific (builtin, classMember, parameter)
+
+---
+
 ## Updating This Document
 
 Run the extraction script to get the latest legends:

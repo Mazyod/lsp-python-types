@@ -4,7 +4,7 @@ import dataclasses as dc
 import typing as t
 from pathlib import Path
 
-from . import types
+from . import semantic_tokens, types
 from .pool import LSPProcessPool
 from .process import LSPProcess, ProcessLaunchInfo
 
@@ -30,6 +30,10 @@ class LSPBackend[TConfig: t.Mapping](t.Protocol):
         self, options: TConfig
     ) -> types.DidChangeConfigurationParams:
         """Get workspace settings for didChangeConfiguration"""
+        ...
+
+    def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
+        """Return hardcoded legend if server doesn't advertise one."""
         ...
 
 
@@ -60,7 +64,12 @@ class Session:
         # Write backend-specific configuration
         backend.write_config(base_path, options)
 
+        # Capture the server's semantic tokens legend during initialization
+        captured_legend: types.SemanticTokensLegend | None = None
+
         async def create_lsp_process():
+            nonlocal captured_legend
+
             proc_info = backend.create_process_launch_info(base_path, options)
             lsp_process = LSPProcess(proc_info)
             await lsp_process.start()
@@ -78,7 +87,14 @@ class Session:
                     resolved_initialize_params | initialize_params
                 )
 
-            await lsp_process.send.initialize(resolved_initialize_params)
+            init_result = await lsp_process.send.initialize(resolved_initialize_params)
+
+            # Extract semantic tokens legend from server capabilities
+            if init_result:
+                caps = init_result.get("capabilities", {})
+                provider = caps.get("semanticTokensProvider")
+                if provider and "legend" in provider:
+                    captured_legend = provider["legend"]
 
             # Send initialized notification (required by LSP spec)
             await lsp_process.notify.initialized({})
@@ -91,7 +107,10 @@ class Session:
 
         lsp_process = await pool.acquire(create_lsp_process, base_path_str)
         try:
-            session = cls(lsp_process, backend, base_path, pool=pool)
+            # Use server legend if captured, otherwise fall back to backend's legend
+            legend = captured_legend or backend.get_semantic_tokens_legend()
+
+            session = cls(lsp_process, backend, base_path, pool=pool, legend=legend)
 
             # Update settings via didChangeConfiguration
             workspace_settings = backend.get_workspace_settings(options)
@@ -116,6 +135,7 @@ class Session:
         base_path: Path,
         *,
         pool: LSPProcessPool,
+        legend: types.SemanticTokensLegend | None = None,
     ):
         self._process = lsp_process
         self._backend = backend
@@ -124,6 +144,14 @@ class Session:
         self._document_text = ""
         self._active_pool: LSPProcessPool | None = pool
         self._diag_result: DiagnosticsResult | None = None
+
+        # Semantic tokens normalization
+        self._backend_legend = legend
+        self._type_map: dict[int, int] | None = None
+        self._modifier_map: dict[int, int] | None = None
+        if legend:
+            self._type_map = semantic_tokens.build_type_mapping(legend)
+            self._modifier_map = semantic_tokens.build_modifier_mapping(legend)
 
     async def shutdown(self) -> None:
         """Shutdown and recycle the session back to the pool"""
@@ -220,11 +248,35 @@ class Session:
         """Resolve the given completion item"""
         return await self._process.send.resolve_completion_item(completion_item)
 
-    async def get_semantic_tokens(self) -> types.SemanticTokens | None:
-        """Get semantic tokens for the current document"""
-        return await self._process.send.semantic_tokens_full(
+    async def get_semantic_tokens(
+        self, *, normalize: bool = False
+    ) -> types.SemanticTokens | None:
+        """Get semantic tokens for the current document."""
+        tokens = await self._process.send.semantic_tokens_full(
             {"textDocument": {"uri": self._document_uri}}
         )
+
+        if not normalize or tokens is None:
+            return tokens
+
+        # Remap indices to canonical legend
+        if self._type_map is None or self._modifier_map is None:
+            # No legend captured, can't normalize
+            return tokens
+
+        return semantic_tokens.normalize_tokens(
+            tokens, self._type_map, self._modifier_map
+        )
+
+    @property
+    def canonical_legend(self) -> types.SemanticTokensLegend:
+        """The canonical legend for normalized semantic tokens."""
+        return semantic_tokens.CANONICAL_LEGEND
+
+    @property
+    def backend_legend(self) -> types.SemanticTokensLegend | None:
+        """The backend's semantic tokens legend, if available."""
+        return self._backend_legend
 
     # Private methods
 

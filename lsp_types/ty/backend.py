@@ -105,3 +105,7 @@ class TyBackend(LSPBackend):
     ) -> types.DidChangeConfigurationParams:
         """Get workspace settings for didChangeConfiguration"""
         return {"settings": options}
+
+    def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
+        """ty advertises legend via LSP, use server-provided."""
+        return None

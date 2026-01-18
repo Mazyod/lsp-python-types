@@ -65,22 +65,26 @@ async def extract_legend(
 
         if semantic_provider is None:
             # Try requesting tokens anyway - some servers respond without advertising
-            await process.notify.did_open_text_document({
-                "textDocument": {
-                    "uri": f"file://{base_path}/test.py",
-                    "languageId": types.LanguageKind.Python,
-                    "version": 1,
-                    "text": "x = 1\n",
+            await process.notify.did_open_text_document(
+                {
+                    "textDocument": {
+                        "uri": f"file://{base_path}/test.py",
+                        "languageId": types.LanguageKind.Python,
+                        "version": 1,
+                        "text": "x = 1\n",
+                    }
                 }
-            })
+            )
             tokens = await asyncio.wait_for(
-                process.send.semantic_tokens_full({
-                    "textDocument": {"uri": f"file://{base_path}/test.py"}
-                }),
+                process.send.semantic_tokens_full(
+                    {"textDocument": {"uri": f"file://{base_path}/test.py"}}
+                ),
                 timeout=5.0,
             )
             if tokens and tokens.get("data"):
-                print(f"  {backend_name}: No legend advertised, but returns tokens (unusable without legend)")
+                print(
+                    f"  {backend_name}: No legend advertised, but returns tokens (unusable without legend)"
+                )
             else:
                 print(f"  {backend_name}: No semantic tokens provider")
             return None

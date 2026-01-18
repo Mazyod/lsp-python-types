@@ -313,6 +313,72 @@ result = greet("world")
     await session.shutdown()
 
 
+async def test_session_semantic_tokens_normalized(lsp_backend):
+    """Test normalized semantic token retrieval with canonical legend"""
+    code = """\
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+
+result = greet("world")
+"""
+    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+
+    # Check that canonical_legend is available
+    canonical_legend = session.canonical_legend
+    assert canonical_legend is not None
+    assert "tokenTypes" in canonical_legend
+    assert "tokenModifiers" in canonical_legend
+
+    # Check that backend_legend is captured (Pyrefly uses hardcoded, others use server)
+    backend_legend = session.backend_legend
+    assert backend_legend is not None
+
+    # Get raw tokens
+    raw_tokens = await session.get_semantic_tokens()
+    assert raw_tokens is not None
+    raw_data = raw_tokens.get("data", [])
+    assert len(raw_data) >= 8
+
+    # Get normalized tokens
+    normalized_tokens = await session.get_semantic_tokens(normalize=True)
+    assert normalized_tokens is not None
+    normalized_data = normalized_tokens.get("data", [])
+
+    # Token count should be the same
+    assert len(normalized_data) == len(raw_data)
+
+    # Verify that tokens have different indices (due to remapping)
+    # but same positions (deltaLine, deltaStart, length stay the same)
+    for i in range(0, min(len(raw_data), 10), 5):  # Check first 2 tokens
+        # Position values should be identical
+        assert normalized_data[i] == raw_data[i]  # deltaLine
+        assert normalized_data[i + 1] == raw_data[i + 1]  # deltaStart
+        assert normalized_data[i + 2] == raw_data[i + 2]  # length
+        # Token type and modifiers may differ due to remapping
+        # (they could be same if backend uses same indices as canonical)
+
+    await session.shutdown()
+
+
+async def test_session_semantic_tokens_canonical_legend_consistency(lsp_backend):
+    """Test that canonical legend is consistent across backends"""
+    session = await lsp_types.Session.create(lsp_backend, initial_code="x = 1")
+
+    # The canonical legend should be the same regardless of backend
+    canonical = session.canonical_legend
+    assert canonical["tokenTypes"][0] == "namespace"
+    assert canonical["tokenTypes"][2] == "class"
+    assert canonical["tokenTypes"][8] == "variable"
+    assert canonical["tokenTypes"][12] == "function"
+    assert canonical["tokenTypes"][22] == "decorator"
+
+    assert canonical["tokenModifiers"][0] == "declaration"
+    assert canonical["tokenModifiers"][1] == "definition"
+    assert canonical["tokenModifiers"][6] == "async"
+
+    await session.shutdown()
+
+
 async def test_session_recycling_basic(lsp_backend):
     """Test basic session recycling functionality"""
     pool = LSPProcessPool(max_size=2)

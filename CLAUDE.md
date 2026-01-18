@@ -70,6 +70,14 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 - Reusable across different LSP implementations (not just Pyright)
 - Handles process lifecycle: creation, reuse, idle cleanup, and shutdown
 
+**Semantic Tokens Normalization (`lsp_types/semantic_tokens.py`)**
+- `CANONICAL_LEGEND`: Fixed canonical legend for Monaco/editor integration
+- `CANONICAL_TOKEN_TYPES`, `CANONICAL_TOKEN_MODIFIERS`: LSP standard types/modifiers plus backend-specific
+- `build_type_mapping()`, `build_modifier_mapping()`: Create index mapping tables
+- `normalize_tokens()`: Remap token indices from backend-specific to canonical legend
+- `PYREFLY_LEGEND`: Hardcoded legend for Pyrefly (doesn't advertise via LSP)
+- Used by `Session.get_semantic_tokens(normalize=True)` for backend-agnostic tokens
+
 **Backend Integrations**
 
 **Pyright Integration (`lsp_types/pyright/`)**

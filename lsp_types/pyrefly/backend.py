@@ -7,6 +7,7 @@ import tomli_w
 import lsp_types
 from lsp_types import types
 from lsp_types.process import ProcessLaunchInfo
+from lsp_types.semantic_tokens import PYREFLY_LEGEND
 from lsp_types.session import LSPBackend
 
 from .config_schema import Model as PyreflyConfig
@@ -79,3 +80,7 @@ class PyreflyBackend(LSPBackend):
     ) -> types.DidChangeConfigurationParams:
         """Get workspace settings for didChangeConfiguration"""
         return {"settings": options}
+
+    def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
+        """Pyrefly doesn't advertise legend via LSP, return hardcoded legend."""
+        return PYREFLY_LEGEND
