@@ -109,16 +109,16 @@ class MockLSPServer:
             return
 
         # Handle standard LSP methods
-        if method == "initialize":
+        if method == "initialize" and request_id is not None:
             self._handle_initialize(request_id)
         elif method == "initialized":
             self._initialized = True
             # No response for notifications
-        elif method == "shutdown":
+        elif method == "shutdown" and request_id is not None:
             self._handle_shutdown(request_id)
         elif method == "exit":
             sys.exit(0)
-        elif not is_notification:
+        elif not is_notification and request_id is not None:
             # Default response for unknown requests
             self._handle_default(request_id, method)
 

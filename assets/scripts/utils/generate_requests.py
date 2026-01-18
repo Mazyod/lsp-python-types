@@ -1,6 +1,7 @@
 import re
 
 from ..lsp_schema import Request
+from .generate_methods import method_to_enum_name
 from .helpers import StructureKind, format_comment, format_type, indentation
 
 method_to_symbol_name = {
@@ -98,6 +99,7 @@ def generate_requests(requests: list[Request]) -> list[str]:
 def generate_request_func(request: Request) -> str:
     method = request["method"]
     symbol_name = method_to_symbol_name.get(method)
+    enum_name = method_to_enum_name(method)
 
     if not symbol_name:
         raise Exception("Please define a symbol name for ", method)
@@ -138,7 +140,7 @@ def generate_request_func(request: Request) -> str:
         result += f"\n{documentation}"
 
     result += f"""
-{indentation}{indentation}return await self.dispatcher("{method}", {"params" if params else "None"})
+{indentation}{indentation}return await self.dispatcher(methods.Request.{enum_name}, {"params" if params else "None"})
 """
 
     return result

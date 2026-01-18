@@ -1,4 +1,5 @@
 from ..lsp_schema import Notification
+from .generate_methods import method_to_enum_name
 from .helpers import format_comment, indentation
 
 method_to_symbol_name = {
@@ -87,6 +88,7 @@ def generate_notification_handler(
 def generate_notification_func(
     method: str, symbol_name: str, notification: Notification
 ) -> str:
+    enum_name = method_to_enum_name(method)
     params = notification.get("params", {})
     formatted_params = ["self"]
     if params:
@@ -109,6 +111,6 @@ def generate_notification_func(
     if documentation.strip():
         result += f"\n{documentation}"
 
-    result += f"""\n{indentation}{indentation}return self.dispatcher("{method}", {"params" if params else "None"})\n"""
+    result += f"""\n{indentation}{indentation}return self.dispatcher(methods.Notification.{enum_name}, {"params" if params else "None"})\n"""
 
     return result
