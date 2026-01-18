@@ -9,11 +9,13 @@ from lsp_types.pool import LSPProcessPool
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.ty.backend import TyBackend
+from lsp_types.ty.config_schema import Model as TyConfig
 
 
-@pytest.fixture(params=[PyrightBackend, PyreflyBackend])
+@pytest.fixture(params=[PyrightBackend, PyreflyBackend, TyBackend])
 def lsp_backend(request):
-    """Parametrized fixture providing both Pyright and Pyrefly backends"""
+    """Parametrized fixture providing Pyright, Pyrefly, and ty backends"""
     return request.param()
 
 
@@ -64,8 +66,14 @@ print(f"The result is: {result}")
     await session.shutdown()
 
 
-async def test_session_diagnostics(lsp_backend):
+async def test_session_diagnostics(lsp_backend, backend_name):
     """Test diagnostic reporting for type errors"""
+    # ty requires files to exist on disk for diagnostics
+    if backend_name == "ty":
+        pytest.xfail(
+            "ty requires files on disk for diagnostics (virtual documents not supported)"
+        )
+
     code = """\
 def greet(name: str) -> str:
     return name + 123
@@ -101,7 +109,7 @@ print(greet("world"))
     await session.shutdown()
 
 
-async def test_session_hover(lsp_backend):
+async def test_session_hover(lsp_backend, backend_name):
     """Test hover information for symbols"""
     code = """\
 def greet(name: str) -> str:
@@ -130,7 +138,9 @@ result = greet("world")
     assert isinstance(contents, dict)  # MarkupContent
     assert contents.get("kind") == lsp_types.MarkupKind.Markdown
     hover_text = contents.get("value", "")
-    assert "result" in hover_text
+    # ty shows just the type, not "variable: type" format
+    if backend_name != "ty":
+        assert "result" in hover_text
     assert "str" in hover_text
 
     await session.shutdown()
@@ -142,6 +152,10 @@ async def test_session_rename(lsp_backend, backend_name):
     # FIXME: Pyrefly detects file as external and disables rename edits
     if backend_name == "pyrefly":
         pytest.xfail("Pyrefly detects file as external and disables rename edits")
+
+    # ty requires files on disk for rename operations
+    if backend_name == "ty":
+        pytest.xfail("ty requires files on disk for rename operations")
 
     code = """\
 def greet(name: str) -> str:
@@ -240,6 +254,10 @@ complex_function(
 
 async def test_session_completion(lsp_backend, backend_name):
     """Test code completion and completion item resolution"""
+    # ty requires files on disk for completion
+    if backend_name == "ty":
+        pytest.xfail("ty requires files on disk for completion")
+
     code = """\
 class MyClass:
     def my_method(self) -> None:
@@ -335,8 +353,14 @@ async def test_session_recycling_basic(lsp_backend):
         await pool.cleanup()
 
 
-async def test_session_recycling_with_diagnostics(lsp_backend):
+async def test_session_recycling_with_diagnostics(lsp_backend, backend_name):
     """Test that recycling properly clears old state"""
+    # ty requires files on disk for diagnostics
+    if backend_name == "ty":
+        pytest.xfail(
+            "ty requires files on disk for diagnostics (virtual documents not supported)"
+        )
+
     pool = LSPProcessPool(max_size=1)
 
     try:
@@ -644,3 +668,141 @@ print(result)
         )
 
         await session.shutdown()
+
+
+# ty-specific configuration tests
+async def test_ty_session_with_config_options(tmp_path: Path):
+    """Test ty session creation with various configuration options"""
+    backend = TyBackend()
+
+    options: TyConfig = {
+        "environment": {
+            "python_version": "3.12",
+        },
+        "rules": {
+            "possibly-unresolved-reference": "warn",
+        },
+    }
+
+    code = """\
+def test_function(x: int) -> int:
+    return x * 2
+
+result = test_function(5)
+"""
+    # ty requires files to exist on disk for diagnostics
+    (tmp_path / "new.py").write_text(code)
+
+    session = await lsp_types.Session.create(
+        backend, base_path=tmp_path, initial_code=code, options=options
+    )
+
+    hover_info = await session.get_hover_info(lsp_types.Position(line=0, character=4))
+    assert hover_info is not None
+    assert "test_function" in str(hover_info)
+
+    diagnostics = await session.get_diagnostics()
+    assert len(diagnostics) == 0, "Expected no diagnostics for valid code"
+
+    await session.shutdown()
+
+
+async def test_ty_nested_config_serialization(tmp_path: Path):
+    """Test ty backend correctly serializes nested config sections"""
+    backend = TyBackend()
+
+    config: TyConfig = {
+        "environment": {
+            "python_version": "3.12",
+            "extra_paths": ["./lib", "./src"],
+            "python_platform": "linux",
+        },
+        "src": {
+            "include": ["**/*.py"],
+            "exclude": ["**/tests/**"],
+            "respect_ignore_files": True,
+        },
+        "rules": {
+            "unused-ignore-comment": "warn",
+            "possibly-unresolved-reference": "error",
+        },
+        "terminal": {
+            "output_format": "full",
+            "error_on_warning": False,
+        },
+    }
+
+    backend.write_config(tmp_path, config)
+
+    # Verify TOML file
+    import tomllib
+
+    config_path = tmp_path / "ty.toml"
+    assert config_path.exists()
+
+    parsed = tomllib.loads(config_path.read_text())
+
+    # Verify nested sections with kebab-case keys
+    assert parsed["environment"]["python-version"] == "3.12"
+    assert parsed["environment"]["extra-paths"] == ["./lib", "./src"]
+    assert parsed["src"]["respect-ignore-files"] is True
+    assert parsed["rules"]["unused-ignore-comment"] == "warn"
+    assert parsed["terminal"]["output-format"] == "full"
+
+
+async def test_ty_extra_paths_configuration(tmp_path: Path):
+    """Test that extra_paths configuration enables custom import resolution"""
+    backend = TyBackend()
+
+    # Create custom module directory outside base path
+    lib_path = tmp_path / "custom_lib"
+    lib_path.mkdir()
+    (lib_path / "__init__.py").touch()
+
+    # Create custom module
+    custom_module = lib_path / "my_utils.py"
+    custom_module.write_text("""
+def helper_function(x: int) -> str:
+    '''Convert int to string.'''
+    return str(x)
+""")
+
+    # Code that imports from custom location
+    code = """
+from my_utils import helper_function
+
+result = helper_function(42)
+print(result)
+"""
+    # ty requires files to exist on disk for diagnostics
+    (tmp_path / "new.py").write_text(code)
+
+    # Configure with extra_paths pointing to lib directory
+    options: TyConfig = {
+        "environment": {
+            "extra_paths": [str(lib_path)],
+        },
+    }
+
+    session = await lsp_types.Session.create(
+        backend,
+        base_path=tmp_path,
+        initial_code=code,
+        options=options,
+    )
+
+    # Verify no import errors
+    diagnostics = await session.get_diagnostics()
+    import_errors = [
+        d
+        for d in diagnostics
+        if "import" in d.get("message", "").lower()
+        or "module" in d.get("message", "").lower()
+    ]
+
+    # Should succeed because extra_paths includes lib/
+    assert len(import_errors) == 0, (
+        f"Expected no import errors with extra_paths configured, got: {import_errors}"
+    )
+
+    await session.shutdown()

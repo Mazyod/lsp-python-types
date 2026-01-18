@@ -83,6 +83,14 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 - **Key Design**: Uses consolidated `Session` class with `PyreflyBackend` for specialization
 - **Config Flexibility**: Supports arbitrary configuration fields via TOML serialization (using `tomli-w`)
 
+**ty Integration (`lsp_types/ty/`)**
+- `backend.py`: `TyBackend` implementation for ty LSP server (Astral's Rust-based type checker)
+- `config_schema.py`: ty configuration types with nested sections (environment, src, rules, etc.)
+- **Key Design**: Uses consolidated `Session` class with `TyBackend` for specialization
+- **Config Format**: TOML (`ty.toml`) with nested sections and kebab-case keys
+- **Known Limitation**: ty requires files to exist on disk (virtual documents not fully supported)
+- **Documentation**: See `KNOWN_LIMITATIONS.md` in the ty package for details
+
 ### Type Generation Pipeline
 
 **Schema Sources:**
@@ -97,33 +105,34 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 
 ### Testing Strategy
 
-**Tests are parametrized to run against multiple backends (Pyright and Pyrefly).**
+**Tests are parametrized to run against multiple backends (Pyright, Pyrefly, and ty).**
 
 **Process Pool Tests (`tests/test_pool.py`)**
 - Direct `LSPProcessPool` testing with generic interface
-- Parametrized fixtures for testing both Pyright and Pyrefly backends
+- Parametrized fixtures for testing Pyright, Pyrefly, and ty backends
 - Comprehensive pool behavior testing (creation, recycling, limits, cleanup)
 - Performance benchmarks comparing pooled vs non-pooled sessions
 - Concurrent usage scenarios and idle process management
 
 **Session Tests (`tests/test_session.py`)**
 - Core consolidated Session class functionality
-- Parametrized fixtures for testing both Pyright and Pyrefly backends
+- Parametrized fixtures for testing Pyright, Pyrefly, and ty backends
 - Integration testing with actual language servers (diagnostics, hover, completion)
 - Dynamic environment testing with temporary directories
 - Backend-agnostic tests that validate common LSP operations
+- Backend-specific tests for unique configuration options (e.g., ty's nested config, Pyrefly's search_path)
 
 ### Dependencies
 
 **Runtime:**
-- `tomli-w>=1.0.0` - TOML writing support for Pyrefly configuration serialization
+- `tomli-w>=1.0.0` - TOML writing support for Pyrefly and ty configuration serialization
 
 **Development:** uv-managed dependencies in `pyproject.toml`
 - `pytest` with async support for testing
 - `datamodel-code-generator` for type generation
 - `httpx` for schema downloading
 
-**Note:** Previously a zero-dependency library. Added `tomli-w` to support arbitrary configuration fields in Pyrefly backend.
+**Note:** Previously a zero-dependency library. Added `tomli-w` to support TOML configuration for Pyrefly and ty backends.
 
 ### Examples
 
@@ -135,9 +144,10 @@ The `examples/` directory contains demo scripts showing library usage:
 
 - Always prefix test commands with `uv run`
 - **Before committing**: Run tests (`uv run pytest`), type checking (`uvx pyright`), and linting (`uvx ruff check .`) - CI will fail if any have errors
-- Pool tests require `pyright-langserver` and/or `pyrefly` binaries available in PATH
+- Pool tests require `pyright-langserver`, `pyrefly`, and/or `ty` binaries available in PATH
 - Type generation requires Python 3.12+ for modern TypedDict features
 - Generated types should not be manually edited - regenerate from schemas
+- Each backend has a `KNOWN_LIMITATIONS.md` file documenting backend-specific behaviors
 
 ### Architecture Design Patterns
 

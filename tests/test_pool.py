@@ -15,11 +15,12 @@ import lsp_types
 from lsp_types.pool import LSPProcessPool
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.ty.backend import TyBackend
 
 
-@pytest.fixture(params=[PyrightBackend, PyreflyBackend])
+@pytest.fixture(params=[PyrightBackend, PyreflyBackend, TyBackend])
 def lsp_backend(request):
-    """Parametrized fixture providing both Pyright and Pyrefly backends"""
+    """Parametrized fixture providing Pyright, Pyrefly, and ty backends"""
     return request.param()
 
 
@@ -201,8 +202,16 @@ class TestLSPProcessPool:
         # Pool should have recycled sessions available
         assert session_pool.available_count > 0
 
-    async def test_session_warmup_on_recycle(self, session_pool, lsp_backend):
+    async def test_session_warmup_on_recycle(
+        self, session_pool, lsp_backend, backend_name
+    ):
         """Test that recycled sessions are properly warmed up with new code"""
+        # ty requires files on disk and has different hover format
+        if backend_name == "ty":
+            pytest.xfail(
+                "ty requires files on disk and doesn't include var names in hover"
+            )
+
         # Create session with initial code
         session1 = await lsp_types.Session.create(
             lsp_backend, initial_code="old_var = 'old_value'", pool=session_pool

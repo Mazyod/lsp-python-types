@@ -62,6 +62,7 @@ The following LSPs are available out of the box:
 
 - [Pyright](https://github.com/microsoft/pyright)
 - [Pyrefly](https://github.com/facebook/pyrefly)
+- [ty](https://github.com/astral-sh/ty) - Astral's fast Python type checker
 
 ### Pyright Example
 
