@@ -64,6 +64,41 @@ The following LSPs are available out of the box:
 - [Pyrefly](https://github.com/facebook/pyrefly)
 - [ty](https://github.com/astral-sh/ty) - Astral's fast Python type checker
 
+## Feature Support Matrix
+
+### Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| :white_check_mark: | Fully supported |
+| :warning: | Partial support (see notes) |
+| :x: | Not supported |
+| :grey_question: | Not tested / Not exposed in API |
+
+### Features by Backend
+
+> Last verified: basedpyright 1.36.2, Pyrefly 0.48.2, ty 0.0.12
+
+| Feature | Pyright | Pyrefly | ty | Notes |
+|---------|:-------:|:-------:|:--:|-------|
+| Diagnostics | :white_check_mark: | :white_check_mark: | :warning: | ty requires files on disk |
+| Hover | :white_check_mark: | :white_check_mark: | :white_check_mark: | ty shows type only, not variable name |
+| Completion | :white_check_mark: | :white_check_mark: | :warning: | ty requires files on disk |
+| Completion Resolution | :white_check_mark: | :x: | :white_check_mark: | Pyrefly: not yet supported |
+| Signature Help | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
+| Rename | :white_check_mark: | :warning: | :warning: | Pyrefly: disabled for external files; ty: requires files on disk |
+| Semantic Tokens | :white_check_mark:\* | :white_check_mark: | :white_check_mark: | \*basedpyright recommended for extended features |
+| Go to Definition | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+| Find References | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+| Code Actions | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+| Formatting | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+
+> See [Feature Verification Guide](docs/FEATURE_VERIFICATION.md) for methodology on maintaining this table.
+
+For detailed backend limitations:
+- [Pyrefly Known Limitations](lsp_types/pyrefly/KNOWN_LIMITATIONS.md)
+- [ty Known Limitations](lsp_types/ty/KNOWN_LIMITATIONS.md)
+
 ### Pyright Example
 
 ```python
