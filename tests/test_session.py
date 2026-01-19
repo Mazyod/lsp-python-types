@@ -25,6 +25,58 @@ def backend_name(lsp_backend):
     return lsp_backend.__class__.__name__.replace("Backend", "").lower()
 
 
+def test_requires_file_on_disk_protocol():
+    """Test that requires_file_on_disk returns correct values for each backend"""
+    # Pyright and Pyrefly support virtual documents
+    assert PyrightBackend().requires_file_on_disk() is False
+    assert PyreflyBackend().requires_file_on_disk() is False
+
+    # ty requires files to exist on disk
+    assert TyBackend().requires_file_on_disk() is True
+
+
+async def test_ty_file_written_to_disk(tmp_path: Path):
+    """Test that ty backend automatically writes file to disk"""
+    backend = TyBackend()
+    code = "x: int = 42"
+
+    file_path = tmp_path / "new.py"
+    assert not file_path.exists(), "File should not exist before session creation"
+
+    session = await lsp_types.Session.create(
+        backend, base_path=tmp_path, initial_code=code
+    )
+
+    # File should now exist on disk
+    assert file_path.exists(), "File should be written to disk for ty backend"
+    assert file_path.read_text() == code
+
+    # Update code and verify file is updated
+    new_code = "y: str = 'hello'"
+    await session.update_code(new_code)
+    assert file_path.read_text() == new_code, "File should be updated on code change"
+
+    await session.shutdown()
+
+
+async def test_pyright_no_file_written(tmp_path: Path):
+    """Test that pyright backend does NOT write file to disk (virtual docs work)"""
+    backend = PyrightBackend()
+    code = "x: int = 42"
+
+    file_path = tmp_path / "new.py"
+    assert not file_path.exists()
+
+    session = await lsp_types.Session.create(
+        backend, base_path=tmp_path, initial_code=code
+    )
+
+    # File should NOT exist - Pyright uses virtual documents
+    assert not file_path.exists(), "Pyright should not write file to disk"
+
+    await session.shutdown()
+
+
 async def test_session_with_dynamic_environment(lsp_backend, tmp_path: Path):
     """Test LSP session with a dynamic temporary environment"""
 
@@ -66,20 +118,17 @@ print(f"The result is: {result}")
     await session.shutdown()
 
 
-async def test_session_diagnostics(lsp_backend, backend_name):
+async def test_session_diagnostics(lsp_backend, backend_name, tmp_path: Path):
     """Test diagnostic reporting for type errors"""
-    # ty requires files to exist on disk for diagnostics
-    if backend_name == "ty":
-        pytest.xfail(
-            "ty requires files on disk for diagnostics (virtual documents not supported)"
-        )
 
     code = """\
 def greet(name: str) -> str:
     return name + 123
 """
 
-    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code=code
+    )
 
     diagnostics = await session.get_diagnostics()
     assert len(diagnostics) > 0, "Expected type error diagnostic"
@@ -109,7 +158,7 @@ print(greet("world"))
     await session.shutdown()
 
 
-async def test_session_hover(lsp_backend, backend_name):
+async def test_session_hover(lsp_backend, backend_name, tmp_path: Path):
     """Test hover information for symbols"""
     code = """\
 def greet(name: str) -> str:
@@ -117,7 +166,9 @@ def greet(name: str) -> str:
 
 result = greet("world")
 """
-    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code=code
+    )
 
     # Hover over the function name
     hover_info = await session.get_hover_info(lsp_types.Position(line=0, character=4))
@@ -146,16 +197,12 @@ result = greet("world")
     await session.shutdown()
 
 
-async def test_session_rename(lsp_backend, backend_name):
+async def test_session_rename(lsp_backend, backend_name, tmp_path: Path):
     """Test symbol renaming functionality"""
 
     # FIXME: Pyrefly detects file as external and disables rename edits
     if backend_name == "pyrefly":
         pytest.xfail("Pyrefly detects file as external and disables rename edits")
-
-    # ty requires files on disk for rename operations
-    if backend_name == "ty":
-        pytest.xfail("ty requires files on disk for rename operations")
 
     code = """\
 def greet(name: str) -> str:
@@ -164,7 +211,9 @@ def greet(name: str) -> str:
 result = greet("world")
 print(result)
 """
-    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code=code
+    )
 
     # Rename the function
     rename_edits = await session.get_rename_edits(
@@ -173,8 +222,8 @@ print(result)
     assert rename_edits is not None
 
     # Handle backend-specific response formats
-    if backend_name == "pyrefly":
-        # Pyrefly uses "changes" format
+    if backend_name in ("pyrefly", "ty"):
+        # Pyrefly and ty use "changes" format
         assert "changes" in rename_edits
         changes = next(iter(rename_edits["changes"].values()))
 
@@ -201,8 +250,8 @@ print(result)
     assert rename_edits is not None
 
     # Handle backend-specific response formats
-    if backend_name == "pyrefly":
-        # Pyrefly uses "changes" format
+    if backend_name in ("pyrefly", "ty"):
+        # Pyrefly and ty use "changes" format
         assert "changes" in rename_edits
         changes = next(iter(rename_edits["changes"].values()))
 
@@ -225,7 +274,7 @@ print(result)
     await session.shutdown()
 
 
-async def test_session_signature_help(lsp_backend):
+async def test_session_signature_help(lsp_backend, tmp_path: Path):
     """Test function signature help"""
 
     code = """\
@@ -234,7 +283,9 @@ def complex_function(a: int, b: str, c: float = 1.0) -> None:
 
 complex_function(
 """
-    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code=code
+    )
 
     # Get signature help inside the function call
     sig_help = await session.get_signature_help(
@@ -252,11 +303,8 @@ complex_function(
     await session.shutdown()
 
 
-async def test_session_completion(lsp_backend, backend_name):
+async def test_session_completion(lsp_backend, backend_name, tmp_path: Path):
     """Test code completion and completion item resolution"""
-    # ty requires files on disk for completion
-    if backend_name == "ty":
-        pytest.xfail("ty requires files on disk for completion")
 
     code = """\
 class MyClass:
@@ -266,7 +314,9 @@ class MyClass:
 obj = MyClass()
 obj.
 """
-    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code=code
+    )
 
     # Get completions after the dot
     completions = await session.get_completion(lsp_types.Position(line=5, character=4))
@@ -283,7 +333,8 @@ obj.
     assert len(method_items) > 0, "my_method not found in completion items"
 
     # Resolve a completion item for more details
-    if backend_name != "pyrefly":  # Pyrefly doesn't support completion resolution yet
+    # Pyrefly and ty don't support completion resolution
+    if backend_name not in ("pyrefly", "ty"):
         method_completion = method_items[0]
         resolved = await session.resolve_completion(method_completion)
         assert resolved is not None
@@ -292,7 +343,7 @@ obj.
     await session.shutdown()
 
 
-async def test_session_semantic_tokens(lsp_backend):
+async def test_session_semantic_tokens(lsp_backend, tmp_path: Path):
     """Test semantic token retrieval"""
     code = """\
 def greet(name: str) -> str:
@@ -300,7 +351,9 @@ def greet(name: str) -> str:
 
 result = greet("world")
 """
-    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code=code
+    )
 
     # Get semantic tokens
     tokens = await session.get_semantic_tokens()
@@ -313,7 +366,7 @@ result = greet("world")
     await session.shutdown()
 
 
-async def test_session_semantic_tokens_normalized(lsp_backend):
+async def test_session_semantic_tokens_normalized(lsp_backend, tmp_path: Path):
     """Test normalized semantic token retrieval with canonical legend"""
     code = """\
 def greet(name: str) -> str:
@@ -321,7 +374,9 @@ def greet(name: str) -> str:
 
 result = greet("world")
 """
-    session = await lsp_types.Session.create(lsp_backend, initial_code=code)
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code=code
+    )
 
     # Check that canonical_legend is available
     canonical_legend = session.canonical_legend
@@ -360,9 +415,13 @@ result = greet("world")
     await session.shutdown()
 
 
-async def test_session_semantic_tokens_canonical_legend_consistency(lsp_backend):
+async def test_session_semantic_tokens_canonical_legend_consistency(
+    lsp_backend, tmp_path: Path
+):
     """Test that canonical legend is consistent across backends"""
-    session = await lsp_types.Session.create(lsp_backend, initial_code="x = 1")
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code="x = 1"
+    )
 
     # The canonical legend should be the same regardless of backend
     canonical = session.canonical_legend
@@ -379,14 +438,17 @@ async def test_session_semantic_tokens_canonical_legend_consistency(lsp_backend)
     await session.shutdown()
 
 
-async def test_session_recycling_basic(lsp_backend):
+async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
     """Test basic session recycling functionality"""
     pool = LSPProcessPool(max_size=2)
 
     try:
         # Create first session with pool
         session1 = await lsp_types.Session.create(
-            lsp_backend, initial_code="def func1(): return 1", pool=pool
+            lsp_backend,
+            base_path=tmp_path,
+            initial_code="def func1(): return 1",
+            pool=pool,
         )
 
         # Verify it works
@@ -404,7 +466,10 @@ async def test_session_recycling_basic(lsp_backend):
 
         # Create second session - should reuse the recycled one
         session2 = await lsp_types.Session.create(
-            lsp_backend, initial_code="def func2(): return 2", pool=pool
+            lsp_backend,
+            base_path=tmp_path,
+            initial_code="def func2(): return 2",
+            pool=pool,
         )
 
         # Verify new code is active
@@ -419,20 +484,20 @@ async def test_session_recycling_basic(lsp_backend):
         await pool.cleanup()
 
 
-async def test_session_recycling_with_diagnostics(lsp_backend, backend_name):
+async def test_session_recycling_with_diagnostics(
+    lsp_backend, backend_name, tmp_path: Path
+):
     """Test that recycling properly clears old state"""
-    # ty requires files on disk for diagnostics
-    if backend_name == "ty":
-        pytest.xfail(
-            "ty requires files on disk for diagnostics (virtual documents not supported)"
-        )
 
     pool = LSPProcessPool(max_size=1)
 
     try:
         # First session with error
         session1 = await lsp_types.Session.create(
-            lsp_backend, initial_code="undefined_variable", pool=pool
+            lsp_backend,
+            base_path=tmp_path,
+            initial_code="undefined_variable",
+            pool=pool,
         )
 
         diagnostics = await session1.get_diagnostics()
@@ -442,7 +507,7 @@ async def test_session_recycling_with_diagnostics(lsp_backend, backend_name):
 
         # Second session with valid code
         session2 = await lsp_types.Session.create(
-            lsp_backend, initial_code="x = 42", pool=pool
+            lsp_backend, base_path=tmp_path, initial_code="x = 42", pool=pool
         )
 
         diagnostics = await session2.get_diagnostics()
@@ -453,7 +518,7 @@ async def test_session_recycling_with_diagnostics(lsp_backend, backend_name):
         await pool.cleanup()
 
 
-async def test_session_recycling_performance(lsp_backend):
+async def test_session_recycling_performance(lsp_backend, tmp_path: Path):
     """Test that recycling is faster than creating new sessions"""
     pool = LSPProcessPool(max_size=2)
 
@@ -462,7 +527,7 @@ async def test_session_recycling_performance(lsp_backend):
         start_time = time.time()
         for i in range(3):
             session = await lsp_types.Session.create(
-                lsp_backend, initial_code=f"x{i} = {i}"
+                lsp_backend, base_path=tmp_path, initial_code=f"x{i} = {i}"
             )
             await session.shutdown()
         fresh_time = time.time() - start_time
@@ -472,7 +537,7 @@ async def test_session_recycling_performance(lsp_backend):
         sessions = []
         for i in range(3):
             session = await lsp_types.Session.create(
-                lsp_backend, initial_code=f"y{i} = {i}", pool=pool
+                lsp_backend, base_path=tmp_path, initial_code=f"y{i} = {i}", pool=pool
             )
             sessions.append(session)
 
@@ -491,7 +556,7 @@ async def test_session_recycling_performance(lsp_backend):
 
 
 # Pyrefly-specific configuration tests
-async def test_pyrefly_session_with_config_options():
+async def test_pyrefly_session_with_config_options(tmp_path: Path):
     """Test Pyrefly session creation with various configuration options"""
     # Only run for Pyrefly backend
     backend = PyreflyBackend()
@@ -512,7 +577,7 @@ result = test_function(5)
 """
 
     session = await lsp_types.Session.create(
-        backend, initial_code=code, options=options
+        backend, base_path=tmp_path, initial_code=code, options=options
     )
 
     # Verify session works with options
@@ -527,7 +592,7 @@ result = test_function(5)
     await session.shutdown()
 
 
-async def test_pyrefly_session_with_minimal_config():
+async def test_pyrefly_session_with_minimal_config(tmp_path: Path):
     """Test Pyrefly session with minimal configuration"""
     # Only run for Pyrefly backend
     backend = PyreflyBackend()
@@ -542,7 +607,7 @@ async def test_pyrefly_session_with_minimal_config():
     code = "x = 42"
 
     session = await lsp_types.Session.create(
-        backend, initial_code=code, options=options
+        backend, base_path=tmp_path, initial_code=code, options=options
     )
 
     # Basic functionality test

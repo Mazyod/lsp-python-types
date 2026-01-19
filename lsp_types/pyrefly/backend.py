@@ -84,3 +84,7 @@ class PyreflyBackend(LSPBackend):
     def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
         """Pyrefly doesn't advertise legend via LSP, return hardcoded legend."""
         return PYREFLY_LEGEND
+
+    def requires_file_on_disk(self) -> bool:
+        """Pyrefly supports virtual documents, no file needed on disk."""
+        return False

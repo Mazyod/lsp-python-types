@@ -2,7 +2,7 @@
 
 This document describes known limitations and behavioral differences when using the ty backend compared to other LSP backends (Pyright, Pyrefly).
 
-## 1. Files Must Exist on Disk
+## 1. Files Must Exist on Disk (Handled Automatically)
 
 **Limitation**: ty requires Python files to exist on disk before it can provide diagnostics, completion, rename, and other analysis features.
 
@@ -11,23 +11,9 @@ This document describes known limitations and behavioral differences when using 
 - Empty or limited completion results
 - Rename operations may fail
 
-**Workaround**: Always write files to disk before creating a session:
-```python
-from pathlib import Path
+**Resolution**: The `TyBackend` implements `requires_file_on_disk() -> True`, which tells `Session.create()` to automatically write the initial code to disk before opening the document. The `update_code()` method also keeps the file in sync with code changes.
 
-base_path = Path("/tmp/my_project")
-base_path.mkdir(exist_ok=True)
-
-code = "x: int = 'not an int'"
-(base_path / "new.py").write_text(code)
-
-session = await Session.create(
-    TyBackend(),
-    base_path=base_path,
-    initial_code=code,
-)
-diagnostics = await session.get_diagnostics()  # Now returns errors
-```
+This is handled transparently - no user action required.
 
 ## 2. `workspace/didChangeConfiguration` Not Supported
 
@@ -81,6 +67,17 @@ WARN Your LSP client doesn't support file watching: You may see stale results wh
 ```
 
 **Impact**: If files are modified outside the LSP session (e.g., by external tools), ty may not detect the changes until the session is recreated.
+
+## 7. Completion Item Resolution Not Supported
+
+**Limitation**: ty does not support the `completionItem/resolve` LSP request.
+
+**Behavior**: Calling `resolve_completion()` will raise an error:
+```
+Unknown request: completionItem/resolve (-32601)
+```
+
+**Impact**: Completion items won't have extended documentation or additional metadata that resolution typically provides. Basic completion works fine.
 
 ---
 

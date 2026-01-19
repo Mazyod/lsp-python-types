@@ -109,3 +109,7 @@ class TyBackend(LSPBackend):
     def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
         """ty advertises legend via LSP, use server-provided."""
         return None
+
+    def requires_file_on_disk(self) -> bool:
+        """ty requires files to exist on disk for analysis."""
+        return True

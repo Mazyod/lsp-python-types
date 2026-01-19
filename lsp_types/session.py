@@ -36,6 +36,15 @@ class LSPBackend[TConfig: t.Mapping](t.Protocol):
         """Return hardcoded legend if server doesn't advertise one."""
         ...
 
+    def requires_file_on_disk(self) -> bool:
+        """Return True if this backend requires files to exist on disk.
+
+        Some LSP backends (like ty) cannot analyze virtual documents opened via
+        didOpen without a corresponding file on disk. For these backends, the
+        session will write the initial code to disk before opening the document.
+        """
+        ...
+
 
 @dc.dataclass(kw_only=True)
 class DiagnosticsResult:
@@ -118,6 +127,11 @@ class Session:
                 workspace_settings
             )
 
+            # Write file to disk if backend requires it (e.g., ty)
+            if backend.requires_file_on_disk():
+                session._file_path.write_text(initial_code)
+                session._file_on_disk = True
+
             # Simulate opening a document
             await session._open_document(initial_code)
 
@@ -139,11 +153,13 @@ class Session:
     ):
         self._process = lsp_process
         self._backend = backend
-        self._document_uri = f"file://{base_path / 'new.py'}"
+        self._file_path = base_path / "new.py"
+        self._document_uri = f"file://{self._file_path}"
         self._document_version = 1
         self._document_text = ""
         self._active_pool: LSPProcessPool | None = pool
         self._diag_result: DiagnosticsResult | None = None
+        self._file_on_disk = False  # Set to True if file was written for backends that require it
 
         # Semantic tokens normalization
         self._backend_legend = legend
@@ -169,6 +185,10 @@ class Session:
         """Update the code in the current document"""
         self._document_version += 1
         self._document_text = code
+
+        # Keep file on disk in sync if required by backend
+        if self._file_on_disk:
+            self._file_path.write_text(code)
 
         document_version = self._document_version
         await self._process.notify.did_change_text_document(

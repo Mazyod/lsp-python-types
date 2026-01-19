@@ -83,3 +83,7 @@ class PyrightBackend(LSPBackend):
     def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
         """Pyright advertises legend via LSP, use server-provided."""
         return None
+
+    def requires_file_on_disk(self) -> bool:
+        """Pyright supports virtual documents, no file needed on disk."""
+        return False

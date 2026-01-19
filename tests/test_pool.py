@@ -40,17 +40,24 @@ class TestLSPProcessPool:
         yield pool
         await pool.cleanup()
 
+    @pytest.fixture
+    def base_path(self, tmp_path: Path) -> Path:
+        """Provide a temp directory as base_path for sessions"""
+        return tmp_path
+
     async def test_session_pool_creation(self, session_pool):
         """Test that session pool can be created with proper configuration"""
         assert session_pool.max_size == 3
         assert session_pool.current_size == 0
         assert session_pool.available_count == 0
 
-    async def test_session_pool_acquire_and_recycle(self, session_pool, lsp_backend):
+    async def test_session_pool_acquire_and_recycle(
+        self, session_pool, lsp_backend, base_path
+    ):
         """Test basic session acquisition and recycling"""
         # Create a session using the pool
         session = await lsp_types.Session.create(
-            lsp_backend, initial_code="x = 1", pool=session_pool
+            lsp_backend, base_path=base_path, initial_code="x = 1", pool=session_pool
         )
 
         # Verify session works
@@ -67,12 +74,15 @@ class TestLSPProcessPool:
         assert session_pool.current_size == 1
 
     async def test_session_recycling_with_different_code(
-        self, session_pool, lsp_backend
+        self, session_pool, lsp_backend, base_path
     ):
         """Test that recycled sessions work correctly with different code"""
         # First session with initial code
         session1 = await lsp_types.Session.create(
-            lsp_backend, initial_code="def func1(): pass", pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code="def func1(): pass",
+            pool=session_pool,
         )
 
         # Check that the function exists
@@ -86,7 +96,10 @@ class TestLSPProcessPool:
 
         # Second session with different code - should reuse the recycled session
         session2 = await lsp_types.Session.create(
-            lsp_backend, initial_code="def func2(): pass", pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code="def func2(): pass",
+            pool=session_pool,
         )
 
         # Verify the session was recycled (same pool, different code)
@@ -102,7 +115,7 @@ class TestLSPProcessPool:
         await session2.shutdown()
 
     async def test_session_recycling_with_different_options(
-        self, session_pool, lsp_backend, backend_name
+        self, session_pool, lsp_backend, backend_name, base_path
     ):
         """Test recycling sessions with different options"""
 
@@ -125,7 +138,11 @@ class TestLSPProcessPool:
 
         # First session with first options
         session1 = await lsp_types.Session.create(
-            lsp_backend, initial_code=code1, options=options1, pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code=code1,
+            options=options1,
+            pool=session_pool,
         )
 
         await session1.shutdown()
@@ -133,6 +150,7 @@ class TestLSPProcessPool:
         # Second session with different options - should update configuration
         session2 = await lsp_types.Session.create(
             lsp_backend,
+            base_path=base_path,
             initial_code=code2,
             options=options2,
             pool=session_pool,
@@ -143,14 +161,19 @@ class TestLSPProcessPool:
 
         await session2.shutdown()
 
-    async def test_session_pool_max_size_limit(self, session_pool, lsp_backend):
+    async def test_session_pool_max_size_limit(
+        self, session_pool, lsp_backend, base_path
+    ):
         """Test that pool respects max size limit"""
         sessions = []
 
         # Create sessions up to max size
         for i in range(session_pool.max_size):
             session = await lsp_types.Session.create(
-                lsp_backend, initial_code=f"x{i} = {i}", pool=session_pool
+                lsp_backend,
+                base_path=base_path,
+                initial_code=f"x{i} = {i}",
+                pool=session_pool,
             )
             sessions.append(session)
 
@@ -159,7 +182,10 @@ class TestLSPProcessPool:
 
         # Try to create one more session - should create a new process (not pooled)
         extra_session = await lsp_types.Session.create(
-            lsp_backend, initial_code="extra = 999", pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code="extra = 999",
+            pool=session_pool,
         )
         sessions.append(extra_session)
 
@@ -170,12 +196,15 @@ class TestLSPProcessPool:
         for session in sessions:
             await session.shutdown()
 
-    async def test_concurrent_session_usage(self, session_pool, lsp_backend):
+    async def test_concurrent_session_usage(
+        self, session_pool, lsp_backend, base_path
+    ):
         """Test concurrent session acquisition and usage"""
 
         async def use_session(session_id: int):
             session = await lsp_types.Session.create(
                 lsp_backend,
+                base_path=base_path,
                 initial_code=f"def func_{session_id}(): return {session_id}",
                 pool=session_pool,
             )
@@ -203,18 +232,19 @@ class TestLSPProcessPool:
         assert session_pool.available_count > 0
 
     async def test_session_warmup_on_recycle(
-        self, session_pool, lsp_backend, backend_name
+        self, session_pool, lsp_backend, backend_name, base_path
     ):
         """Test that recycled sessions are properly warmed up with new code"""
-        # ty requires files on disk and has different hover format
+        # ty hover doesn't include variable names (shows only type)
         if backend_name == "ty":
-            pytest.xfail(
-                "ty requires files on disk and doesn't include var names in hover"
-            )
+            pytest.xfail("ty hover doesn't include variable names in output")
 
         # Create session with initial code
         session1 = await lsp_types.Session.create(
-            lsp_backend, initial_code="old_var = 'old_value'", pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code="old_var = 'old_value'",
+            pool=session_pool,
         )
 
         # Verify old code is present
@@ -229,7 +259,10 @@ class TestLSPProcessPool:
         # Create new session with different code
         new_code = "new_var = 'new_value'"
         session2 = await lsp_types.Session.create(
-            lsp_backend, initial_code=new_code, pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code=new_code,
+            pool=session_pool,
         )
 
         # Verify new code is present and old code is gone
@@ -251,11 +284,14 @@ class TestLSPProcessPool:
 
         await session2.shutdown()
 
-    async def test_session_pool_cleanup(self, session_pool, lsp_backend):
+    async def test_session_pool_cleanup(self, session_pool, lsp_backend, base_path):
         """Test proper cleanup of session pool resources"""
         # Create and recycle a session
         session = await lsp_types.Session.create(
-            lsp_backend, initial_code="test_var = 42", pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code="test_var = 42",
+            pool=session_pool,
         )
         await session.shutdown()
 
@@ -315,13 +351,18 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_pool_exhaustion_fallback(self, session_pool, lsp_backend):
+    async def test_pool_exhaustion_fallback(
+        self, session_pool, lsp_backend, base_path
+    ):
         """Test that pool exhaustion gracefully falls back to new sessions"""
         # Fill up the pool
         active_sessions = []
         for i in range(session_pool.max_size):
             session = await lsp_types.Session.create(
-                lsp_backend, initial_code=f"x{i} = {i}", pool=session_pool
+                lsp_backend,
+                base_path=base_path,
+                initial_code=f"x{i} = {i}",
+                pool=session_pool,
             )
             active_sessions.append(session)
 
@@ -331,7 +372,10 @@ class TestLSPProcessPool:
 
         # Create additional session - should work but not use pool
         extra_session = await lsp_types.Session.create(
-            lsp_backend, initial_code="extra = 'not_pooled'", pool=session_pool
+            lsp_backend,
+            base_path=base_path,
+            initial_code="extra = 'not_pooled'",
+            pool=session_pool,
         )
 
         # Should work fine
@@ -345,7 +389,7 @@ class TestLSPProcessPool:
         for session in active_sessions:
             await session.shutdown()
 
-    async def test_idle_process_cleanup(self, lsp_backend):
+    async def test_idle_process_cleanup(self, lsp_backend, tmp_path: Path):
         """Test that idle processes are automatically removed from the pool"""
         # Create pool with very short idle time and cleanup interval for fast test
         pool = LSPProcessPool(
@@ -357,7 +401,10 @@ class TestLSPProcessPool:
         try:
             # Create and recycle a session to get a process in the pool
             session = await lsp_types.Session.create(
-                lsp_backend, initial_code="test_var = 42", pool=pool
+                lsp_backend,
+                base_path=tmp_path,
+                initial_code="test_var = 42",
+                pool=pool,
             )
             await session.shutdown()
 
@@ -379,7 +426,9 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_idle_cleanup_preserves_active_processes(self, lsp_backend):
+    async def test_idle_cleanup_preserves_active_processes(
+        self, lsp_backend, tmp_path: Path
+    ):
         """Test that idle cleanup only removes available processes, not active ones"""
         pool = LSPProcessPool(
             max_size=3,
@@ -390,13 +439,19 @@ class TestLSPProcessPool:
         try:
             # Create and recycle one session to get it in the available pool
             session1 = await lsp_types.Session.create(
-                lsp_backend, initial_code="var1 = 1", pool=pool
+                lsp_backend,
+                base_path=tmp_path,
+                initial_code="var1 = 1",
+                pool=pool,
             )
             await session1.shutdown()
 
             # Now create another session that will reuse the available process
             session2 = await lsp_types.Session.create(
-                lsp_backend, initial_code="var2 = 2", pool=pool
+                lsp_backend,
+                base_path=tmp_path,
+                initial_code="var2 = 2",
+                pool=pool,
             )
             # Don't recycle session2, keep it active
 
@@ -430,7 +485,7 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_idle_cleanup_timing_precision(self, lsp_backend):
+    async def test_idle_cleanup_timing_precision(self, lsp_backend, tmp_path: Path):
         """Test that idle cleanup respects the max_idle_time precisely"""
         pool = LSPProcessPool(
             max_size=2,
@@ -441,7 +496,10 @@ class TestLSPProcessPool:
         try:
             # Create and recycle a session
             session = await lsp_types.Session.create(
-                lsp_backend, initial_code="test_var = 42", pool=pool
+                lsp_backend,
+                base_path=tmp_path,
+                initial_code="test_var = 42",
+                pool=pool,
             )
             await session.shutdown()
 
@@ -467,7 +525,7 @@ class TestLSPProcessPoolBenchmarks:
     """Benchmark tests comparing pooled vs non-pooled session performance"""
 
     async def test_benchmark_session_creation_comparison(
-        self, lsp_backend, backend_name
+        self, lsp_backend, backend_name, tmp_path: Path
     ):
         """Compare session creation times with and without pooling"""
         pool = LSPProcessPool(max_size=3)
@@ -478,7 +536,10 @@ class TestLSPProcessPoolBenchmarks:
             for i in range(3):
                 start_time = time.perf_counter()
                 session = await lsp_types.Session.create(
-                    lsp_backend, initial_code=f"pooled_var_{i} = {i}", pool=pool
+                    lsp_backend,
+                    base_path=tmp_path,
+                    initial_code=f"pooled_var_{i} = {i}",
+                    pool=pool,
                 )
                 await session.shutdown()
                 end_time = time.perf_counter()
@@ -489,7 +550,9 @@ class TestLSPProcessPoolBenchmarks:
             for i in range(3):
                 start_time = time.perf_counter()
                 session = await lsp_types.Session.create(
-                    lsp_backend, initial_code=f"non_pooled_var_{i} = {i}"
+                    lsp_backend,
+                    base_path=tmp_path,
+                    initial_code=f"non_pooled_var_{i} = {i}",
                 )
                 await session.shutdown()
                 end_time = time.perf_counter()
@@ -525,14 +588,19 @@ class TestLSPProcessPoolBenchmarks:
         finally:
             await pool.cleanup()
 
-    async def test_benchmark_session_reuse_performance(self, lsp_backend, backend_name):
+    async def test_benchmark_session_reuse_performance(
+        self, lsp_backend, backend_name, tmp_path: Path
+    ):
         """Compare session reuse performance vs fresh creation"""
         pool = LSPProcessPool(max_size=3)
 
         try:
             # Pre-warm the pool
             warmup_session = await lsp_types.Session.create(
-                lsp_backend, initial_code="warmup = True", pool=pool
+                lsp_backend,
+                base_path=tmp_path,
+                initial_code="warmup = True",
+                pool=pool,
             )
             await warmup_session.shutdown()
 
@@ -541,7 +609,10 @@ class TestLSPProcessPoolBenchmarks:
             for i in range(5):
                 start_time = time.perf_counter()
                 session = await lsp_types.Session.create(
-                    lsp_backend, initial_code=f"reused_var_{i} = {i}", pool=pool
+                    lsp_backend,
+                    base_path=tmp_path,
+                    initial_code=f"reused_var_{i} = {i}",
+                    pool=pool,
                 )
                 # Do some work
                 hover_info = await session.get_hover_info(
@@ -557,7 +628,9 @@ class TestLSPProcessPoolBenchmarks:
             for i in range(3):
                 start_time = time.perf_counter()
                 session = await lsp_types.Session.create(
-                    lsp_backend, initial_code=f"fresh_var_{i} = {i}"
+                    lsp_backend,
+                    base_path=tmp_path,
+                    initial_code=f"fresh_var_{i} = {i}",
                 )
                 hover_info = await session.get_hover_info(
                     lsp_types.Position(line=0, character=0)
@@ -581,7 +654,7 @@ class TestLSPProcessPoolBenchmarks:
             await pool.cleanup()
 
     async def test_benchmark_concurrent_session_creation(
-        self, lsp_backend, backend_name
+        self, lsp_backend, backend_name, tmp_path: Path
     ):
         """Compare concurrent session creation with and without pooling"""
         pool = LSPProcessPool(max_size=5)
@@ -593,6 +666,7 @@ class TestLSPProcessPoolBenchmarks:
             async def create_pooled_session(session_id: int):
                 session = await lsp_types.Session.create(
                     lsp_backend,
+                    base_path=tmp_path,
                     initial_code=f"pooled_concurrent_{session_id} = {session_id}",
                     pool=pool,
                 )
@@ -612,6 +686,7 @@ class TestLSPProcessPoolBenchmarks:
             async def create_fresh_session(session_id: int):
                 session = await lsp_types.Session.create(
                     lsp_backend,
+                    base_path=tmp_path,
                     initial_code=f"fresh_concurrent_{session_id} = {session_id}",
                 )
                 hover_info = await session.get_hover_info(
@@ -641,7 +716,7 @@ class TestLSPProcessPoolBenchmarks:
 
 
 # Pyrefly-specific configuration benchmark test
-async def test_pyrefly_config_options_benchmark():
+async def test_pyrefly_config_options_benchmark(tmp_path: Path):
     """Benchmark different Pyrefly configuration options"""
     # Only run for Pyrefly backend
     backend = PyreflyBackend()
@@ -666,6 +741,7 @@ async def test_pyrefly_config_options_benchmark():
 
                 session = await lsp_types.Session.create(
                     backend,
+                    base_path=tmp_path,
                     initial_code=f"def test_{i}(x: int) -> int: return x * 2\nresult = test_{i}(5)",
                     options=config,  # type: ignore
                     pool=pool,
