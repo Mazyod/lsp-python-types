@@ -14,9 +14,10 @@ uv run pytest tests/test_session.py            # Session tests
 uv run pytest tests/test_pool.py::TestLSPProcessPool::test_name -v  # Single test
 
 # Type checking (required before committing)
-uvx pyright                                    # Run pyright type checker
-uvx pyright lsp_types/                         # Check only library code
-uvx pyright tests/                             # Check only test code
+# NOTE: --pythonpath is required to resolve the virtual environment correctly
+uvx pyright --pythonpath .venv/bin/python      # Run pyright type checker
+uvx pyright --pythonpath .venv/bin/python lsp_types/   # Check only library code
+uvx pyright --pythonpath .venv/bin/python tests/       # Check only test code
 
 # Linting and formatting (required before committing)
 uvx ruff check .                               # Check for linting errors

@@ -171,6 +171,9 @@ class FailingBackend:
     def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
         return None
 
+    def requires_file_on_disk(self) -> bool:
+        return False
+
 
 async def test_session_create_releases_process_on_failure(tmp_path: Path):
     """Test that Session.create releases the process back to the pool when initialization fails."""
