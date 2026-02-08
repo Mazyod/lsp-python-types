@@ -124,7 +124,39 @@ def get_base_python_capabilities() -> types.ClientCapabilities:
 
 Backends could extend this base instead of duplicating the boilerplate.
 
-### 4. Backend Registry Pattern
+### 4. Monaco Native LSP Client (`monaco.lsp`)
+
+Monaco Editor v0.55.0 (November 2025) introduced a built-in LSP client under `monaco.lsp` that could significantly simplify the playground. The current playground manually handles JSON-RPC, the LSP handshake, position conversion, diagnostics, and hover registration (~200 lines per backend). With `monaco.lsp`, this reduces to ~10-15 lines per backend.
+
+**What it provides:**
+- `MonacoLspClient` — auto-registers 21 LSP features (completion, hover, diagnostics, semantic tokens, go-to-definition, rename, code actions, inlay hints, etc.)
+- `WebSocketTransport` — connect via WebSocket
+- `createTransportToWorker(worker)` — connect to a Web Worker
+- `createTransportToIFrame(iframe)` — connect to an iframe
+
+**Example usage:**
+```typescript
+const worker = new Worker(PYRIGHT_WORKER_URL);
+const transport = monaco.lsp.createTransportToWorker(worker);
+new monaco.lsp.MonacoLspClient(transport);
+// All features auto-registered, including semantic tokens
+```
+
+**What it would replace in the playground:**
+- `BackendAdapter` interface (diagnostics, hover, updateCode)
+- `typeConversions.ts` (LSP-to-Monaco position mapping)
+- Per-backend implementations (~200 lines each)
+- Dependencies: `vscode-languageserver-protocol`, `vscode-jsonrpc`
+
+**Blockers / caveats (as of v0.55.0):**
+- **API not stable** — the author (hediet, Microsoft) explicitly warned the API may change
+- **No custom initialization params** — sends `rootUri: null`, `processId: null` with no way to customize. The playground backends need specific `initializationOptions`
+- **Global registration** — providers register for all models, not per-language
+- **No reconnection** — WebSocket drops require page refresh
+
+**Recommendation:** Monitor the API stability across v0.56.0+. The lack of custom `initializationOptions` is the main blocker for adoption. Once that is addressed, migrating the playground would eliminate significant boilerplate and gain features (completion, semantic tokens, rename, etc.) for free.
+
+### 5. Backend Registry Pattern
 
 For easier discovery and testing:
 
