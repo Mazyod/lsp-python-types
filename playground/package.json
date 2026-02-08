@@ -10,7 +10,7 @@
     "fetch-wasm": "bash fetch-wasm.sh"
   },
   "dependencies": {
-    "monaco-editor": "^0.52.2",
+    "monaco-editor": "^0.55.0",
     "remote-web-worker": "^0.0.9",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5"
