@@ -19,10 +19,15 @@ const PACKAGE = "browser-basedpyright";
 const VERSION = "1.28.1";
 const WORKER_URL = `https://cdn.jsdelivr.net/npm/${PACKAGE}@${VERSION}/dist/pyright.worker.js`;
 
-const FILE_URI = "file:///src/main.py";
-const CONFIG_URI = "file:///src/pyrightconfig.json";
+const ROOT_PATH = "/src/";
+const ROOT_URI = `file://${ROOT_PATH}`;
+const FILE_NAME = "main.py";
+const FILE_PATH = `${ROOT_PATH}${FILE_NAME}`;
+const FILE_URI = `${ROOT_URI}${FILE_NAME}`;
+const CONFIG_PATH = `${ROOT_PATH}pyrightconfig.json`;
 
 const DEFAULT_CONFIG = JSON.stringify({
+  typeshedPath: "/typeshed",
   pythonVersion: "3.12",
   typeCheckingMode: "standard",
 });
@@ -96,9 +101,10 @@ export class PyrightBackend implements BackendAdapter {
     this.connection.listen();
 
     // LSP initialize handshake
+    // Note: initializationOptions.files uses bare paths (not file:// URIs)
     await this.connection.sendRequest("initialize", {
-      rootUri: "file:///src/",
-      rootPath: "/src/",
+      rootUri: ROOT_URI,
+      rootPath: ROOT_PATH,
       processId: 1,
       capabilities: {
         textDocument: {
@@ -113,8 +119,8 @@ export class PyrightBackend implements BackendAdapter {
       },
       initializationOptions: {
         files: {
-          [FILE_URI]: "",
-          [CONFIG_URI]: DEFAULT_CONFIG,
+          [FILE_PATH]: "",
+          [CONFIG_PATH]: DEFAULT_CONFIG,
         },
       },
     });
