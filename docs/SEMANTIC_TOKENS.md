@@ -91,7 +91,7 @@ See `examples/extract_semantic_legends.py` for a complete working example.
 
 ### Pyrefly
 
-> Last verified: Pyrefly 0.48.2
+> Last verified: Pyrefly 0.51.2
 > Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/main/pyrefly/lib/state/semantic_tokens.rs)
 
 Pyrefly does not advertise its legend via LSP initialization, but the token mappings are defined in source code.
@@ -143,7 +143,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ### ty
 
-> Last verified: ty 0.0.12
+> Last verified: ty 0.0.15
 
 #### Token Types
 

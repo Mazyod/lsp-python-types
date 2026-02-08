@@ -59,6 +59,10 @@ async def extract_legend(
         # Send initialized notification (required by LSP spec)
         await process.notify.initialized({})
 
+        # Extract server version info
+        server_info = init_result.get("serverInfo", {})
+        server_version = server_info.get("version", "unknown")
+
         # Extract semantic tokens provider from server capabilities
         server_caps = init_result.get("capabilities", {})
         semantic_provider = server_caps.get("semanticTokensProvider")
@@ -87,6 +91,7 @@ async def extract_legend(
                 )
             else:
                 print(f"  {backend_name}: No semantic tokens provider")
+            print(f"  {backend_name}: version {server_version}")
             return None
 
         legend = semantic_provider.get("legend")
@@ -96,6 +101,7 @@ async def extract_legend(
 
         return {
             "backend": backend_name,
+            "version": server_version,
             "tokenTypes": legend.get("tokenTypes", []),
             "tokenModifiers": legend.get("tokenModifiers", []),
         }
@@ -112,10 +118,12 @@ async def extract_legend(
 def print_legend_table(legend: dict) -> None:
     """Print a legend as markdown tables."""
     backend = legend["backend"]
+    version = legend["version"]
     token_types = legend["tokenTypes"]
     token_modifiers = legend["tokenModifiers"]
 
     print(f"\n### {backend}\n")
+    print(f"> Version: {version}\n")
 
     # Token Types table
     print("#### Token Types\n")
@@ -159,7 +167,7 @@ async def main() -> None:
             if legend:
                 legends.append(legend)
                 print(
-                    f"  {name}: {len(legend['tokenTypes'])} types, {len(legend['tokenModifiers'])} modifiers"
+                    f"  {name}: version {legend['version']}, {len(legend['tokenTypes'])} types, {len(legend['tokenModifiers'])} modifiers"
                 )
 
         print("\n" + "=" * 60)
