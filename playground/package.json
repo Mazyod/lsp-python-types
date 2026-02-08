@@ -1,0 +1,22 @@
+{
+  "name": "lsp-python-types-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "fetch-wasm": "bash fetch-wasm.sh"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.52.2",
+    "remote-web-worker": "^0.0.9",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver-protocol": "^3.17.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}
