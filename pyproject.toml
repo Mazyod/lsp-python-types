@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 readme = "README.md"
 license = "MIT"
 dependencies = [
-    "tomli-w>=1.0.0",  # TOML writing support for Pyrefly config
+    "tomli-w>=1.0.0",  # TOML writing support for Pyrefly and ty config
 ]
 keywords = [
     "lsp",
@@ -43,8 +43,8 @@ pyrefly = [
 dev = [
     "pytest>=9.0.0,<10",
     "pytest-cov>=7.0.0,<8",
-    "pytest-asyncio>=0.25.3",
-    "datamodel-code-generator>=0.27.2",
+    "pytest-asyncio>=1.0.0",
+    "datamodel-code-generator>=0.53.0",
     "httpx>=0.28.1",
     "rich>=14.2.0",
 ]

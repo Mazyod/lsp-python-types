@@ -319,10 +319,10 @@ provides-extras = ["pyrefly"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "datamodel-code-generator", specifier = ">=0.27.2" },
+    { name = "datamodel-code-generator", specifier = ">=0.53.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=9.0.0,<10" },
-    { name = "pytest-asyncio", specifier = ">=0.25.3" },
+    { name = "pytest-asyncio", specifier = ">=1.0.0" },
     { name = "pytest-cov", specifier = ">=7.0.0,<8" },
     { name = "rich", specifier = ">=14.2.0" },
 ]
