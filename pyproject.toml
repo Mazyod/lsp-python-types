@@ -1,7 +1,7 @@
 [project]
 name = "lsp-types"
 version = "0.16.0"
-description = "Zero-dependency Python library for Language Server Protocol types"
+description = "Minimal-dependency Python library for Language Server Protocol types"
 authors = [{ name = "Mazyad Alabduljaleel", email = "mazjaleel@gmail.com" }]
 requires-python = ">=3.12"
 readme = "README.md"
