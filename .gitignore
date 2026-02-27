@@ -1,5 +1,6 @@
-# FIXME: Created in tests
+# Backend config files (may be created by tests or local usage)
 /pyrefly.toml
+/ty.toml
 
 # Created by https://www.toptal.com/developers/gitignore/api/linux,macos,python,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,macos,python,visualstudiocode
