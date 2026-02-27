@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import dataclasses as dc
 import itertools
@@ -32,7 +34,7 @@ class Error(Exception):
         return {"code": self.code, "message": super().__str__()}
 
     @classmethod
-    def from_lsp(cls, d: types.LSPObject) -> "Error":
+    def from_lsp(cls, d: types.LSPObject) -> Error:
         try:
             code = types.ErrorCodes(d["code"])
         except ValueError:
@@ -83,7 +85,7 @@ class LSPProcess:
             self._send_notification, self._on_notification
         )
 
-    async def __aenter__(self) -> "LSPProcess":
+    async def __aenter__(self) -> LSPProcess:
         await self.start()
         return self
 
