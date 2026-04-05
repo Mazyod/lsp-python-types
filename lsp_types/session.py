@@ -159,7 +159,9 @@ class Session:
         self._document_text = ""
         self._active_pool: LSPProcessPool | None = pool
         self._diag_result: DiagnosticsResult | None = None
-        self._file_on_disk = False  # Set to True if file was written for backends that require it
+        self._file_on_disk = (
+            False  # Set to True if file was written for backends that require it
+        )
 
         # Semantic tokens normalization
         self._backend_legend = legend

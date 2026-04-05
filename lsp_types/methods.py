@@ -3,6 +3,7 @@ from __future__ import annotations
 # Generated code.
 # DO NOT EDIT.
 # LSP v3.17.0
+
 from enum import StrEnum
 
 

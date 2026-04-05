@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from enum import IntEnum, IntFlag, StrEnum
-
 # Generated code.
 # DO NOT EDIT.
 # LSP v3.17.0
-from typing import Any, Literal, Mapping, NotRequired, TypedDict, Union
+
+from typing import Any, Literal, Mapping, TypedDict, Union, NotRequired
+from enum import IntEnum, IntFlag, StrEnum
+
 
 URI = str
 DocumentUri = str
@@ -3054,14 +3055,14 @@ class DocumentOnTypeFormattingRegistrationOptions(TypedDict):
 class RenameParams(TypedDict):
     """The parameters of a {@link RenameRequest}."""
 
-    textDocument: "TextDocumentIdentifier"
-    """The document to rename."""
-    position: "Position"
-    """The position at which this request was sent."""
     newName: str
     """The new name of the symbol. If the given name is not valid the
     request must return a {@link ResponseError} with an
     appropriate message set."""
+    textDocument: "TextDocumentIdentifier"
+    """The text document."""
+    position: "Position"
+    """The position inside the text document."""
     workDoneToken: NotRequired["ProgressToken"]
     """An optional token that a server can use to report work done progress."""
 

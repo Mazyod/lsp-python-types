@@ -159,11 +159,20 @@
 			"method": "textDocument/documentColor",
 			"typeName": "DocumentColorRequest",
 			"result": {
-				"kind": "array",
-				"element": {
-					"kind": "reference",
-					"name": "ColorInformation"
-				}
+				"kind": "or",
+				"items": [
+					{
+						"kind": "array",
+						"element": {
+							"kind": "reference",
+							"name": "ColorInformation"
+						}
+					},
+					{
+						"kind": "base",
+						"name": "null"
+					}
+				]
 			},
 			"messageDirection": "clientToServer",
 			"clientCapability": "textDocument.colorProvider",
@@ -189,11 +198,20 @@
 			"method": "textDocument/colorPresentation",
 			"typeName": "ColorPresentationRequest",
 			"result": {
-				"kind": "array",
-				"element": {
-					"kind": "reference",
-					"name": "ColorPresentation"
-				}
+				"kind": "or",
+				"items": [
+					{
+						"kind": "array",
+						"element": {
+							"kind": "reference",
+							"name": "ColorPresentation"
+						}
+					},
+					{
+						"kind": "base",
+						"name": "null"
+					}
+				]
 			},
 			"messageDirection": "clientToServer",
 			"clientCapability": "textDocument.colorProvider",
@@ -438,6 +456,8 @@
 				]
 			},
 			"messageDirection": "clientToServer",
+			"clientCapability": "textDocument.callHierarchy",
+			"serverCapability": "callHierarchyProvider",
 			"params": {
 				"kind": "reference",
 				"name": "CallHierarchyIncomingCallsParams"
@@ -472,6 +492,8 @@
 				]
 			},
 			"messageDirection": "clientToServer",
+			"clientCapability": "textDocument.callHierarchy",
+			"serverCapability": "callHierarchyProvider",
 			"params": {
 				"kind": "reference",
 				"name": "CallHierarchyOutgoingCallsParams"
@@ -6402,28 +6424,18 @@
 			"name": "RenameParams",
 			"properties": [
 				{
-					"name": "textDocument",
-					"type": {
-						"kind": "reference",
-						"name": "TextDocumentIdentifier"
-					},
-					"documentation": "The document to rename."
-				},
-				{
-					"name": "position",
-					"type": {
-						"kind": "reference",
-						"name": "Position"
-					},
-					"documentation": "The position at which this request was sent."
-				},
-				{
 					"name": "newName",
 					"type": {
 						"kind": "base",
 						"name": "string"
 					},
 					"documentation": "The new name of the symbol. If the given name is not valid the\nrequest must return a {@link ResponseError} with an\nappropriate message set."
+				}
+			],
+			"extends": [
+				{
+					"kind": "reference",
+					"name": "TextDocumentPositionParams"
 				}
 			],
 			"mixins": [

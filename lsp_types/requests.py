@@ -3,10 +3,12 @@ from __future__ import annotations
 # Generated code.
 # DO NOT EDIT.
 # LSP v3.17.0
+
 import asyncio
 from typing import Any, Awaitable, Callable, Union
+from . import methods
+from . import types
 
-from . import methods, types
 
 RequestDispatcher = Callable[[str, types.LSPAny], Awaitable[Any]]
 
@@ -37,7 +39,7 @@ class RequestFunctions:
 
     async def document_color(
         self, params: types.DocumentColorParams
-    ) -> list[types.ColorInformation]:
+    ) -> Union[list[types.ColorInformation], None]:
         """A request to list all color symbols found in a given text document. The request's
         parameter is of type {@link DocumentColorParams} the
         response is of type {@link ColorInformation ColorInformation[]} or a Thenable
@@ -48,7 +50,7 @@ class RequestFunctions:
 
     async def color_presentation(
         self, params: types.ColorPresentationParams
-    ) -> list[types.ColorPresentation]:
+    ) -> Union[list[types.ColorPresentation], None]:
         """A request to list all presentation for a color. The request's
         parameter is of type {@link ColorPresentationParams} the
         response is of type {@link ColorInformation ColorInformation[]} or a Thenable

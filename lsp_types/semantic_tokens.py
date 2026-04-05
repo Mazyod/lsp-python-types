@@ -54,6 +54,7 @@ CANONICAL_TOKEN_MODIFIERS: list[str] = [
     "builtin",  # bit 10 (pyright)
     "classMember",  # bit 11 (pyright)
     "parameter",  # bit 12 (pyright - modifier, not to be confused with type)
+    "selfParameter",  # bit 13 (pyrefly - modifier for self/cls parameters)
 ]
 
 # The canonical legend for Monaco/editor integration
@@ -109,6 +110,7 @@ PYREFLY_LEGEND: types.SemanticTokensLegend = {
         "modification",  # bit 7
         "documentation",  # bit 8
         "defaultLibrary",  # bit 9
+        "selfParameter",  # bit 10 (for self/cls parameters)
     ],
 }
 

@@ -196,9 +196,7 @@ class TestLSPProcessPool:
         for session in sessions:
             await session.shutdown()
 
-    async def test_concurrent_session_usage(
-        self, session_pool, lsp_backend, base_path
-    ):
+    async def test_concurrent_session_usage(self, session_pool, lsp_backend, base_path):
         """Test concurrent session acquisition and usage"""
 
         async def use_session(session_id: int):
@@ -351,9 +349,7 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_pool_exhaustion_fallback(
-        self, session_pool, lsp_backend, base_path
-    ):
+    async def test_pool_exhaustion_fallback(self, session_pool, lsp_backend, base_path):
         """Test that pool exhaustion gracefully falls back to new sessions"""
         # Fill up the pool
         active_sessions = []

@@ -1,6 +1,6 @@
 [project]
 name = "lsp-types"
-version = "0.16.0"
+version = "0.17.0"
 description = "Minimal-dependency Python library for Language Server Protocol types"
 authors = [{ name = "Mazyad Alabduljaleel", email = "mazjaleel@gmail.com" }]
 requires-python = ">=3.12"
@@ -37,6 +37,9 @@ Documentation = "https://github.com/mazyod/lsp-python-types#readme"
 [project.optional-dependencies]
 pyrefly = [
   "pyrefly>=0.32.0",
+]
+ty = [
+  "ty>=0.0.15",
 ]
 
 [dependency-groups]
