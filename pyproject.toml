@@ -41,6 +41,9 @@ pyrefly = [
 ty = [
   "ty>=0.0.15",
 ]
+zuban = [
+  "zuban>=0.7.0",
+]
 
 [dependency-groups]
 dev = [
