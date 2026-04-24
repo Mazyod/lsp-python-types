@@ -142,3 +142,52 @@ def test_zuban_backend_write_config_overwrites_existing_pyproject(tmp_path: Path
     assert parsed == {"tool": {"zuban": {"mode": "default"}}}
     assert "project" not in parsed
     assert "ruff" not in parsed.get("tool", {})
+
+
+def test_zuban_backend_create_process_launch_info_no_flags(tmp_path: Path):
+    """Zuban's server subcommand takes no CLI flags."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    backend = ZubanBackend()
+    proc_info = backend.create_process_launch_info(tmp_path, {})
+    assert proc_info.cmd == ["zuban", "server"]
+    assert proc_info.cwd == tmp_path
+
+
+def test_zuban_backend_requires_file_on_disk_false():
+    """Zuban supports virtual documents (confirmed by smoke test)."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    assert ZubanBackend().requires_file_on_disk() is False
+
+
+def test_zuban_backend_semantic_tokens_legend_none():
+    """Zuban advertises its legend via LSP; no hardcoded legend needed."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    assert ZubanBackend().get_semantic_tokens_legend() is None
+
+
+def test_zuban_backend_lsp_capabilities_parity():
+    """Capability set matches Pyrefly/ty parity (no extended features yet)."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    caps = ZubanBackend().get_lsp_capabilities()
+    td = caps.get("textDocument")
+    assert td is not None
+    assert "publishDiagnostics" in td
+    assert "hover" in td
+    assert "signatureHelp" in td
+    assert "completion" in td
+    assert "definition" in td
+    assert "references" in td
+    assert "rename" in td
+
+
+def test_zuban_backend_workspace_settings_passthrough():
+    """get_workspace_settings wraps the options dict as {settings: options}."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    options: ZubanConfig = {"mode": "default", "untyped_strict_optional": True}
+    settings = ZubanBackend().get_workspace_settings(options)
+    assert settings == {"settings": options}
