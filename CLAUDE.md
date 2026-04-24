@@ -100,6 +100,14 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 - **Known Limitation**: ty requires files to exist on disk (virtual documents not fully supported)
 - **Documentation**: See `KNOWN_LIMITATIONS.md` in the ty package for details
 
+**Zuban Integration (`lsp_types/zuban/`)**
+- `backend.py`: `ZubanBackend` implementation for Zuban LSP server (Rust-based type checker + LSP by the author of Jedi)
+- `config_schema.py`: Zuban configuration types (TypedDict with known fields; arbitrary Mypy-compatible fields pass through)
+- **Key Design**: Uses consolidated `Session` class with `ZubanBackend` for specialization
+- **Config Format**: `pyproject.toml` with `[tool.zuban]` table; snake_case keys (no kebab conversion)
+- **Virtual Documents**: Supported — no on-disk mirroring needed
+- **Documentation**: See `KNOWN_LIMITATIONS.md` in the zuban package for details
+
 ### Type Generation Pipeline
 
 **Schema Sources:**
@@ -114,18 +122,18 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 
 ### Testing Strategy
 
-**Tests are parametrized to run against multiple backends (Pyright, Pyrefly, and ty).**
+**Tests are parametrized to run against multiple backends (Pyright, Pyrefly, ty, and Zuban).**
 
 **Process Pool Tests (`tests/test_pool.py`)**
 - Direct `LSPProcessPool` testing with generic interface
-- Parametrized fixtures for testing Pyright, Pyrefly, and ty backends
+- Parametrized fixtures for testing Pyright, Pyrefly, ty, and Zuban backends
 - Comprehensive pool behavior testing (creation, recycling, limits, cleanup)
 - Performance benchmarks comparing pooled vs non-pooled sessions
 - Concurrent usage scenarios and idle process management
 
 **Session Tests (`tests/test_session.py`)**
 - Core consolidated Session class functionality
-- Parametrized fixtures for testing Pyright, Pyrefly, and ty backends
+- Parametrized fixtures for testing Pyright, Pyrefly, ty, and Zuban backends
 - Integration testing with actual language servers (diagnostics, hover, completion)
 - Dynamic environment testing with temporary directories
 - Backend-agnostic tests that validate common LSP operations
@@ -153,7 +161,7 @@ The `examples/` directory contains demo scripts showing library usage:
 
 - Always prefix test commands with `uv run`
 - **Before committing**: Run tests (`uv run pytest`), type checking (`uvx pyright`), and linting (`uvx ruff check .`) - CI will fail if any have errors
-- Pool tests require `pyright-langserver`, `pyrefly`, and/or `ty` binaries available in PATH
+- Pool tests require `pyright-langserver`, `pyrefly`, `ty`, and/or `zuban` binaries available in PATH
 - Type generation requires Python 3.12+ for modern TypedDict features
 - Generated types should not be manually edited - regenerate from schemas
 - Each backend has a `KNOWN_LIMITATIONS.md` file documenting backend-specific behaviors
