@@ -75,9 +75,10 @@ class Session:
 
         # Capture the server's semantic tokens legend during initialization
         captured_legend: types.SemanticTokensLegend | None = None
+        captured_server_info: types.ServerInfo | None = None
 
         async def create_lsp_process():
-            nonlocal captured_legend
+            nonlocal captured_legend, captured_server_info
 
             proc_info = backend.create_process_launch_info(base_path, options)
             lsp_process = LSPProcess(proc_info)
@@ -104,6 +105,7 @@ class Session:
                 provider = caps.get("semanticTokensProvider")
                 if provider and "legend" in provider:
                     captured_legend = provider["legend"]
+                captured_server_info = init_result.get("serverInfo")
 
             # Send initialized notification (required by LSP spec)
             await lsp_process.notify.initialized({})
@@ -119,7 +121,14 @@ class Session:
             # Use server legend if captured, otherwise fall back to backend's legend
             legend = captured_legend or backend.get_semantic_tokens_legend()
 
-            session = cls(lsp_process, backend, base_path, pool=pool, legend=legend)
+            session = cls(
+                lsp_process,
+                backend,
+                base_path,
+                pool=pool,
+                legend=legend,
+                server_info=captured_server_info,
+            )
 
             # Update settings via didChangeConfiguration
             workspace_settings = backend.get_workspace_settings(options)
@@ -150,6 +159,7 @@ class Session:
         *,
         pool: LSPProcessPool,
         legend: types.SemanticTokensLegend | None = None,
+        server_info: types.ServerInfo | None = None,
     ):
         self._process = lsp_process
         self._backend = backend
@@ -162,6 +172,7 @@ class Session:
         self._file_on_disk = (
             False  # Set to True if file was written for backends that require it
         )
+        self._server_info = server_info
 
         # Semantic tokens normalization
         self._backend_legend = legend
@@ -299,6 +310,11 @@ class Session:
     def backend_legend(self) -> types.SemanticTokensLegend | None:
         """The backend's semantic tokens legend, if available."""
         return self._backend_legend
+
+    @property
+    def server_info(self) -> types.ServerInfo | None:
+        """The server's self-reported name and version from the initialize response."""
+        return self._server_info
 
     # Private methods
 

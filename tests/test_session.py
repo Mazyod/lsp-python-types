@@ -438,6 +438,26 @@ async def test_session_semantic_tokens_canonical_legend_consistency(
     await session.shutdown()
 
 
+async def test_session_server_info(lsp_backend, backend_name, tmp_path: Path):
+    """Test that serverInfo from the initialize response is exposed on the session"""
+    session = await lsp_types.Session.create(
+        lsp_backend, base_path=tmp_path, initial_code="x = 1"
+    )
+
+    server_info = session.server_info
+    assert server_info is not None, (
+        f"{backend_name} should report serverInfo in initialize response"
+    )
+
+    name = server_info.get("name", "")
+    assert name, "serverInfo.name should be a non-empty string"
+    assert backend_name in name.lower(), (
+        f"serverInfo.name ({name!r}) should identify the {backend_name} backend"
+    )
+
+    await session.shutdown()
+
+
 async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
     """Test basic session recycling functionality"""
     pool = LSPProcessPool(max_size=2)
