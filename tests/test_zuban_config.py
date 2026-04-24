@@ -170,11 +170,15 @@ def test_zuban_backend_semantic_tokens_legend_none():
 
 def test_zuban_backend_lsp_capabilities_parity():
     """Capability set matches Pyrefly/ty parity (no extended features yet)."""
+    import typing as t
     from lsp_types.zuban.backend import ZubanBackend
+    from lsp_types import DiagnosticTag, MarkupKind
 
     caps = ZubanBackend().get_lsp_capabilities()
-    td = caps.get("textDocument")
+    td = t.cast(dict, caps.get("textDocument"))
     assert td is not None
+
+    # Top-level keys required for parity.
     assert "publishDiagnostics" in td
     assert "hover" in td
     assert "signatureHelp" in td
@@ -182,6 +186,21 @@ def test_zuban_backend_lsp_capabilities_parity():
     assert "definition" in td
     assert "references" in td
     assert "rename" in td
+
+    # publishDiagnostics structure.
+    pd = t.cast(dict, td["publishDiagnostics"])
+    assert pd["versionSupport"] is True
+    assert pd["tagSupport"]["valueSet"] == [
+        DiagnosticTag.Unnecessary,
+        DiagnosticTag.Deprecated,
+    ]
+
+    # hover structure.
+    hover = t.cast(dict, td["hover"])
+    assert hover["contentFormat"] == [
+        MarkupKind.Markdown,
+        MarkupKind.PlainText,
+    ]
 
 
 def test_zuban_backend_workspace_settings_passthrough():
