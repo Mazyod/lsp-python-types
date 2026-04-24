@@ -319,6 +319,17 @@ class LSPProcess:
             return
         except Exception:
             logger.exception("Client - Error reading stdout")
+        finally:
+            # Server closed the connection (EOF, crash, or task cancel) — reject
+            # any outstanding requests so callers don't await forever.
+            for future in list(self._pending_requests.values()):
+                if not future.done():
+                    future.set_exception(
+                        Error(
+                            types.ErrorCodes.InternalError,
+                            "LSP server closed connection before responding",
+                        )
+                    )
 
     async def _read_stderr(self) -> None:
         """Read and log messages from the server's stderr."""
