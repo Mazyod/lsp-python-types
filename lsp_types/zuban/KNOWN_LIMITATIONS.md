@@ -2,15 +2,15 @@
 
 This document describes known limitations and behavioral differences when using the Zuban backend compared to other LSP backends (Pyright, Pyrefly, ty).
 
-## 1. Config Written to `pyproject.toml` (Overwrite Semantics)
+## 1. Config Written to `pyproject.toml`
 
-**Limitation**: `ZubanBackend.write_config` writes to `pyproject.toml` under `[tool.zuban]`. It does not read, merge, or write `mypy.ini`, `.mypy.ini`, or `setup.cfg`. Any pre-existing content in `pyproject.toml` is replaced.
+**Behavior**: `ZubanBackend.write_config` adds or updates `[tool.zuban]` inside `pyproject.toml`, preserving any existing `[project]` metadata and other `[tool.*]` sections. It does not read, merge, or write `mypy.ini`, `.mypy.ini`, or `setup.cfg`.
 
 **Why `pyproject.toml` and not a dedicated file**: Unlike Pyright (`pyrightconfig.json`), Pyrefly (`pyrefly.toml`), and ty (`ty.toml`), Zuban has no dedicated config file in its native "default" mode. The only way to configure Zuban's PyRight-like mode is via `pyproject.toml`'s `[tool.zuban]` table.
 
 **Why `[tool.zuban]` and not `[tool.mypy]`**: Presence of `[tool.zuban]` puts Zuban into its recommended `default` mode (PyRight-like). `[tool.mypy]` would force the Mypy-compatible mode, which is less capable.
 
-**Impact**: In typical test/session use (`tmp_path` or a fresh directory), the overwrite is a no-op because no prior `pyproject.toml` exists. For embedded use against a real project directory, callers must manage the merge themselves before invoking `write_config`. This overwrite contract is pinned by `test_zuban_backend_write_config_overwrites_existing_pyproject` in `tests/test_zuban_config.py`.
+**Impact**: Re-invoking `write_config` replaces the previous `[tool.zuban]` table in place; nothing else is touched. This is safe even when `base_path` points at a real project root (as happens when `Session.create()` is called with the default `base_path=Path(".")`).
 
 ## 2. Unused `# type: ignore` Comments Not Reported
 

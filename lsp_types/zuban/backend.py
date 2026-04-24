@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import tomli_w
@@ -16,15 +17,24 @@ class ZubanBackend(LSPBackend):
     """Zuban-specific LSP backend implementation."""
 
     def write_config(self, base_path: Path, options: ZubanConfig) -> None:
-        """Write pyproject.toml with a [tool.zuban] table.
+        """Add or update `[tool.zuban]` in `pyproject.toml`, preserving other content.
+
+        Zuban's native-mode config lives under `[tool.zuban]` in `pyproject.toml`
+        — it has no dedicated config file. Because `Session.create()` defaults
+        `base_path=Path(".")`, this method must not destroy a caller's existing
+        `pyproject.toml`: any `[project]` metadata and other `[tool.*]` sections
+        are preserved; only `[tool.zuban]` is added or replaced.
 
         Keys stay snake_case — Zuban's native TOML format uses snake_case directly
         (unlike Pyrefly/ty which use kebab-case). Presence of `[tool.zuban]` puts
         Zuban into its recommended `default` mode.
         """
         config_path = base_path / "pyproject.toml"
-        toml_content = tomli_w.dumps({"tool": {"zuban": dict(options)}})
-        config_path.write_text(toml_content)
+        existing: dict = {}
+        if config_path.exists():
+            existing = tomllib.loads(config_path.read_text())
+        existing.setdefault("tool", {})["zuban"] = dict(options)
+        config_path.write_text(tomli_w.dumps(existing))
 
     def create_process_launch_info(
         self, base_path: Path, options: ZubanConfig

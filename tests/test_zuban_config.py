@@ -99,27 +99,17 @@ def test_zuban_backend_write_config_allows_arbitrary_fields(tmp_path: Path):
     assert zuban["python_version"] == "3.12"
 
 
-def test_zuban_backend_write_config_overwrites_existing_pyproject(tmp_path: Path):
-    """ZubanBackend.write_config intentionally overwrites any existing pyproject.toml.
+def test_zuban_backend_write_config_preserves_existing_pyproject(tmp_path: Path):
+    """ZubanBackend.write_config must not destroy existing pyproject.toml content.
 
-    This is a deliberate design choice, not an oversight:
-
-    - Zuban's native-mode configuration lives under `[tool.zuban]` in
-      pyproject.toml — it has no dedicated config file of its own (unlike
-      Pyright's pyrightconfig.json, Pyrefly's pyrefly.toml, ty's ty.toml).
-    - In typical test/session usage (`tmp_path` or fresh directories), no
-      existing pyproject.toml is present, so the overwrite is a no-op.
-    - Callers who need to preserve existing pyproject.toml content must
-      perform their own merge before invoking this backend.
-
-    This test exists to pin the contract so the behavior isn't silently
-    changed. If a future version of this backend grows merge semantics,
-    delete this test and add one asserting the new behavior. See
-    `lsp_types/zuban/KNOWN_LIMITATIONS.md` for the full rationale.
+    Because `Session.create()` defaults `base_path=Path(".")`, a naive
+    `Session.create(ZubanBackend())` call from a real project root must preserve
+    the user's `[project]` metadata and other `[tool.*]` sections. This test pins
+    the merge contract: everything survives except that `[tool.zuban]` is
+    added/updated in place.
     """
     from lsp_types.zuban.backend import ZubanBackend
 
-    # Simulate an existing pyproject.toml with unrelated content.
     pre_existing = (
         "[project]\n"
         'name = "someone-elses-project"\n'
@@ -135,12 +125,25 @@ def test_zuban_backend_write_config_overwrites_existing_pyproject(tmp_path: Path
     options: ZubanConfig = {"mode": "default"}
     backend.write_config(tmp_path, options)
 
-    # Contract: the file now contains only [tool.zuban]; the previous
-    # [project] and [tool.ruff] sections are gone.
+    # Contract: existing sections survive; [tool.zuban] is added.
     parsed = tomllib.loads(config_path.read_text())
-    assert parsed == {"tool": {"zuban": {"mode": "default"}}}
-    assert "project" not in parsed
-    assert "ruff" not in parsed.get("tool", {})
+    assert parsed["project"]["name"] == "someone-elses-project"
+    assert parsed["project"]["version"] == "1.2.3"
+    assert parsed["tool"]["ruff"]["line-length"] == 88
+    assert parsed["tool"]["zuban"] == {"mode": "default"}
+
+
+def test_zuban_backend_write_config_replaces_existing_zuban_table(tmp_path: Path):
+    """Re-invoking write_config replaces the previous [tool.zuban] table in place."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    backend = ZubanBackend()
+    backend.write_config(tmp_path, {"mode": "mypy", "untyped_strict_optional": False})
+    backend.write_config(tmp_path, {"mode": "default"})
+
+    parsed = tomllib.loads((tmp_path / "pyproject.toml").read_text())
+    # New call wins: mode flipped, prior untyped_strict_optional is gone.
+    assert parsed["tool"]["zuban"] == {"mode": "default"}
 
 
 def test_zuban_backend_create_process_launch_info_no_flags(tmp_path: Path):
