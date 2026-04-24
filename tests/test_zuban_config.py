@@ -32,4 +32,6 @@ def test_zuban_config_accepts_arbitrary_fields_via_cast():
         ZubanConfig,
         cfg | {"strict": True, "disallow_untyped_defs": True, "python_version": "3.12"},
     )
-    assert cfg["strict"] is True  # pyright: ignore[reportTypedDictNotRequiredAccess]
+    assert cfg["strict"] is True  # pyright: ignore[reportGeneralTypeIssues]
+    assert cfg["disallow_untyped_defs"] is True  # pyright: ignore[reportGeneralTypeIssues]
+    assert cfg["python_version"] == "3.12"  # pyright: ignore[reportGeneralTypeIssues]

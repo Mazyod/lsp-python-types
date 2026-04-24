@@ -16,23 +16,23 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 
+# Zuban's two operating modes. `default` is PyRight-like and recommended.
 ZubanMode = Literal["default", "mypy"]
-"""Zuban's two operating modes. `default` is PyRight-like and recommended."""
 
+# Controls how Zuban infers untyped function return types.
+# - `any`: behave like Mypy (return type is `Any`).
+# - `inferred`: infer return types (Zuban default).
+# - `advanced`: more sophisticated inference including parameter types.
 UntypedFunctionReturnMode = Literal["any", "inferred", "advanced"]
-"""Controls how Zuban infers untyped function return types.
-
-- `any`: behave like Mypy (return type is `Any`).
-- `inferred`: infer return types (Zuban default).
-- `advanced`: more sophisticated inference including parameter types.
-"""
 
 
 class Model(TypedDict, total=False):
     """Zuban-specific configuration written under `[tool.zuban]` in pyproject.toml.
 
-    Mypy-compatible options are also accepted as arbitrary fields (not typed
-    here); they pass through to the TOML file unchanged.
+    The typed fields below cover Zuban-specific options. Mypy-compatible options
+    (e.g. `strict`, `disallow_untyped_defs`, `python_version`) are not in the
+    TypedDict, but can be supplied at call sites via `typing.cast` — they pass
+    through to the TOML file unchanged.
     """
 
     mode: NotRequired[ZubanMode]
