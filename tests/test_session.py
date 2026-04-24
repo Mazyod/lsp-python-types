@@ -28,9 +28,10 @@ def backend_name(lsp_backend):
 
 def test_requires_file_on_disk_protocol():
     """Test that requires_file_on_disk returns correct values for each backend"""
-    # Pyright and Pyrefly support virtual documents
+    # Pyright, Pyrefly, and Zuban support virtual documents
     assert PyrightBackend().requires_file_on_disk() is False
     assert PyreflyBackend().requires_file_on_disk() is False
+    assert ZubanBackend().requires_file_on_disk() is False
 
     # ty requires files to exist on disk
     assert TyBackend().requires_file_on_disk() is True
