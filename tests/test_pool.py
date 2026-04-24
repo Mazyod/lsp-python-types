@@ -16,11 +16,12 @@ from lsp_types.pool import LSPProcessPool
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyright.backend import PyrightBackend
 from lsp_types.ty.backend import TyBackend
+from lsp_types.zuban.backend import ZubanBackend
 
 
-@pytest.fixture(params=[PyrightBackend, PyreflyBackend, TyBackend])
+@pytest.fixture(params=[PyrightBackend, PyreflyBackend, TyBackend, ZubanBackend])
 def lsp_backend(request):
-    """Parametrized fixture providing Pyright, Pyrefly, and ty backends"""
+    """Parametrized fixture providing Pyright, Pyrefly, ty, and Zuban backends"""
     return request.param()
 
 
