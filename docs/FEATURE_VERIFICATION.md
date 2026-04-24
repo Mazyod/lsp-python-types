@@ -10,7 +10,7 @@ This document describes how to verify and update the feature support matrix in t
 uv run pytest tests/test_session.py -v
 ```
 
-Tests are parametrized across all backends (Pyright, Pyrefly, ty). Key indicators:
+Tests are parametrized across all backends (Pyright, Pyrefly, ty, Zuban). Key indicators:
 - **PASSED**: Feature works for that backend
 - **XFAIL**: Known limitation, documented with reason
 - **FAILED**: Regression or new issue
@@ -33,6 +33,7 @@ Each backend declares its LSP capabilities in `get_lsp_capabilities()`:
 - `lsp_types/pyright/backend.py`
 - `lsp_types/pyrefly/backend.py`
 - `lsp_types/ty/backend.py`
+- `lsp_types/zuban/backend.py`
 
 Features declared here indicate what the client advertises to the server.
 
@@ -40,6 +41,7 @@ Features declared here indicate what the client advertises to the server.
 
 - [Pyrefly Known Limitations](../lsp_types/pyrefly/KNOWN_LIMITATIONS.md)
 - [ty Known Limitations](../lsp_types/ty/KNOWN_LIMITATIONS.md)
+- [Zuban Known Limitations](../lsp_types/zuban/KNOWN_LIMITATIONS.md)
 
 ## Updating the Feature Table
 
@@ -58,6 +60,7 @@ Update the "Last verified" line in README when re-testing:
 pyright --version      # or basedpyright --version
 pyrefly --version
 ty --version
+zuban --version
 ```
 
 ### Status Symbols

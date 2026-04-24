@@ -184,4 +184,4 @@ The ty backend integration revealed that different LSP servers have varying requ
 2. Shared utilities for common patterns (TOML conversion, base capabilities)
 3. Better documentation of backend-specific behaviors
 
-The core `LSPBackend` protocol and `Session` class work well across all three backends (Pyright, Pyrefly, ty) with minimal backend-specific handling needed in tests.
+The core `LSPBackend` protocol and `Session` class work well across all four backends (Pyright, Pyrefly, ty, Zuban) with minimal backend-specific handling needed in tests.

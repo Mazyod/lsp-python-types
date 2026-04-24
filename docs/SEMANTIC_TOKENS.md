@@ -91,7 +91,7 @@ See `examples/extract_semantic_legends.py` for a complete working example.
 
 ### Pyrefly
 
-> Last verified: Pyrefly 0.51.2
+> Last verified: Pyrefly 0.59.1
 > Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/main/pyrefly/lib/state/semantic_tokens.rs)
 
 Pyrefly does not advertise its legend via LSP initialization, but the token mappings are defined in source code.
@@ -143,7 +143,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ### ty
 
-> Last verified: ty 0.0.15
+> Last verified: ty 0.0.28
 
 #### Token Types
 
@@ -173,6 +173,55 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 | 1 | `readonly` |
 | 2 | `async` |
 | 3 | `documentation` |
+
+---
+
+### Zuban
+
+> Last verified: Zuban 0.7.0
+
+Zuban advertises its legend via LSP initialization (follows LSP 3.17 standard ordering for the 23 token types it emits).
+
+#### Token Types
+
+| Index | Token Type |
+|------:|------------|
+| 0 | `namespace` |
+| 1 | `type` |
+| 2 | `class` |
+| 3 | `enum` |
+| 4 | `interface` |
+| 5 | `struct` |
+| 6 | `typeParameter` |
+| 7 | `parameter` |
+| 8 | `variable` |
+| 9 | `property` |
+| 10 | `enumMember` |
+| 11 | `event` |
+| 12 | `function` |
+| 13 | `method` |
+| 14 | `macro` |
+| 15 | `keyword` |
+| 16 | `modifier` |
+| 17 | `comment` |
+| 18 | `string` |
+| 19 | `number` |
+| 20 | `regexp` |
+| 21 | `operator` |
+| 22 | `decorator` |
+
+#### Token Modifiers
+
+| Bit | Modifier |
+|----:|----------|
+| 0 | `declaration` |
+| 1 | `definition` |
+| 2 | `readonly` |
+| 3 | `static` |
+| 4 | `deprecated` |
+| 5 | `abstract` |
+| 6 | `async` |
+| 7 | `defaultLibrary` |
 
 ---
 
@@ -213,12 +262,12 @@ The library provides a **normalized tokens API** that remaps token indices to a 
 
 Each backend has different legend ordering:
 
-| Token | Pyright Index | Pyrefly Index | ty Index |
-|-------|---------------|---------------|----------|
-| `namespace` | 0 | 0 | 0 |
-| `class` | 2 | 2 | 1 |
-| `variable` | 6 | 8 | 5 |
-| `function` | 9 | 12 | 7 |
+| Token | Pyright Index | Pyrefly Index | ty Index | Zuban Index |
+|-------|---------------|---------------|----------|-------------|
+| `namespace` | 0 | 0 | 0 | 0 |
+| `class` | 2 | 2 | 1 | 2 |
+| `variable` | 6 | 8 | 5 | 8 |
+| `function` | 9 | 12 | 7 | 12 |
 
 A Monaco client configured with one legend breaks when switching backends.
 

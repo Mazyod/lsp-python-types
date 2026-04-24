@@ -63,6 +63,7 @@ The following LSPs are available out of the box:
 - [Pyright](https://github.com/microsoft/pyright)
 - [Pyrefly](https://github.com/facebook/pyrefly)
 - [ty](https://github.com/astral-sh/ty) - Astral's fast Python type checker
+- [Zuban](https://github.com/zubanls/zuban) - Rust-based type checker + LSP by the author of Jedi
 
 ## Feature Support Matrix
 
@@ -77,21 +78,21 @@ The following LSPs are available out of the box:
 
 ### Features by Backend
 
-> Last verified: basedpyright 1.36.2, Pyrefly 0.48.2, ty 0.0.12
+> Last verified: basedpyright 1.36.2, Pyrefly 0.59.1, ty 0.0.28, Zuban 0.7.0
 
-| Feature | Pyright | Pyrefly | ty | Notes |
-|---------|:-------:|:-------:|:--:|-------|
-| Diagnostics | :white_check_mark: | :white_check_mark: | :warning: | ty requires files on disk |
-| Hover | :white_check_mark: | :white_check_mark: | :white_check_mark: | ty shows type only, not variable name |
-| Completion | :white_check_mark: | :white_check_mark: | :warning: | ty requires files on disk |
-| Completion Resolution | :white_check_mark: | :x: | :white_check_mark: | Pyrefly: not yet supported |
-| Signature Help | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| Rename | :white_check_mark: | :warning: | :warning: | Pyrefly: disabled for external files; ty: requires files on disk |
-| Semantic Tokens | :white_check_mark:\* | :white_check_mark:\*\* | :white_check_mark: | \*basedpyright recommended; \*\*Pyrefly: legend not advertised (see docs) |
-| Go to Definition | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
-| Find References | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
-| Code Actions | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
-| Formatting | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+| Feature | Pyright | Pyrefly | ty | Zuban | Notes |
+|---------|:-------:|:-------:|:--:|:-----:|-------|
+| Diagnostics | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty requires files on disk |
+| Hover | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | ty shows type only, not variable name |
+| Completion | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty requires files on disk |
+| Completion Resolution | :white_check_mark: | :x: | :white_check_mark: | :white_check_mark: | Pyrefly: not yet supported |
+| Signature Help | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
+| Rename | :white_check_mark: | :warning: | :warning: | :white_check_mark: | Pyrefly: disabled for external files; ty: requires files on disk |
+| Semantic Tokens | :white_check_mark:\* | :white_check_mark:\*\* | :white_check_mark: | :white_check_mark: | \*basedpyright recommended; \*\*Pyrefly: legend not advertised (see docs) |
+| Go to Definition | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+| Find References | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+| Code Actions | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
+| Formatting | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
 
 > See [Feature Verification Guide](docs/FEATURE_VERIFICATION.md) for methodology on maintaining this table.
 
@@ -99,6 +100,7 @@ For detailed documentation:
 - [Semantic Tokens Reference](docs/SEMANTIC_TOKENS.md) - Token types and modifiers for Monaco/editor integration
 - [Pyrefly Known Limitations](lsp_types/pyrefly/KNOWN_LIMITATIONS.md)
 - [ty Known Limitations](lsp_types/ty/KNOWN_LIMITATIONS.md)
+- [Zuban Known Limitations](lsp_types/zuban/KNOWN_LIMITATIONS.md)
 
 ### Pyright Example
 

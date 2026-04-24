@@ -27,6 +27,7 @@ from lsp_types.process import LSPProcess
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyright.backend import PyrightBackend
 from lsp_types.ty.backend import TyBackend
+from lsp_types.zuban.backend import ZubanBackend
 
 # Suppress LSP server stderr output (info/warning messages)
 logging.getLogger("lsp-types").setLevel(logging.CRITICAL)
@@ -154,6 +155,7 @@ async def main() -> None:
             ("Pyright (basedpyright)", PyrightBackend()),
             ("Pyrefly", PyreflyBackend()),
             ("ty", TyBackend()),
+            ("Zuban", ZubanBackend()),
         ]
 
         legends = []
