@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tomllib
 import typing as t
+from pathlib import Path
 
 from lsp_types.zuban.config_schema import Model as ZubanConfig
 
@@ -35,10 +37,6 @@ def test_zuban_config_accepts_arbitrary_fields_via_cast():
     assert cfg["strict"] is True  # pyright: ignore[reportGeneralTypeIssues]
     assert cfg["disallow_untyped_defs"] is True  # pyright: ignore[reportGeneralTypeIssues]
     assert cfg["python_version"] == "3.12"  # pyright: ignore[reportGeneralTypeIssues]
-
-
-import tomllib
-from pathlib import Path
 
 
 def test_zuban_backend_write_config_creates_pyproject_toml(tmp_path: Path):
@@ -90,7 +88,8 @@ def test_zuban_backend_write_config_allows_arbitrary_fields(tmp_path: Path):
     options: ZubanConfig = {"mode": "default"}
     options = t.cast(
         ZubanConfig,
-        options | {"strict": True, "disallow_untyped_defs": True, "python_version": "3.12"},
+        options
+        | {"strict": True, "disallow_untyped_defs": True, "python_version": "3.12"},
     )
     backend.write_config(tmp_path, options)
 
@@ -122,12 +121,12 @@ def test_zuban_backend_write_config_overwrites_existing_pyproject(tmp_path: Path
 
     # Simulate an existing pyproject.toml with unrelated content.
     pre_existing = (
-        '[project]\n'
+        "[project]\n"
         'name = "someone-elses-project"\n'
         'version = "1.2.3"\n'
-        '\n'
-        '[tool.ruff]\n'
-        'line-length = 88\n'
+        "\n"
+        "[tool.ruff]\n"
+        "line-length = 88\n"
     )
     config_path = tmp_path / "pyproject.toml"
     config_path.write_text(pre_existing)
