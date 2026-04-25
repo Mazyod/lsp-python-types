@@ -174,6 +174,73 @@ class FailingBackend:
     def requires_file_on_disk(self) -> bool:
         return False
 
+    def consumes_did_change_configuration(self) -> bool:
+        return True
+
+
+class MockBackend:
+    """Backend that talks to the mock LSP server, with a configurable predicate."""
+
+    def __init__(self, *, consumes_config: bool):
+        self._consumes_config = consumes_config
+
+    def write_config(self, base_path: Path, options: dict) -> None:
+        return None
+
+    def create_process_launch_info(
+        self, base_path: Path, options: dict
+    ) -> ProcessLaunchInfo:
+        return ProcessLaunchInfo(cmd=get_mock_server_cmd())
+
+    def get_lsp_capabilities(self) -> types.ClientCapabilities:
+        return {}
+
+    def get_workspace_settings(
+        self, options: dict
+    ) -> types.DidChangeConfigurationParams:
+        return {"settings": {}}
+
+    def get_semantic_tokens_legend(self) -> types.SemanticTokensLegend | None:
+        return None
+
+    def requires_file_on_disk(self) -> bool:
+        return False
+
+    def consumes_did_change_configuration(self) -> bool:
+        return self._consumes_config
+
+
+async def _capture_session_notifications(
+    backend: MockBackend, tmp_path: Path
+) -> list[str]:
+    """Run Session.create against `backend` and return the methods it notified."""
+    captured: list[str] = []
+    real_send = LSPProcess._send_notification
+
+    async def recording_send(self, method: str, params):  # type: ignore[no-untyped-def]
+        captured.append(method)
+        return await real_send(self, method, params)
+
+    with patch.object(LSPProcess, "_send_notification", recording_send):
+        session = await Session.create(
+            backend, base_path=tmp_path, initial_code="x = 1"
+        )
+        await session.shutdown()
+    return captured
+
+
+async def test_did_change_configuration_gate(tmp_path: Path):
+    """The notification is sent iff the backend predicate returns True."""
+    sent = await _capture_session_notifications(
+        MockBackend(consumes_config=True), tmp_path
+    )
+    assert "workspace/didChangeConfiguration" in sent
+
+    skipped = await _capture_session_notifications(
+        MockBackend(consumes_config=False), tmp_path
+    )
+    assert "workspace/didChangeConfiguration" not in skipped
+
 
 async def test_session_create_releases_process_on_failure(tmp_path: Path):
     """Test that Session.create releases the process back to the pool when initialization fails."""

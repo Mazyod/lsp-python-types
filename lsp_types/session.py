@@ -45,6 +45,16 @@ class LSPBackend[TConfig: t.Mapping](t.Protocol):
         """
         ...
 
+    def consumes_did_change_configuration(self) -> bool:
+        """Return True if this backend consumes workspace/didChangeConfiguration.
+
+        Backends that configure themselves exclusively from on-disk config files
+        (e.g. Zuban reads `[tool.zuban]` from `pyproject.toml`) ignore this
+        notification and may log it as an unhandled-notification error. Override
+        to False on those backends to suppress the notification at the source.
+        """
+        return True
+
 
 @dc.dataclass(kw_only=True)
 class DiagnosticsResult:
@@ -131,10 +141,11 @@ class Session:
             )
 
             # Update settings via didChangeConfiguration
-            workspace_settings = backend.get_workspace_settings(options)
-            await lsp_process.notify.workspace_did_change_configuration(
-                workspace_settings
-            )
+            if backend.consumes_did_change_configuration():
+                workspace_settings = backend.get_workspace_settings(options)
+                await lsp_process.notify.workspace_did_change_configuration(
+                    workspace_settings
+                )
 
             # Write file to disk if backend requires it (e.g., ty)
             if backend.requires_file_on_disk():

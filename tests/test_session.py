@@ -37,6 +37,18 @@ def test_requires_file_on_disk_protocol():
     assert TyBackend().requires_file_on_disk() is True
 
 
+def test_consumes_did_change_configuration_protocol():
+    """Each backend declares whether it consumes workspace/didChangeConfiguration."""
+    # Pyright, Pyrefly, and ty consume the notification (default).
+    assert PyrightBackend().consumes_did_change_configuration() is True
+    assert PyreflyBackend().consumes_did_change_configuration() is True
+    assert TyBackend().consumes_did_change_configuration() is True
+
+    # Zuban configures itself from pyproject.toml and would log an
+    # unhandled-notification error if we sent it.
+    assert ZubanBackend().consumes_did_change_configuration() is False
+
+
 async def test_ty_file_written_to_disk(tmp_path: Path):
     """Test that ty backend automatically writes file to disk"""
     backend = TyBackend()

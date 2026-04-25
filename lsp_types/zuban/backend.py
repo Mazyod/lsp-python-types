@@ -80,3 +80,8 @@ class ZubanBackend(LSPBackend):
     def requires_file_on_disk(self) -> bool:
         # Confirmed in smoke test: virtual documents (didOpen without disk file) work.
         return False
+
+    def consumes_did_change_configuration(self) -> bool:
+        # Zuban reads `[tool.zuban]` from pyproject.toml; the notification is
+        # logged as an unhandled-notification error otherwise.
+        return False
