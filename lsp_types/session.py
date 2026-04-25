@@ -288,13 +288,23 @@ class Session:
             {"textDocument": {"uri": self._document_uri}, "position": position}
         )
 
-    async def get_completion(
-        self, position: types.Position
-    ) -> types.CompletionList | list[types.CompletionItem] | None:
-        """Get completion items at the given position"""
-        return await self._process.send.completion(
+    async def get_completion(self, position: types.Position) -> types.CompletionList:
+        """Get completion items at the given position.
+
+        The LSP spec lets servers reply with a ``CompletionList``, a bare
+        ``CompletionItem[]``, or ``null``; this method normalizes all three to
+        a ``CompletionList`` so callers always work against the same shape.
+        ``null`` and a bare list both map to ``isIncomplete: False`` (the spec
+        treats them as complete result sets — empty and given, respectively).
+        """
+        result = await self._process.send.completion(
             {"textDocument": {"uri": self._document_uri}, "position": position}
         )
+        if result is None:
+            return {"items": [], "isIncomplete": False}
+        if isinstance(result, list):
+            return {"items": result, "isIncomplete": False}
+        return result
 
     async def resolve_completion(
         self, completion_item: types.CompletionItem

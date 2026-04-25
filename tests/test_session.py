@@ -1,6 +1,7 @@
 import time
 import typing as t
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -9,6 +10,7 @@ from lsp_types.pool import LSPProcessPool
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.session import Session
 from lsp_types.ty.backend import TyBackend
 from lsp_types.ty.config_schema import Model as TyConfig
 from lsp_types.zuban.backend import ZubanBackend
@@ -35,6 +37,32 @@ def test_requires_file_on_disk_protocol():
 
     # ty requires files to exist on disk
     assert TyBackend().requires_file_on_disk() is True
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        (None, {"items": [], "isIncomplete": False}),
+        (
+            [{"label": "foo"}, {"label": "bar"}],
+            {"items": [{"label": "foo"}, {"label": "bar"}], "isIncomplete": False},
+        ),
+        (
+            {"items": [{"label": "baz"}], "isIncomplete": True},
+            {"items": [{"label": "baz"}], "isIncomplete": True},
+        ),
+    ],
+    ids=["none", "bare_list", "completion_list_passthrough"],
+)
+async def test_get_completion_normalizes_response_shape(raw, expected):
+    """Session normalizes all three LSP-spec completion shapes to CompletionList."""
+    session = Session.__new__(Session)
+    session._document_uri = "file:///doesnt-matter.py"
+    session._process = MagicMock()
+    session._process.send.completion = AsyncMock(return_value=raw)
+
+    result = await session.get_completion(lsp_types.Position(line=0, character=0))
+    assert result == expected
 
 
 def test_consumes_did_change_configuration_protocol():
@@ -344,18 +372,16 @@ obj.
         lsp_backend, base_path=tmp_path, initial_code=code
     )
 
-    # Get completions after the dot
+    # Get completions after the dot — Session normalizes every backend's
+    # response to a CompletionList regardless of the underlying server's shape.
     completions = await session.get_completion(lsp_types.Position(line=5, character=4))
-    assert completions is not None
-
-    # Should be either a CompletionList or list of CompletionItem
-    if isinstance(completions, dict):
-        items = completions.get("items", [])
-    else:
-        items = completions
+    assert "items" in completions
+    assert "isIncomplete" in completions
 
     # Find my_method in completions
-    method_items = [item for item in items if item.get("label") == "my_method"]
+    method_items = [
+        item for item in completions["items"] if item.get("label") == "my_method"
+    ]
     assert len(method_items) > 0, "my_method not found in completion items"
 
     # Resolve a completion item for more details
