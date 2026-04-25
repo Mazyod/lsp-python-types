@@ -113,3 +113,7 @@ class TyBackend(LSPBackend):
     def requires_file_on_disk(self) -> bool:
         """ty requires files to exist on disk for analysis."""
         return True
+
+    def consumes_did_change_configuration(self) -> bool:
+        """ty reads ``ty.toml`` from disk; it logs the notification as unhandled."""
+        return False

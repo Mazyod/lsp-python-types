@@ -19,14 +19,14 @@ This is handled transparently - no user action required.
 
 **Limitation**: ty does not handle the `workspace/didChangeConfiguration` notification.
 
-**Behavior**: ty logs a warning:
+**Behavior**: ty would log a warning if the notification were sent:
 ```
 WARN Received notification workspace/didChangeConfiguration which does not have a handler.
 ```
 
 **Impact**: Runtime configuration changes via LSP notifications are ignored. However, configuration written to `ty.toml` before session creation is respected.
 
-**Workaround**: Ensure all configuration is set in `ty.toml` via the `options` parameter when creating a session. If configuration needs to change, create a new session.
+**Resolution**: `TyBackend` implements `consumes_did_change_configuration() -> False`, so `Session.create()` skips the notification entirely — the warning above no longer appears in stderr. All configuration must still be set in `ty.toml` via the `options` parameter when creating a session; to change configuration at runtime, create a new session.
 
 ## 3. Hover Format Differs
 

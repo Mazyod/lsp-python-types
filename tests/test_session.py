@@ -67,13 +67,13 @@ async def test_get_completion_normalizes_response_shape(raw, expected):
 
 def test_consumes_did_change_configuration_protocol():
     """Each backend declares whether it consumes workspace/didChangeConfiguration."""
-    # Pyright, Pyrefly, and ty consume the notification (default).
+    # Pyright and Pyrefly consume the notification (default).
     assert PyrightBackend().consumes_did_change_configuration() is True
     assert PyreflyBackend().consumes_did_change_configuration() is True
-    assert TyBackend().consumes_did_change_configuration() is True
 
-    # Zuban configures itself from pyproject.toml and would log an
-    # unhandled-notification error if we sent it.
+    # ty (ty.toml) and Zuban (pyproject.toml) configure themselves from disk
+    # and would log the notification as unhandled if we sent it.
+    assert TyBackend().consumes_did_change_configuration() is False
     assert ZubanBackend().consumes_did_change_configuration() is False
 
 
