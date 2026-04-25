@@ -185,7 +185,8 @@ result = greet("world")
     )
 
     # Hover over the function name
-    hover_info = await session.get_hover_info(lsp_types.Position(line=0, character=4))
+    fn_position = lsp_types.Position(line=0, character=4)
+    hover_info = await session.get_hover_info(fn_position)
     assert hover_info is not None
 
     contents = hover_info.get("contents")
@@ -194,9 +195,15 @@ result = greet("world")
     hover_text = contents.get("value", "")
     assert "greet" in hover_text
     assert "str" in hover_text
+    # Every backend must surface a range — synthesized to a zero-width range
+    # at the request position when the backend itself omits it (Pyrefly).
+    assert "range" in hover_info
+    if backend_name == "pyrefly":
+        assert hover_info["range"] == {"start": fn_position, "end": fn_position}
 
     # Hover over the variable
-    hover_info = await session.get_hover_info(lsp_types.Position(line=3, character=0))
+    var_position = lsp_types.Position(line=3, character=0)
+    hover_info = await session.get_hover_info(var_position)
     assert hover_info is not None
 
     contents = hover_info.get("contents")
@@ -207,6 +214,11 @@ result = greet("world")
     if backend_name != "ty":
         assert "result" in hover_text
     assert "str" in hover_text
+    assert "range" in hover_info
+
+    # On Pyrefly the range is the synthesized fallback at the request position.
+    if backend_name == "pyrefly":
+        assert hover_info["range"] == {"start": var_position, "end": var_position}
 
     await session.shutdown()
 

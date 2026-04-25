@@ -253,10 +253,20 @@ class Session:
         return diagnostics
 
     async def get_hover_info(self, position: types.Position) -> types.Hover | None:
-        """Get hover information at the given position"""
-        return await self._process.send.hover(
+        """Get hover information at the given position.
+
+        If the backend omits ``range`` (Pyrefly does), it is synthesized as a
+        zero-width range at the request position so callers can rely on the
+        field being present. The synthesized range marks the request position,
+        not the symbol extent — consumers that need the symbol's actual span
+        must compute it themselves.
+        """
+        hover = await self._process.send.hover(
             {"textDocument": {"uri": self._document_uri}, "position": position}
         )
+        if hover is not None and "range" not in hover:
+            hover["range"] = {"start": position, "end": position}
+        return hover
 
     async def get_rename_edits(
         self, position: types.Position, new_name: str
