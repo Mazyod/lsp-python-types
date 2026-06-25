@@ -232,8 +232,7 @@ class MessageType(IntEnum):
     Debug = 5
     """A debug message.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class TextDocumentSyncKind(IntEnum):
@@ -391,8 +390,7 @@ class CodeActionKind(StrEnum):
     - Move method to base class
     - ...
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     RefactorRewrite = "refactor.rewrite"
     """Base kind for refactoring rewrite actions: 'refactor.rewrite'
 
@@ -469,11 +467,9 @@ class LanguageKind(StrEnum):
     CSharp = "csharp"
     CSS = "css"
     D = "d"
-    """@since 3.18.0
-    @proposed"""
+    """@since 3.18.0"""
     Delphi = "pascal"
-    """@since 3.18.0
-    @proposed"""
+    """@since 3.18.0"""
     Diff = "diff"
     Dart = "dart"
     Dockerfile = "dockerfile"
@@ -481,7 +477,7 @@ class LanguageKind(StrEnum):
     Erlang = "erlang"
     FSharp = "fsharp"
     GitCommit = "git-commit"
-    GitRebase = "rebase"
+    GitRebase = "git-rebase"
     Go = "go"
     Groovy = "groovy"
     Handlebars = "handlebars"
@@ -500,11 +496,11 @@ class LanguageKind(StrEnum):
     ObjectiveC = "objective-c"
     ObjectiveCPP = "objective-cpp"
     Pascal = "pascal"
-    """@since 3.18.0
-    @proposed"""
+    """@since 3.18.0"""
     Perl = "perl"
     Perl6 = "perl6"
     PHP = "php"
+    Plaintext = "plaintext"
     Powershell = "powershell"
     Pug = "jade"
     Python = "python"
@@ -531,8 +527,7 @@ class LanguageKind(StrEnum):
 class InlineCompletionTriggerKind(IntEnum):
     """Describes how an {@link InlineCompletionItemProvider inline completion provider} was triggered.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     Invoked = 1
     """Completion was triggered explicitly by a user gesture."""
@@ -783,6 +778,25 @@ pull request.
 
 @since 3.17.0"""
 
+DocumentDiagnosticReportProgress = Union[
+    "DocumentDiagnosticReport", "DocumentDiagnosticReportPartialResult"
+]
+"""The document diagnostic report used when reporting partial result.
+
+When using partial results, the first literal sent needs to be a
+DocumentDiagnosticReport providing the diagnostics on the document
+followed by n DocumentDiagnosticReportPartialResult literals providing
+the diagnostics for related documents.
+
+```
+DocumentDiagnosticReport
+DocumentDiagnosticReportPartialResult
+DocumentDiagnosticReportPartialResult
+...
+```
+
+@since 3.18.1"""
+
 PrepareRenameResult = Union[
     "Range", "PrepareRenamePlaceholder", "PrepareRenameDefaultBehavior"
 ]
@@ -852,7 +866,7 @@ the {@link TextDocument.languageId language}, the {@link Uri.scheme scheme} of
 its resource, or a glob-pattern that is applied to the {@link TextDocument.fileName path}.
 
 Glob patterns can have the following syntax:
-- `*` to match one or more characters in a path segment
+- `*` to match zero or more characters in a path segment
 - `?` to match on one character in a path segment
 - `**` to match any number of path segments, including none
 - `{}` to group sub patterns into an OR expression. (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
@@ -877,7 +891,7 @@ against the notebook's URI (same as with documents)
 
 Pattern = str
 """The glob pattern to watch relative to the base path. Glob patterns can have the following syntax:
-- `*` to match one or more characters in a path segment
+- `*` to match zero or more characters in a path segment
 - `?` to match on one character in a path segment
 - `**` to match any number of path segments, including none
 - `{}` to group conditions (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
@@ -1607,9 +1621,9 @@ class InlineValueParams(TypedDict):
     textDocument: "TextDocumentIdentifier"
     """The text document."""
     range: "Range"
-    """The document range for which inline values should be computed."""
+    """The document range for which inline values information will be returned."""
     context: "InlineValueContext"
-    """Additional information about the context in which inline values were
+    """Additional information about the context in which inline values information was
     requested."""
     workDoneToken: NotRequired["ProgressToken"]
     """An optional token that a server can use to report work done progress."""
@@ -1716,17 +1730,6 @@ class DocumentDiagnosticParams(TypedDict):
     partialResultToken: NotRequired["ProgressToken"]
     """An optional token that a server can use to report partial results (e.g. streaming) to
     the client."""
-
-
-class DocumentDiagnosticReportPartialResult(TypedDict):
-    """A partial result for a document diagnostic report.
-
-    @since 3.17.0"""
-
-    relatedDocuments: Mapping[
-        "DocumentUri",
-        Union["FullDocumentDiagnosticReport", "UnchangedDocumentDiagnosticReport"],
-    ]
 
 
 class DiagnosticServerCancellationData(TypedDict):
@@ -1872,8 +1875,7 @@ class DidCloseNotebookDocumentParams(TypedDict):
 class InlineCompletionParams(TypedDict):
     """A parameter literal used in inline completion requests.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     context: "InlineCompletionContext"
     """Additional information about the context in which inline completions were
@@ -1889,8 +1891,7 @@ class InlineCompletionParams(TypedDict):
 class InlineCompletionList(TypedDict):
     """Represents a collection of {@link InlineCompletionItem inline completion items} to be presented in the editor.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     items: list["InlineCompletionItem"]
     """The inline completion items"""
@@ -1899,8 +1900,7 @@ class InlineCompletionList(TypedDict):
 class InlineCompletionItem(TypedDict):
     """An inline completion item represents a text snippet that is proposed inline to complete text that is being typed.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     insertText: Union[str, "StringValue"]
     """The text to replace the range with. Must be set."""
@@ -1915,8 +1915,7 @@ class InlineCompletionItem(TypedDict):
 class InlineCompletionRegistrationOptions(TypedDict):
     """Inline completion options used during static or dynamic registration.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     documentSelector: Union["DocumentSelector", None]
     """A document selector to identify the scope of the registration. If set to null
@@ -1929,8 +1928,7 @@ class InlineCompletionRegistrationOptions(TypedDict):
 class TextDocumentContentParams(TypedDict):
     """Parameters for the `workspace/textDocumentContent` request.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     uri: "DocumentUri"
     """The uri of the text document."""
@@ -1939,8 +1937,7 @@ class TextDocumentContentParams(TypedDict):
 class TextDocumentContentResult(TypedDict):
     """Result of the `workspace/textDocumentContent` request.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     text: str
     """The text content of the text document. Please note, that the content of
@@ -1952,8 +1949,7 @@ class TextDocumentContentResult(TypedDict):
 class TextDocumentContentRegistrationOptions(TypedDict):
     """Text document content provider registration options.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     schemes: list[str]
     """The schemes for which the server provides content."""
@@ -1965,8 +1961,7 @@ class TextDocumentContentRegistrationOptions(TypedDict):
 class TextDocumentContentRefreshParams(TypedDict):
     """Parameters for the `workspace/textDocumentContent/refresh` request.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     uri: "DocumentUri"
     """The uri of the text document to refresh."""
@@ -2507,7 +2502,10 @@ class SignatureHelp(TypedDict):
 
     In future version of the protocol this property might become
     mandatory (but still nullable) to better express the active parameter if
-    the active signature does have any."""
+    the active signature does have any.
+
+    Since version 3.16.0 the `SignatureInformation` itself provides a
+    `activeParameter` property and it should be used instead of this one."""
 
 
 class SignatureHelpRegistrationOptions(TypedDict):
@@ -2722,8 +2720,7 @@ class Command(TypedDict):
     tooltip: NotRequired[str]
     """An optional tooltip.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     command: str
     """The identifier of the actual command handler."""
     arguments: NotRequired[list["LSPAny"]]
@@ -2811,8 +2808,7 @@ class CodeActionRegistrationOptions(TypedDict):
 
     At most one documentation entry should be shown per provider.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     resolveProvider: NotRequired[bool]
     """The server provides support to resolve additional
     information for a code action.
@@ -3002,15 +2998,13 @@ class DocumentRangeFormattingRegistrationOptions(TypedDict):
     rangesSupport: NotRequired[bool]
     """Whether the server supports formatting multiple ranges at once.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class DocumentRangesFormattingParams(TypedDict):
     """The parameters of a {@link DocumentRangesFormattingRequest}.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     textDocument: "TextDocumentIdentifier"
     """The document to format."""
@@ -3118,8 +3112,7 @@ class ApplyWorkspaceEditParams(TypedDict):
     metadata: NotRequired["WorkspaceEditMetadata"]
     """Additional data about the edit.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class ApplyWorkspaceEditResult(TypedDict):
@@ -3563,7 +3556,7 @@ class InlineValueContext(TypedDict):
 
 
 class InlineValueText(TypedDict):
-    """Provide inline value as text.
+    """Returns inline value information as the complete text to be shown.
 
     @since 3.17.0"""
 
@@ -3574,15 +3567,21 @@ class InlineValueText(TypedDict):
 
 
 class InlineValueVariableLookup(TypedDict):
-    """Provide inline value through a variable lookup.
-    If only a range is specified, the variable name will be extracted from the underlying document.
-    An optional variable name can be used to override the extracted name.
+    """To compute inline value through a variable lookup.
+
+    If only a range is specified, the variable name should
+    be extracted from the underlying document.
+
+    An optional variable name could be used to lookup instead
+    of the extracted name.
 
     @since 3.17.0"""
 
     range: "Range"
     """The document range for which the inline value applies.
-    The range is used to extract the variable name from the underlying document."""
+
+    The range could be used to extract the variable name
+    from the underlying document."""
     variableName: NotRequired[str]
     """If specified the name of the variable to look up."""
     caseSensitiveLookup: bool
@@ -3590,17 +3589,23 @@ class InlineValueVariableLookup(TypedDict):
 
 
 class InlineValueEvaluatableExpression(TypedDict):
-    """Provide an inline value through an expression evaluation.
-    If only a range is specified, the expression will be extracted from the underlying document.
-    An optional expression can be used to override the extracted expression.
+    """To compute an inline value through an expression evaluation.
+
+    If only a range is specified, the expression should be
+    extracted from the underlying document.
+
+    An optional expression could be evaluated instead of
+    the extracted expression.
 
     @since 3.17.0"""
 
     range: "Range"
     """The document range for which the inline value applies.
-    The range is used to extract the evaluatable expression from the underlying document."""
+
+    The range could be used to extract the evaluatable expression
+    from the underlying document."""
     expression: NotRequired[str]
-    """If specified the expression overrides the extracted expression."""
+    """If specified the expression could be evaluated instead."""
 
 
 class InlineValueOptions(TypedDict):
@@ -3739,35 +3744,15 @@ class RelatedUnchangedDocumentDiagnosticReport(TypedDict):
     diagnostic request for the same document."""
 
 
-class FullDocumentDiagnosticReport(TypedDict):
-    """A diagnostic report with a full set of problems.
+class DocumentDiagnosticReportPartialResult(TypedDict):
+    """A partial result for a document diagnostic report.
 
     @since 3.17.0"""
 
-    kind: Literal["full"]
-    """A full document diagnostic report."""
-    resultId: NotRequired[str]
-    """An optional result id. If provided it will
-    be sent on the next diagnostic request for the
-    same document."""
-    items: list["Diagnostic"]
-    """The actual items."""
-
-
-class UnchangedDocumentDiagnosticReport(TypedDict):
-    """A diagnostic report indicating that the last returned
-    report is still accurate.
-
-    @since 3.17.0"""
-
-    kind: Literal["unchanged"]
-    """A document diagnostic report indicating
-    no changes to the last result. A server can
-    only return `unchanged` if result ids are
-    provided."""
-    resultId: str
-    """A result id which will be sent on the next
-    diagnostic request for the same document."""
+    relatedDocuments: Mapping[
+        "DocumentUri",
+        Union["FullDocumentDiagnosticReport", "UnchangedDocumentDiagnosticReport"],
+    ]
 
 
 class DiagnosticOptions(TypedDict):
@@ -3896,8 +3881,7 @@ class NotebookDocumentIdentifier(TypedDict):
 class InlineCompletionContext(TypedDict):
     """Provides information about the context in which an inline completion was requested.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     triggerKind: "InlineCompletionTriggerKind"
     """Describes how the inline completion was triggered."""
@@ -3914,8 +3898,7 @@ class StringValue(TypedDict):
     the end of the snippet. Variables are defined with `$name` and
     `${name:default value}`.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     kind: Literal["snippet"]
     """The kind of string value."""
@@ -3926,8 +3909,7 @@ class StringValue(TypedDict):
 class InlineCompletionOptions(TypedDict):
     """Inline completion options used during static registration.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     workDoneProgress: NotRequired[bool]
 
@@ -3935,8 +3917,7 @@ class InlineCompletionOptions(TypedDict):
 class TextDocumentContentOptions(TypedDict):
     """Text document content provider options.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     schemes: list[str]
     """The schemes for which the server provides content."""
@@ -4116,8 +4097,7 @@ class ServerCapabilities(TypedDict):
     inlineCompletionProvider: NotRequired[Union[bool, "InlineCompletionOptions"]]
     """Inline completion options used during static registration.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     workspace: NotRequired["WorkspaceOptions"]
     """Workspace specific server capabilities."""
     experimental: NotRequired["LSPAny"]
@@ -4193,8 +4173,11 @@ class Diagnostic(TypedDict):
     """A human-readable string describing the source of this
     diagnostic, e.g. 'typescript' or 'super lint'. It usually
     appears in the user interface."""
-    message: str
-    """The diagnostic's message. It usually appears in the user interface"""
+    message: Union[str, "MarkupContent"]
+    """The diagnostic's message. It usually appears in the user interface.
+
+    @since 3.18.0 - support for MarkupContent. This is guarded by the client
+    capability `textDocument.diagnostic.markupMessageSupport`."""
     tags: NotRequired[list["DiagnosticTag"]]
     """Additional metadata about the diagnostic.
 
@@ -4556,8 +4539,7 @@ class CodeActionOptions(TypedDict):
 
     At most one documentation entry should be shown per provider.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     resolveProvider: NotRequired[bool]
     """The server provides support to resolve additional
     information for a code action.
@@ -4634,8 +4616,7 @@ class DocumentRangeFormattingOptions(TypedDict):
     rangesSupport: NotRequired[bool]
     """Whether the server supports formatting multiple ranges at once.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     workDoneProgress: NotRequired[bool]
 
 
@@ -4682,8 +4663,7 @@ class ExecuteCommandOptions(TypedDict):
 class WorkspaceEditMetadata(TypedDict):
     """Additional data about a workspace edit.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     isRefactoring: NotRequired[bool]
     """Signal to the editor that this edit is a refactoring."""
@@ -4738,8 +4718,7 @@ class AnnotatedTextEdit(TypedDict):
 class SnippetTextEdit(TypedDict):
     """An interactive text edit.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     range: "Range"
     """The range of the text document to be manipulated."""
@@ -4795,7 +4774,7 @@ class FileOperationPattern(TypedDict):
 
     glob: str
     """The glob pattern to match. Glob patterns can have the following syntax:
-    - `*` to match one or more characters in a path segment
+    - `*` to match zero or more characters in a path segment
     - `?` to match on one character in a path segment
     - `**` to match any number of path segments, including none
     - `{}` to group sub patterns into an OR expression. (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
@@ -4807,6 +4786,37 @@ class FileOperationPattern(TypedDict):
     Matches both if undefined."""
     options: NotRequired["FileOperationPatternOptions"]
     """Additional options used during matching."""
+
+
+class FullDocumentDiagnosticReport(TypedDict):
+    """A diagnostic report with a full set of problems.
+
+    @since 3.17.0"""
+
+    kind: Literal["full"]
+    """A full document diagnostic report."""
+    resultId: NotRequired[str]
+    """An optional result id. If provided it will
+    be sent on the next diagnostic request for the
+    same document."""
+    items: list["Diagnostic"]
+    """The actual items."""
+
+
+class UnchangedDocumentDiagnosticReport(TypedDict):
+    """A diagnostic report indicating that the last returned
+    report is still accurate.
+
+    @since 3.17.0"""
+
+    kind: Literal["unchanged"]
+    """A document diagnostic report indicating
+    no changes to the last result. A server can
+    only return `unchanged` if result ids are
+    provided."""
+    resultId: str
+    """A result id which will be sent on the next
+    diagnostic request for the same document."""
 
 
 class WorkspaceFullDocumentDiagnosticReport(TypedDict):
@@ -4912,8 +4922,7 @@ class NotebookDocumentCellChanges(TypedDict):
 class SelectedCompletionInfo(TypedDict):
     """Describes the currently selected completion item.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     range: "Range"
     """The range that will be replaced if this completion item is accepted."""
@@ -4990,8 +4999,7 @@ class WorkspaceOptions(TypedDict):
     ]
     """The server supports the `workspace/textDocumentContent` request.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class TextDocumentContentChangePartial(TypedDict):
@@ -5087,8 +5095,7 @@ class ParameterInformation(TypedDict):
 class CodeActionKindDocumentation(TypedDict):
     """Documentation for a class of code actions.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     kind: "CodeActionKind"
     """The kind of the code action being documented.
@@ -5224,13 +5231,11 @@ class WorkspaceClientCapabilities(TypedDict):
     foldingRange: NotRequired["FoldingRangeWorkspaceClientCapabilities"]
     """Capabilities specific to the folding range requests scoped to the workspace.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     textDocumentContent: NotRequired["TextDocumentContentClientCapabilities"]
     """Capabilities specific to the `workspace/textDocumentContent` request.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class TextDocumentClientCapabilities(TypedDict):
@@ -5332,8 +5337,7 @@ class TextDocumentClientCapabilities(TypedDict):
     inlineCompletion: NotRequired["InlineCompletionClientCapabilities"]
     """Client capabilities specific to inline completions.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class NotebookDocumentClientCapabilities(TypedDict):
@@ -5588,13 +5592,11 @@ class WorkspaceEditClientCapabilities(TypedDict):
     metadataSupport: NotRequired[bool]
     """Whether the client supports `WorkspaceEditMetadata` in `WorkspaceEdit`s.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     snippetEditSupport: NotRequired[bool]
     """Whether the client supports snippets as text edits.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class DidChangeConfigurationClientCapabilities(TypedDict):
@@ -5739,8 +5741,7 @@ class DiagnosticWorkspaceClientCapabilities(TypedDict):
 class FoldingRangeWorkspaceClientCapabilities(TypedDict):
     """Client workspace capabilities specific to folding ranges
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     refreshSupport: NotRequired[bool]
     """Whether the client implementation supports a refresh request sent from the
@@ -5751,15 +5752,13 @@ class FoldingRangeWorkspaceClientCapabilities(TypedDict):
     useful for situation where a server for example detects a project wide
     change that requires such a calculation.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class TextDocumentContentClientCapabilities(TypedDict):
     """Client capabilities for a text document content provider.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     dynamicRegistration: NotRequired[bool]
     """Text document content provider supports dynamic registration."""
@@ -5794,6 +5793,7 @@ class CompletionClientCapabilities(TypedDict):
     """The client supports the following `CompletionItem` specific
     capabilities."""
     completionItemKind: NotRequired["ClientCompletionItemOptionsKind"]
+    """The client supports the following completion item kinds."""
     insertTextMode: NotRequired["InsertTextMode"]
     """Defines how the client handles whitespace and indentation
     when accepting a completion item that uses multi line
@@ -5962,8 +5962,7 @@ class CodeActionClientCapabilities(TypedDict):
     """Whether the client supports documentation for a class of
     code actions.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
     tagSupport: NotRequired["CodeActionTagOptions"]
     """Client supports the tag property on a code action. Clients
     supporting tags have to handle unknown tags gracefully.
@@ -6016,8 +6015,7 @@ class DocumentRangeFormattingClientCapabilities(TypedDict):
     rangesSupport: NotRequired[bool]
     """Whether the client supports formatting multiple ranges at once.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class DocumentOnTypeFormattingClientCapabilities(TypedDict):
@@ -6228,6 +6226,10 @@ class DiagnosticClientCapabilities(TypedDict):
     return value for the corresponding server capability as well."""
     relatedDocumentSupport: NotRequired[bool]
     """Whether the clients supports related documents for document diagnostic pulls."""
+    markupMessageSupport: NotRequired[bool]
+    """Whether the client supports `MarkupContent` in diagnostic messages.
+
+    @since 3.18.0"""
     relatedInformation: NotRequired[bool]
     """Whether the clients accepts diagnostics with related information."""
     tagSupport: NotRequired["ClientDiagnosticsTagOptions"]
@@ -6250,8 +6252,7 @@ class DiagnosticClientCapabilities(TypedDict):
 class InlineCompletionClientCapabilities(TypedDict):
     """Client capabilities specific to inline completions.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
     dynamicRegistration: NotRequired[bool]
     """Whether implementation supports dynamic registration for inline completion providers."""
@@ -6475,8 +6476,7 @@ class ClientSignatureInformationOptions(TypedDict):
     `SignatureHelp`/`SignatureInformation` being set to `null` to
     indicate that no parameter should be active.
 
-    @since 3.18.0
-    @proposed"""
+    @since 3.18.0"""
 
 
 class ClientCodeActionLiteralOptions(TypedDict):

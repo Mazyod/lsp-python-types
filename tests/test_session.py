@@ -28,6 +28,19 @@ def backend_name(lsp_backend):
     return lsp_backend.__class__.__name__.replace("Backend", "").lower()
 
 
+def _diagnostic_text(diagnostic: lsp_types.Diagnostic) -> str:
+    """Normalize a diagnostic message to text.
+
+    Since LSP 3.18 ``Diagnostic.message`` is ``str | MarkupContent`` (guarded by
+    the ``markupMessageSupport`` client capability, which this client does not
+    advertise). At runtime it is always ``str``; this keeps the type checker happy.
+    """
+    message = diagnostic.get("message", "")
+    if isinstance(message, dict):  # MarkupContent
+        return message.get("value", "")
+    return message
+
+
 def test_requires_file_on_disk_protocol():
     """Test that requires_file_on_disk returns correct values for each backend"""
     # Pyright, Pyrefly, and Zuban support virtual documents
@@ -182,7 +195,7 @@ def greet(name: str) -> str:
     # Verify the type error diagnostic
     error = diagnostics[0]
     assert error.get("severity", 0) == 1  # Error severity
-    message = error.get("message", "")
+    message = _diagnostic_text(error)
     assert "str" in message, "Expected type error message about str return type"
 
     code = """\
@@ -861,8 +874,8 @@ print(result)
         import_errors = [
             d
             for d in diagnostics
-            if "import" in d.get("message", "").lower()
-            or "module" in d.get("message", "").lower()
+            if "import" in _diagnostic_text(d).lower()
+            or "module" in _diagnostic_text(d).lower()
         ]
 
         # Should succeed because search_path includes lib/
@@ -999,8 +1012,8 @@ print(result)
     import_errors = [
         d
         for d in diagnostics
-        if "import" in d.get("message", "").lower()
-        or "module" in d.get("message", "").lower()
+        if "import" in _diagnostic_text(d).lower()
+        or "module" in _diagnostic_text(d).lower()
     ]
 
     # Should succeed because extra_paths includes lib/

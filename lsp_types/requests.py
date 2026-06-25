@@ -39,7 +39,7 @@ class RequestFunctions:
 
     async def document_color(
         self, params: types.DocumentColorParams
-    ) -> Union[list[types.ColorInformation], None]:
+    ) -> list[types.ColorInformation]:
         """A request to list all color symbols found in a given text document. The request's
         parameter is of type {@link DocumentColorParams} the
         response is of type {@link ColorInformation ColorInformation[]} or a Thenable
@@ -50,10 +50,10 @@ class RequestFunctions:
 
     async def color_presentation(
         self, params: types.ColorPresentationParams
-    ) -> Union[list[types.ColorPresentation], None]:
+    ) -> list[types.ColorPresentation]:
         """A request to list all presentation for a color. The request's
         parameter is of type {@link ColorPresentationParams} the
-        response is of type {@link ColorInformation ColorInformation[]} or a Thenable
+        response is of type {@link ColorPresentation ColorPresentation[]} or a Thenable
         that resolves to such."""
         return await self.dispatcher(
             methods.Request.TEXT_DOCUMENT_COLOR_PRESENTATION, params
@@ -260,6 +260,7 @@ class RequestFunctions:
     ) -> types.DocumentDiagnosticReport:
         """The document diagnostic request definition.
 
+
         @since 3.17.0"""
         return await self.dispatcher(methods.Request.TEXT_DOCUMENT_DIAGNOSTIC, params)
 
@@ -278,8 +279,7 @@ class RequestFunctions:
         type {@link InlineCompletionParams}, the response is of type
         {@link InlineCompletion InlineCompletion[]} or a Thenable that resolves to such.
 
-        @since 3.18.0
-        @proposed"""
+        @since 3.18.0"""
         return await self.dispatcher(
             methods.Request.TEXT_DOCUMENT_INLINE_COMPLETION, params
         )
@@ -290,8 +290,7 @@ class RequestFunctions:
         """The `workspace/textDocumentContent` request is sent from the client to the
         server to request the content of a text document.
 
-        @since 3.18.0
-        @proposed"""
+        @since 3.18.0"""
         return await self.dispatcher(
             methods.Request.WORKSPACE_TEXT_DOCUMENT_CONTENT, params
         )
@@ -481,8 +480,7 @@ class RequestFunctions:
     ) -> Union[list[types.TextEdit], None]:
         """A request to format ranges in a document.
 
-        @since 3.18.0
-        @proposed"""
+        @since 3.18.0"""
         return await self.dispatcher(
             methods.Request.TEXT_DOCUMENT_RANGES_FORMATTING, params
         )
