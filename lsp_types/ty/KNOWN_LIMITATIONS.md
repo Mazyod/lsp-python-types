@@ -83,4 +83,4 @@ Unknown request: completionItem/resolve (-32601)
 
 ## Version Information
 
-These limitations were documented based on ty version 0.0.11 (January 2026), last verified with ty 0.0.28 (April 2026). Future versions may address some of these limitations.
+These limitations were documented based on ty version 0.0.11 (January 2026), last verified with ty 0.0.53 (June 2026). Hover-shows-type-only and `completionItem/resolve` returning `-32601` were both re-confirmed against 0.0.53. Future versions may address some of these limitations.

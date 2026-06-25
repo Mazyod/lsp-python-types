@@ -78,16 +78,16 @@ The following LSPs are available out of the box:
 
 ### Features by Backend
 
-> Last verified: basedpyright 1.36.2, Pyrefly 0.59.1, ty 0.0.28, Zuban 0.7.0
+> Last verified: basedpyright 1.39.8, Pyrefly 1.1.1, ty 0.0.53, Zuban 0.9.0
 
 | Feature | Pyright | Pyrefly | ty | Zuban | Notes |
 |---------|:-------:|:-------:|:--:|:-----:|-------|
 | Diagnostics | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty requires files on disk |
 | Hover | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | ty shows type only, not variable name |
 | Completion | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty requires files on disk |
-| Completion Resolution | :white_check_mark: | :x: | :white_check_mark: | :white_check_mark: | Pyrefly: not yet supported |
+| Completion Resolution | :white_check_mark: | :x: | :x: | :white_check_mark: | Pyrefly: no-op (returns item unchanged); ty: not supported (`-32601`) |
 | Signature Help | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| Rename | :white_check_mark: | :warning: | :warning: | :white_check_mark: | Pyrefly: disabled for external files; ty: requires files on disk |
+| Rename | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty: requires files on disk |
 | Semantic Tokens | :white_check_mark:\* | :white_check_mark:\*\* | :white_check_mark: | :white_check_mark: | \*basedpyright recommended; \*\*Pyrefly: legend not advertised (see docs) |
 | Go to Definition | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
 | Find References | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |

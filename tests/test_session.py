@@ -267,10 +267,6 @@ result = greet("world")
 async def test_session_rename(lsp_backend, backend_name, tmp_path: Path):
     """Test symbol renaming functionality"""
 
-    # FIXME: Pyrefly detects file as external and disables rename edits
-    if backend_name == "pyrefly":
-        pytest.xfail("Pyrefly detects file as external and disables rename edits")
-
     code = """\
 def greet(name: str) -> str:
     return f"Hello, {name}"

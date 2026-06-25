@@ -14,13 +14,13 @@ This document describes known limitations and behavioral differences when using 
 
 ## 2. Unused `# type: ignore` Comments Not Reported
 
-**Limitation**: Zuban does not yet report unused `# type: ignore` comments (upstream limitation as of Zuban 0.7.0, per the [features documentation](https://docs.zubanls.com/en/latest/features.html)).
+**Limitation**: Zuban does not yet report unused `# type: ignore` comments (upstream limitation still present as of Zuban 0.9.0, per the [features documentation](https://docs.zubanls.com/en/latest/features.html)).
 
 **Impact**: Code that accumulates stale `# type: ignore` comments will not be flagged when using this backend.
 
 ## 3. Bounded `TypeVar` Function Bodies Not Fully Type-Checked
 
-**Limitation**: Zuban does not currently type-check function bodies that use bounded `TypeVar` definitions such as `TypeVar("T", str, bytes)` (upstream limitation as of Zuban 0.7.0).
+**Limitation**: Zuban does not currently type-check function bodies that use bounded `TypeVar` definitions such as `TypeVar("T", str, bytes)` (upstream limitation still present as of Zuban 0.9.0).
 
 **Impact**: Type errors inside such functions may not surface via diagnostics.
 
@@ -34,4 +34,4 @@ This document describes known limitations and behavioral differences when using 
 
 ## Version Information
 
-These limitations were documented based on Zuban version 0.7.0 (April 2026). Future versions may address some of these limitations.
+These limitations were documented based on Zuban version 0.7.0 (April 2026), last verified with Zuban 0.9.0 (June 2026). Future versions may address some of these limitations.
