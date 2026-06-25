@@ -52,7 +52,8 @@ export function lspDiagnosticToInfo(
   const range = lspRangeToMonaco(diag.range);
   return {
     ...range,
-    message: diag.message,
+    // LSP 3.18 widened Diagnostic.message to `string | MarkupContent`.
+    message: typeof diag.message === "string" ? diag.message : diag.message.value,
     severity: lspSeverityToMonaco(diag.severity, MarkerSeverity),
     source,
     code:
