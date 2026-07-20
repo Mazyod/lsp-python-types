@@ -65,6 +65,24 @@ The following LSPs are available out of the box:
 - [ty](https://github.com/astral-sh/ty) - Astral's fast Python type checker
 - [Zuban](https://github.com/zubanls/zuban) - Rust-based type checker + LSP by the author of Jedi
 
+### Pyrefly CLI tools
+
+This library drives Pyrefly's LSP server (`pyrefly lsp`), but Pyrefly also ships a broader
+standalone CLI worth knowing about (verified with Pyrefly 1.1.1):
+
+| Command | What it does |
+|---------|--------------|
+| `pyrefly init` | Scaffold a `pyrefly.toml` (or `[tool.pyrefly]` in `pyproject.toml`), or **migrate an existing mypy/pyright config** to Pyrefly |
+| `pyrefly check` | Full type check of a file or project |
+| `pyrefly snippet <CODE>` | Type-check an inline code snippet |
+| `pyrefly infer` | Automatically add inferred type annotations to a file or directory |
+| `pyrefly coverage` | Type-coverage reporting commands |
+| `pyrefly suppress` | Add ignore comments for existing errors, or remove unused ignores |
+| `pyrefly stubgen` | Generate `.pyi` stub files from Python source |
+| `pyrefly dump-config` | Print Pyrefly's resolved configuration |
+
+Run `pyrefly <command> --help` for details, or see the [Pyrefly docs](https://pyrefly.org/).
+
 ## Feature Support Matrix
 
 ### Legend
