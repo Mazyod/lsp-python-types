@@ -2,7 +2,7 @@ from __future__ import annotations
 
 # Generated code.
 # DO NOT EDIT.
-# LSP v3.17.0
+# LSP v3.18.0
 
 from typing import Any, Literal, Mapping, TypedDict, Union, NotRequired
 from enum import IntEnum, IntFlag, StrEnum
@@ -425,7 +425,7 @@ class CodeActionKind(StrEnum):
 class CodeActionTag(IntEnum):
     """Code action tags are extra annotations that tweak the behavior of a code action.
 
-    @since 3.18.0 - proposed"""
+    @since 3.18.0"""
 
     LLMGenerated = 1
     """Marks the code action as LLM-generated."""
@@ -801,13 +801,6 @@ PrepareRenameResult = Union[
     "Range", "PrepareRenamePlaceholder", "PrepareRenameDefaultBehavior"
 ]
 
-DocumentSelector = list["DocumentFilter"]
-"""A document selector is the combination of one or many document filters.
-
-@sample `let sel:DocumentSelector = [{ language: 'typescript' }, { language: 'json', pattern: '**∕tsconfig.json' }]`;
-
-The use of a string as a document filter is deprecated @since 3.16.0."""
-
 ProgressToken = Union[int, str]
 
 ChangeAnnotationIdentifier = str
@@ -820,6 +813,13 @@ WorkspaceDocumentDiagnosticReport = Union[
 """A workspace diagnostic document report.
 
 @since 3.17.0"""
+
+DocumentSelector = list["DocumentFilter"]
+"""A document selector is the combination of one or many document filters.
+
+@sample `let sel:DocumentSelector = [{ language: 'typescript' }, { language: 'json', pattern: '**∕tsconfig.json' }]`;
+
+The use of a string as a document filter is deprecated @since 3.16.0."""
 
 TextDocumentContentChangeEvent = Union[
     "TextDocumentContentChangePartial", "TextDocumentContentChangeWholeDocument"
@@ -841,18 +841,29 @@ ${value}
 Note that markdown strings will be sanitized - that means html will be escaped.
 @deprecated use MarkupContent instead."""
 
+LSPObject = Mapping[str, "LSPAny"]
+"""LSP object definition.
+@since 3.17.0"""
+
 DocumentFilter = Union["TextDocumentFilter", "NotebookCellTextDocumentFilter"]
 """A document filter describes a top level text document or
 a notebook cell document.
 
 @since 3.17.0 - support for NotebookCellTextDocumentFilter."""
 
-LSPObject = Mapping[str, "LSPAny"]
-"""LSP object definition.
-@since 3.17.0"""
-
 GlobPattern = Union["Pattern", "RelativePattern"]
 """The glob pattern. Either a string pattern or a relative pattern.
+
+@since 3.17.0"""
+
+NotebookDocumentFilter = Union[
+    "NotebookDocumentFilterNotebookType",
+    "NotebookDocumentFilterScheme",
+    "NotebookDocumentFilterPattern",
+]
+"""A notebook document filter denotes a notebook document by
+different properties. The properties will be match
+against the notebook's URI (same as with documents)
 
 @since 3.17.0"""
 
@@ -875,17 +886,6 @@ Glob patterns can have the following syntax:
 
 @sample A language filter that applies to typescript files on disk: `{ language: 'typescript', scheme: 'file' }`
 @sample A language filter that applies to all package.json paths: `{ language: 'json', pattern: '**package.json' }`
-
-@since 3.17.0"""
-
-NotebookDocumentFilter = Union[
-    "NotebookDocumentFilterNotebookType",
-    "NotebookDocumentFilterScheme",
-    "NotebookDocumentFilterPattern",
-]
-"""A notebook document filter denotes a notebook document by
-different properties. The properties will be match
-against the notebook's URI (same as with documents)
 
 @since 3.17.0"""
 
@@ -1034,18 +1034,6 @@ class ColorPresentation(TypedDict):
     additionalTextEdits: NotRequired[list["TextEdit"]]
     """An optional array of additional {@link TextEdit text edits} that are applied when
     selecting this color presentation. Edits must not overlap with the main {@link ColorPresentation.textEdit edit} nor with themselves."""
-
-
-class WorkDoneProgressOptions(TypedDict):
-    workDoneProgress: NotRequired[bool]
-
-
-class TextDocumentRegistrationOptions(TypedDict):
-    """General text document registration options."""
-
-    documentSelector: Union["DocumentSelector", None]
-    """A document selector to identify the scope of the registration. If set to null
-    the document selector provided on the client side will be used."""
 
 
 class FoldingRangeParams(TypedDict):
@@ -2098,6 +2086,14 @@ class DidOpenTextDocumentParams(TypedDict):
     """The document that was opened."""
 
 
+class TextDocumentRegistrationOptions(TypedDict):
+    """General text document registration options."""
+
+    documentSelector: Union["DocumentSelector", None]
+    """A document selector to identify the scope of the registration. If set to null
+    the document selector provided on the client side will be used."""
+
+
 class DidChangeTextDocumentParams(TypedDict):
     """The change text document notification's parameters."""
 
@@ -2780,7 +2776,7 @@ class CodeAction(TypedDict):
     tags: NotRequired[list["CodeActionTag"]]
     """Tags for this code action.
 
-    @since 3.18.0 - proposed"""
+    @since 3.18.0"""
 
 
 class CodeActionRegistrationOptions(TypedDict):
@@ -3416,8 +3412,8 @@ class FileCreate(TypedDict):
 
     @since 3.16.0"""
 
-    uri: str
-    """A file:// URI for the location of the file/folder being created."""
+    uri: "DocumentUri"
+    """A URI for the location of the file/folder being created."""
 
 
 class TextDocumentEdit(TypedDict):
@@ -3518,10 +3514,10 @@ class FileRename(TypedDict):
 
     @since 3.16.0"""
 
-    oldUri: str
-    """A file:// URI for the original location of the file/folder being renamed."""
-    newUri: str
-    """A file:// URI for the new location of the file/folder being renamed."""
+    oldUri: "DocumentUri"
+    """A URI for the original location of the file/folder being renamed."""
+    newUri: "DocumentUri"
+    """A URI for the new location of the file/folder being renamed."""
 
 
 class FileDelete(TypedDict):
@@ -3529,8 +3525,8 @@ class FileDelete(TypedDict):
 
     @since 3.16.0"""
 
-    uri: str
-    """A file:// URI for the location of the file/folder being deleted."""
+    uri: "DocumentUri"
+    """A URI for the location of the file/folder being deleted."""
 
 
 class MonikerOptions(TypedDict):
@@ -4669,6 +4665,10 @@ class WorkspaceEditMetadata(TypedDict):
     """Signal to the editor that this edit is a refactoring."""
 
 
+class WorkDoneProgressOptions(TypedDict):
+    workDoneProgress: NotRequired[bool]
+
+
 class SemanticTokensLegend(TypedDict):
     """@since 3.16.0"""
 
@@ -5109,24 +5109,6 @@ class CodeActionKindDocumentation(TypedDict):
     The title of this documentation code action is taken from {@linkcode Command.title}"""
 
 
-class NotebookCellTextDocumentFilter(TypedDict):
-    """A notebook cell text document filter denotes a cell text
-    document by different properties.
-
-    @since 3.17.0"""
-
-    notebook: Union[str, "NotebookDocumentFilter"]
-    """A filter that matches against the notebook
-    containing the notebook cell. If a string
-    value is provided it matches against the
-    notebook type. '*' matches every notebook."""
-    language: NotRequired[str]
-    """A language id like `python`.
-
-    Will be matched against the language id of the
-    notebook cell document. '*' matches every language."""
-
-
 class FileOperationPatternOptions(TypedDict):
     """Matching options for the file operation pattern.
 
@@ -5445,6 +5427,24 @@ class FileOperationOptions(TypedDict):
     """The server is interested in receiving willDeleteFiles file requests."""
 
 
+class NotebookCellTextDocumentFilter(TypedDict):
+    """A notebook cell text document filter denotes a cell text
+    document by different properties.
+
+    @since 3.17.0"""
+
+    notebook: Union[str, "NotebookDocumentFilter"]
+    """A filter that matches against the notebook
+    containing the notebook cell. If a string
+    value is provided it matches against the
+    notebook type. '*' matches every notebook."""
+    language: NotRequired[str]
+    """A language id like `python`.
+
+    Will be matched against the language id of the
+    notebook cell document. '*' matches every language."""
+
+
 class RelativePattern(TypedDict):
     """A relative pattern is a helper to construct glob patterns that are matched
     relatively to a base URI. The common value for a `baseUri` is a workspace
@@ -5457,57 +5457,6 @@ class RelativePattern(TypedDict):
     against relatively."""
     pattern: "Pattern"
     """The actual glob pattern;"""
-
-
-class TextDocumentFilterLanguage(TypedDict):
-    """A document filter where `language` is required field.
-
-    @since 3.18.0"""
-
-    language: str
-    """A language id, like `typescript`."""
-    scheme: NotRequired[str]
-    """A Uri {@link Uri.scheme scheme}, like `file` or `untitled`."""
-    pattern: NotRequired["GlobPattern"]
-    """A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
-
-    @since 3.18.0 - support for relative patterns. Whether clients support
-    relative patterns depends on the client capability
-    `textDocuments.filters.relativePatternSupport`."""
-
-
-class TextDocumentFilterScheme(TypedDict):
-    """A document filter where `scheme` is required field.
-
-    @since 3.18.0"""
-
-    language: NotRequired[str]
-    """A language id, like `typescript`."""
-    scheme: str
-    """A Uri {@link Uri.scheme scheme}, like `file` or `untitled`."""
-    pattern: NotRequired["GlobPattern"]
-    """A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
-
-    @since 3.18.0 - support for relative patterns. Whether clients support
-    relative patterns depends on the client capability
-    `textDocuments.filters.relativePatternSupport`."""
-
-
-class TextDocumentFilterPattern(TypedDict):
-    """A document filter where `pattern` is required field.
-
-    @since 3.18.0"""
-
-    language: NotRequired[str]
-    """A language id, like `typescript`."""
-    scheme: NotRequired[str]
-    """A Uri {@link Uri.scheme scheme}, like `file` or `untitled`."""
-    pattern: "GlobPattern"
-    """A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
-
-    @since 3.18.0 - support for relative patterns. Whether clients support
-    relative patterns depends on the client capability
-    `textDocuments.filters.relativePatternSupport`."""
 
 
 class NotebookDocumentFilterNotebookType(TypedDict):
@@ -5967,7 +5916,7 @@ class CodeActionClientCapabilities(TypedDict):
     """Client supports the tag property on a code action. Clients
     supporting tags have to handle unknown tags gracefully.
 
-    @since 3.18.0 - proposed"""
+    @since 3.18.0"""
 
 
 class CodeLensClientCapabilities(TypedDict):
@@ -6327,6 +6276,57 @@ class MarkdownClientCapabilities(TypedDict):
     @since 3.17.0"""
 
 
+class TextDocumentFilterLanguage(TypedDict):
+    """A document filter where `language` is required field.
+
+    @since 3.18.0"""
+
+    language: str
+    """A language id, like `typescript`."""
+    scheme: NotRequired[str]
+    """A Uri {@link Uri.scheme scheme}, like `file` or `untitled`."""
+    pattern: NotRequired["GlobPattern"]
+    """A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
+
+    @since 3.18.0 - support for relative patterns. Whether clients support
+    relative patterns depends on the client capability
+    `textDocuments.filters.relativePatternSupport`."""
+
+
+class TextDocumentFilterScheme(TypedDict):
+    """A document filter where `scheme` is required field.
+
+    @since 3.18.0"""
+
+    language: NotRequired[str]
+    """A language id, like `typescript`."""
+    scheme: str
+    """A Uri {@link Uri.scheme scheme}, like `file` or `untitled`."""
+    pattern: NotRequired["GlobPattern"]
+    """A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
+
+    @since 3.18.0 - support for relative patterns. Whether clients support
+    relative patterns depends on the client capability
+    `textDocuments.filters.relativePatternSupport`."""
+
+
+class TextDocumentFilterPattern(TypedDict):
+    """A document filter where `pattern` is required field.
+
+    @since 3.18.0"""
+
+    language: NotRequired[str]
+    """A language id, like `typescript`."""
+    scheme: NotRequired[str]
+    """A Uri {@link Uri.scheme scheme}, like `file` or `untitled`."""
+    pattern: "GlobPattern"
+    """A glob pattern, like **​/*.{ts,js}. See TextDocumentFilter for examples.
+
+    @since 3.18.0 - support for relative patterns. Whether clients support
+    relative patterns depends on the client capability
+    `textDocuments.filters.relativePatternSupport`."""
+
+
 class ChangeAnnotationsSupportOptions(TypedDict):
     """@since 3.18.0"""
 
@@ -6495,7 +6495,7 @@ class ClientCodeActionResolveOptions(TypedDict):
 
 
 class CodeActionTagOptions(TypedDict):
-    """@since 3.18.0 - proposed"""
+    """@since 3.18.0"""
 
     valueSet: list["CodeActionTag"]
     """The tags supported by the client."""
