@@ -1,3 +1,4 @@
+import asyncio
 import time
 import typing as t
 from pathlib import Path
@@ -69,10 +70,14 @@ def test_requires_file_on_disk_protocol():
 )
 async def test_get_completion_normalizes_response_shape(raw, expected):
     """Session normalizes all three LSP-spec completion shapes to CompletionList."""
-    session = Session.__new__(Session)
-    session._document_uri = "file:///doesnt-matter.py"
-    session._process = MagicMock()
-    session._process.send.completion = AsyncMock(return_value=raw)
+    process = MagicMock()
+    process.send.completion = AsyncMock(return_value=raw)
+    session = Session(
+        process,
+        MagicMock(),
+        Path("/doesnt-matter"),
+        pool=MagicMock(),
+    )
 
     result = await session.get_completion(lsp_types.Position(line=0, character=0))
     assert result == expected
@@ -573,6 +578,159 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
         await session2.shutdown()
     finally:
         await pool.cleanup()
+
+
+async def test_shutdown_session_cannot_mutate_reused_process(tmp_path: Path):
+    """A closed session cannot act through a process leased to its successor."""
+    pool = LSPProcessPool(max_size=1)
+    backend = PyrightBackend()
+    initial_code = "value: int = 1"
+
+    try:
+        first_session = await lsp_types.Session.create(
+            backend,
+            base_path=tmp_path,
+            initial_code=initial_code,
+            pool=pool,
+        )
+        process = first_session._process
+        await first_session.shutdown()
+
+        second_session = await lsp_types.Session.create(
+            backend,
+            base_path=tmp_path,
+            initial_code=initial_code,
+            pool=pool,
+        )
+        assert second_session._process is process
+
+        with pytest.raises(RuntimeError, match="Session has been shut down"):
+            await first_session.update_code('value: int = "invalid"')
+
+        assert first_session._document_text == initial_code
+        assert first_session._document_version == 1
+        assert await second_session.get_diagnostics() == []
+
+        await second_session.shutdown()
+    finally:
+        await pool.cleanup()
+
+
+async def test_post_shutdown_operations_fail_before_mutation(tmp_path: Path):
+    """Closed-session operations fail before touching local, disk, or server state."""
+    process = MagicMock()
+    pool = MagicMock(spec=LSPProcessPool)
+    pool.release = AsyncMock()
+    legend: lsp_types.SemanticTokensLegend = {
+        "tokenTypes": ["variable"],
+        "tokenModifiers": [],
+    }
+    server_info: lsp_types.ServerInfo = {"name": "test-server"}
+    session = Session(
+        process,
+        MagicMock(),
+        tmp_path,
+        pool=pool,
+        legend=legend,
+        server_info=server_info,
+    )
+    session._document_text = "original"
+    session._file_on_disk = True
+    session._file_path.write_text("original")
+    canonical_legend = session.canonical_legend
+
+    await session.shutdown()
+
+    position = lsp_types.Position(line=0, character=0)
+    operations: list[tuple[str, t.Callable[[], t.Awaitable[t.Any]]]] = [
+        ("update_code", lambda: session.update_code("mutated")),
+        ("get_diagnostics", session.get_diagnostics),
+        ("get_hover_info", lambda: session.get_hover_info(position)),
+        ("get_rename_edits", lambda: session.get_rename_edits(position, "renamed")),
+        ("get_signature_help", lambda: session.get_signature_help(position)),
+        ("get_completion", lambda: session.get_completion(position)),
+        (
+            "resolve_completion",
+            lambda: session.resolve_completion({"label": "value"}),
+        ),
+        ("get_semantic_tokens", session.get_semantic_tokens),
+        ("_open_document", lambda: session._open_document("mutated")),
+    ]
+
+    for operation_name, operation in operations:
+        try:
+            await operation()
+        except RuntimeError as error:
+            assert str(error) == "Session has been shut down", operation_name
+        else:
+            pytest.fail(f"{operation_name} succeeded after shutdown")
+
+    assert session._document_text == "original"
+    assert session._document_version == 1
+    assert session._file_path.read_text() == "original"
+    assert process.mock_calls == []
+    pool.release.assert_awaited_once_with(process)
+
+    # Informational metadata remains useful after the process lease is revoked.
+    assert session.server_info == server_info
+    assert session.backend_legend == legend
+    assert session.canonical_legend is canonical_legend
+
+
+async def test_concurrent_shutdown_releases_process_once(tmp_path: Path):
+    """The session revokes access before awaiting its single process release."""
+    process = MagicMock()
+    pool = MagicMock(spec=LSPProcessPool)
+    release_started = asyncio.Event()
+    allow_release = asyncio.Event()
+
+    async def release(_process):
+        release_started.set()
+        await allow_release.wait()
+
+    pool.release = AsyncMock(side_effect=release)
+    session = Session(process, MagicMock(), tmp_path, pool=pool)
+
+    first_shutdown = asyncio.create_task(session.shutdown())
+    await release_started.wait()
+
+    # The lease is already revoked even though the release is still suspended.
+    with pytest.raises(RuntimeError, match="Session has been shut down"):
+        await session.get_diagnostics()
+
+    await asyncio.gather(session.shutdown(), session.shutdown())
+    allow_release.set()
+    await first_shutdown
+    await session.shutdown()
+
+    pool.release.assert_awaited_once_with(process)
+
+
+async def test_shutdown_release_failure_leaves_session_closed(tmp_path: Path):
+    """A failed release cannot restore access to a partially transferred process."""
+    process = MagicMock()
+    pool = MagicMock(spec=LSPProcessPool)
+    pool.release = AsyncMock(side_effect=RuntimeError("release failed"))
+    server_info: lsp_types.ServerInfo = {"name": "test-server"}
+    session = Session(
+        process,
+        MagicMock(),
+        tmp_path,
+        pool=pool,
+        server_info=server_info,
+    )
+
+    with pytest.raises(RuntimeError, match="release failed"):
+        await session.shutdown()
+
+    with pytest.raises(RuntimeError, match="Session has been shut down"):
+        await session.get_diagnostics()
+
+    # A retry is a no-op: releasing twice could stop a process already handed off.
+    await session.shutdown()
+    pool.release.assert_awaited_once_with(process)
+    assert process.mock_calls == []
+    assert session.server_info == server_info
 
 
 async def test_session_recycling_with_diagnostics(

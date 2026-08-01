@@ -247,13 +247,14 @@ class Session:
         legend: types.SemanticTokensLegend | None = None,
         server_info: types.ServerInfo | None = None,
     ):
-        self._process = lsp_process
+        self.__process = lsp_process
+        self._pool = pool
+        self._closed = False
         self._backend = backend
         self._file_path = base_path / "new.py"
         self._document_uri = f"file://{self._file_path}"
         self._document_version = 1
         self._document_text = ""
-        self._active_pool: LSPProcessPool | None = pool
         self._diag_result: DiagnosticsResult | None = None
         self._file_on_disk = (
             False  # Set to True if file was written for backends that require it
@@ -269,19 +270,26 @@ class Session:
             self._modifier_map = semantic_tokens.build_modifier_mapping(legend)
 
     async def shutdown(self) -> None:
-        """Shutdown and recycle the session back to the pool"""
-        if self._active_pool is None:
-            return  # Already recycled
+        """Close the session and release its process lease exactly once.
+
+        The session remains closed if releasing the process raises because
+        ownership may already have been partially transferred.
+        """
+        if self._closed:
+            return  # Already shut down
+
+        # Revoke this session's lease before yielding so concurrent shutdown calls
+        # cannot release the same process twice, and stale references cannot use a
+        # process after it has been returned to the pool.
+        self._closed = True
 
         # Release back to pool (document cleanup handled by pool/process reset)
         # For max_size=0 pools, this will immediately shutdown the process
-        await self._active_pool.release(self._process)
-
-        # Clear references to prevent further use
-        self._active_pool = None
+        await self._pool.release(self.__process)
 
     async def update_code(self, code: str) -> int:
         """Update the code in the current document"""
+        process = self._process
         self._document_version += 1
         self._document_text = code
 
@@ -290,7 +298,7 @@ class Session:
             self._file_path.write_text(code)
 
         document_version = self._document_version
-        await self._process.notify.did_change_text_document(
+        await process.notify.did_change_text_document(
             {
                 "textDocument": {
                     "uri": self._document_uri,
@@ -304,6 +312,7 @@ class Session:
 
     async def get_diagnostics(self) -> list[types.Diagnostic]:
         """Pull diagnostics via textDocument/diagnostic (LSP-3.17)"""
+        process = self._process
         params: types.DocumentDiagnosticParams = {
             "textDocument": {"uri": self._document_uri},
         }
@@ -311,7 +320,7 @@ class Session:
         if result := self._diag_result:
             params["previousResultId"] = result.id
 
-        report = await self._process.send.text_document_diagnostic(params)
+        report = await process.send.text_document_diagnostic(params)
 
         diagnostics: list[types.Diagnostic]
         match report["kind"]:
@@ -336,7 +345,8 @@ class Session:
         not the symbol extent — consumers that need the symbol's actual span
         must compute it themselves.
         """
-        hover = await self._process.send.hover(
+        process = self._process
+        hover = await process.send.hover(
             {"textDocument": {"uri": self._document_uri}, "position": position}
         )
         if hover is not None and "range" not in hover:
@@ -347,7 +357,8 @@ class Session:
         self, position: types.Position, new_name: str
     ) -> types.WorkspaceEdit | None:
         """Get rename edits for the given position"""
-        return await self._process.send.rename(
+        process = self._process
+        return await process.send.rename(
             {
                 "textDocument": {"uri": self._document_uri},
                 "position": position,
@@ -359,7 +370,8 @@ class Session:
         self, position: types.Position
     ) -> types.SignatureHelp | None:
         """Get signature help at the given position"""
-        return await self._process.send.signature_help(
+        process = self._process
+        return await process.send.signature_help(
             {"textDocument": {"uri": self._document_uri}, "position": position}
         )
 
@@ -372,7 +384,8 @@ class Session:
         ``null`` and a bare list both map to ``isIncomplete: False`` (the spec
         treats them as complete result sets — empty and given, respectively).
         """
-        result = await self._process.send.completion(
+        process = self._process
+        result = await process.send.completion(
             {"textDocument": {"uri": self._document_uri}, "position": position}
         )
         if result is None:
@@ -385,13 +398,15 @@ class Session:
         self, completion_item: types.CompletionItem
     ) -> types.CompletionItem:
         """Resolve the given completion item"""
-        return await self._process.send.resolve_completion_item(completion_item)
+        process = self._process
+        return await process.send.resolve_completion_item(completion_item)
 
     async def get_semantic_tokens(
         self, *, normalize: bool = False
     ) -> types.SemanticTokens | None:
         """Get semantic tokens for the current document."""
-        tokens = await self._process.send.semantic_tokens_full(
+        process = self._process
+        tokens = await process.send.semantic_tokens_full(
             {"textDocument": {"uri": self._document_uri}}
         )
 
@@ -424,10 +439,18 @@ class Session:
 
     # Private methods
 
+    @property
+    def _process(self) -> LSPProcess:
+        """Return the process while this session owns its lease."""
+        if self._closed:
+            raise RuntimeError("Session has been shut down")
+        return self.__process
+
     async def _open_document(self, code: str) -> None:
         """Open a document with the given code"""
+        process = self._process
         self._document_text = code
-        await self._process.notify.did_open_text_document(
+        await process.notify.did_open_text_document(
             {
                 "textDocument": {
                     "languageId": types.LanguageKind.Python,
@@ -438,4 +461,4 @@ class Session:
             }
         )
         # Track the opened document
-        self._process.track_document_open(self._document_uri)
+        process.track_document_open(self._document_uri)

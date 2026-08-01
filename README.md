@@ -149,6 +149,9 @@ def greet(name: str) -> str:
     await session.shutdown()
 ```
 
+After `shutdown()`, a session's operational methods raise `RuntimeError`; its
+captured server and semantic-token metadata remain readable.
+
 ## Development
 
 - Requires Python 3.12+.
