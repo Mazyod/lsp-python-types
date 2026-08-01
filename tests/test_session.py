@@ -1,5 +1,4 @@
 import asyncio
-import time
 import typing as t
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -767,38 +766,31 @@ async def test_session_recycling_with_diagnostics(
         await pool.cleanup()
 
 
-async def test_session_recycling_performance(lsp_backend, tmp_path: Path):
-    """Test that recycling is faster than creating new sessions"""
-    pool = LSPProcessPool(max_size=2)
+async def test_session_recycling_reuses_process(lsp_backend, tmp_path: Path):
+    """Sequential compatible sessions reuse the same pooled process."""
+    pool = LSPProcessPool(max_size=1)
 
     try:
-        # Time creating fresh sessions
-        start_time = time.time()
+        first_session = await lsp_types.Session.create(
+            lsp_backend,
+            base_path=tmp_path,
+            initial_code="first = True",
+            pool=pool,
+        )
+        [pooled_process] = pool._active
+        await first_session.shutdown()
+
         for i in range(3):
             session = await lsp_types.Session.create(
-                lsp_backend, base_path=tmp_path, initial_code=f"x{i} = {i}"
+                lsp_backend,
+                base_path=tmp_path,
+                initial_code=f"value_{i} = {i}",
+                pool=pool,
             )
+            assert pool._active == {pooled_process}
+            assert pool.available_count == 0
             await session.shutdown()
-        fresh_time = time.time() - start_time
-
-        # Time using recycled sessions
-        start_time = time.time()
-        sessions = []
-        for i in range(3):
-            session = await lsp_types.Session.create(
-                lsp_backend, base_path=tmp_path, initial_code=f"y{i} = {i}", pool=pool
-            )
-            sessions.append(session)
-
-        # Recycle them
-        for session in sessions:
-            await session.shutdown()
-
-        recycled_time = time.time() - start_time
-
-        # Recycling should be at least somewhat faster
-        # Note: This is more of a performance indicator than a strict test
-        assert recycled_time <= fresh_time * 1.5  # Allow some variance
+            assert list(pool._available) == [pooled_process]
 
     finally:
         await pool.cleanup()
