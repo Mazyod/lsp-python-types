@@ -13,8 +13,13 @@ import pytest
 
 import lsp_types
 from lsp_types.pool import LSPProcessPool
+from lsp_types.process import LSPProcess, ProcessLaunchInfo
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.session import (
+    _build_process_compatibility_key,
+    _freeze_for_compatibility,
+)
 from lsp_types.ty.backend import TyBackend
 from lsp_types.zuban.backend import ZubanBackend
 
@@ -29,6 +34,71 @@ def lsp_backend(request):
 def backend_name(lsp_backend):
     """Helper fixture to get the backend name for test identification"""
     return lsp_backend.__class__.__name__.replace("Backend", "").lower()
+
+
+class _StubLSPProcess(LSPProcess):
+    def __init__(self) -> None:
+        super().__init__(ProcessLaunchInfo(cmd=["stub-lsp-process"]))
+        self.reset_count = 0
+        self.stop_count = 0
+
+    async def reset(self) -> None:
+        self.reset_count += 1
+
+    async def stop(self) -> None:
+        self.stop_count += 1
+
+
+def test_compatibility_values_are_structural_and_type_safe():
+    """Equivalent mappings match without conflating distinct scalar types."""
+    left = {"nested": {"first": True, "second": [1, "1"]}, "other": None}
+    right = {"other": None, "nested": {"second": [1, "1"], "first": True}}
+
+    assert _freeze_for_compatibility(left) == _freeze_for_compatibility(right)
+    assert _freeze_for_compatibility(True) != _freeze_for_compatibility(1)
+    assert _freeze_for_compatibility(1) != _freeze_for_compatibility(1.0)
+    assert _freeze_for_compatibility(0.0) != _freeze_for_compatibility(-0.0)
+
+    class UnsupportedValue:
+        pass
+
+    unsupported = UnsupportedValue()
+    assert _freeze_for_compatibility(unsupported) != _freeze_for_compatibility(
+        unsupported
+    )
+
+
+def test_process_compatibility_key_includes_all_launch_inputs(tmp_path: Path):
+    """Command, effective environment, and cwd each partition process families."""
+    backend = PyrightBackend()
+    initialize_params: lsp_types.InitializeParams = {
+        "processId": None,
+        "rootUri": f"file://{tmp_path}",
+        "capabilities": {},
+    }
+
+    def build_key(
+        *,
+        command: list[str] | None = None,
+        environment: dict[str, str] | None = None,
+        cwd: Path | None = None,
+    ):
+        return _build_process_compatibility_key(
+            backend,
+            base_path=str(tmp_path),
+            process_launch_info=ProcessLaunchInfo(
+                cmd=command or ["language-server", "--stdio"],
+                cwd=cwd or tmp_path,
+            ),
+            resolved_environment=environment or {"PATH": "/bin"},
+            options={},
+            initialize_params=initialize_params,
+        )
+
+    baseline = build_key()
+    assert baseline != build_key(command=["other-server", "--stdio"])
+    assert baseline != build_key(environment={"PATH": "/other-bin"})
+    assert baseline != build_key(cwd=tmp_path / "other-workspace")
 
 
 class TestLSPProcessPool:
@@ -51,6 +121,77 @@ class TestLSPProcessPool:
         assert session_pool.max_size == 3
         assert session_pool.current_size == 0
         assert session_pool.available_count == 0
+
+    async def test_acquire_selects_by_optional_compatibility_key(self):
+        """Keys isolate process families while omitted keys retain legacy reuse."""
+        pool = LSPProcessPool(max_size=4)
+        created: list[_StubLSPProcess] = []
+
+        async def create_process() -> LSPProcess:
+            process = _StubLSPProcess()
+            created.append(process)
+            return process
+
+        try:
+            first = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyright"),
+            )
+            await pool.release(first)
+
+            reused = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyright"),
+            )
+            assert reused is first
+            assert created[0].reset_count == 1
+            await pool.release(reused)
+
+            incompatible = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyrefly"),
+            )
+            assert incompatible is not first
+            await pool.release(incompatible)
+
+            legacy = await pool.acquire(create_process, "/workspace")
+            assert legacy not in (first, incompatible)
+            await pool.release(legacy)
+            legacy_reused = await pool.acquire(create_process, "/workspace")
+            assert legacy_reused is legacy
+            assert len(created) == 3
+            await pool.release(legacy_reused)
+        finally:
+            await pool.cleanup()
+
+    async def test_sessions_with_different_backends_do_not_share_processes(
+        self, session_pool, base_path
+    ):
+        """A process initialized as one backend cannot serve another backend."""
+        pyright_session = await lsp_types.Session.create(
+            PyrightBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            pool=session_pool,
+        )
+        await pyright_session.shutdown()
+
+        pyrefly_session = await lsp_types.Session.create(
+            PyreflyBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            pool=session_pool,
+        )
+        try:
+            assert session_pool.current_size == 2
+            server_info = pyrefly_session.server_info
+            assert server_info is not None
+            assert "pyrefly" in server_info["name"].lower()
+        finally:
+            await pyrefly_session.shutdown()
 
     async def test_session_pool_acquire_and_recycle(
         self, session_pool, lsp_backend, base_path
@@ -118,7 +259,7 @@ class TestLSPProcessPool:
     async def test_session_recycling_with_different_options(
         self, session_pool, lsp_backend, backend_name, base_path
     ):
-        """Test recycling sessions with different options"""
+        """Sessions with different options do not reuse initialized processes."""
 
         options1: t.Mapping[str, t.Any]
         options2: t.Mapping[str, t.Any]
@@ -148,7 +289,7 @@ class TestLSPProcessPool:
 
         await session1.shutdown()
 
-        # Second session with different options - should update configuration
+        # Second session with different options must use a separately initialized process
         session2 = await lsp_types.Session.create(
             lsp_backend,
             base_path=base_path,
@@ -157,10 +298,46 @@ class TestLSPProcessPool:
             pool=session_pool,
         )
 
+        assert session_pool.current_size == 2
+
         # Warm up the session with new code
         await session2.update_code(code2)
 
         await session2.shutdown()
+
+    async def test_sessions_with_different_initialize_params_do_not_share_processes(
+        self, session_pool, base_path
+    ):
+        """Initialization inputs are part of process compatibility."""
+
+        def initialize_params(client_name: str) -> lsp_types.InitializeParams:
+            return {
+                "processId": None,
+                "rootUri": f"file://{base_path}",
+                "capabilities": {},
+                "clientInfo": {"name": client_name},
+            }
+
+        first = await lsp_types.Session.create(
+            PyrightBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            initialize_params=initialize_params("first-client"),
+            pool=session_pool,
+        )
+        await first.shutdown()
+
+        second = await lsp_types.Session.create(
+            PyrightBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            initialize_params=initialize_params("second-client"),
+            pool=session_pool,
+        )
+        try:
+            assert session_pool.current_size == 2
+        finally:
+            await second.shutdown()
 
     async def test_session_pool_max_size_limit(
         self, session_pool, lsp_backend, base_path

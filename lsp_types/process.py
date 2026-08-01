@@ -24,6 +24,13 @@ class ProcessLaunchInfo:
     env: dict[str, str] = dc.field(default_factory=dict)
     cwd: Path = Path(".")
 
+    def resolved_environment(self) -> dict[str, str]:
+        """Return the exact environment that should be passed to the child."""
+        child_process_environment = os.environ.copy()
+        child_process_environment.pop("PYTHONPATH", None)
+        child_process_environment.update(self.env)
+        return child_process_environment
+
 
 class Error(Exception):
     def __init__(self, code: types.ErrorCodes | int, message: str) -> None:
@@ -68,8 +75,16 @@ class LSPProcess:
                 # Handle notification
     """
 
-    def __init__(self, process_launch_info: ProcessLaunchInfo):
+    def __init__(
+        self,
+        process_launch_info: ProcessLaunchInfo,
+        *,
+        resolved_environment: t.Mapping[str, str] | None = None,
+    ):
         self._process_launch_info = process_launch_info
+        self._resolved_environment = (
+            dict(resolved_environment) if resolved_environment is not None else None
+        )
         self._process: asyncio.subprocess.Process | None = None
         self._notification_listeners: list[asyncio.Queue[types.LSPObject]] = []
         self._pending_requests: dict[int | str, asyncio.Future[t.Any]] = {}
@@ -78,6 +93,7 @@ class LSPProcess:
         self._shutdown = False
         self._open_documents: set[str] = set()
         self._write_lock = asyncio.Lock()
+        self._initialize_result: types.InitializeResult | None = None
 
         # Maintain typed interface
         self.send = requests.RequestFunctions(self._send_request)
@@ -97,9 +113,11 @@ class LSPProcess:
         if self._process:
             raise RuntimeError("LSP process already started")
 
-        child_proc_env = os.environ.copy()
-        child_proc_env.pop("PYTHONPATH", None)
-        child_proc_env.update(self._process_launch_info.env)
+        child_proc_env = (
+            self._process_launch_info.resolved_environment()
+            if self._resolved_environment is None
+            else self._resolved_environment.copy()
+        )
 
         self._process = await asyncio.create_subprocess_exec(
             *self._process_launch_info.cmd,
@@ -178,6 +196,11 @@ class LSPProcess:
         """Track that a document has been opened."""
         self._open_documents.add(uri)
 
+    @property
+    def initialize_result(self) -> types.InitializeResult | None:
+        """The initialize response associated with this process."""
+        return self._initialize_result
+
     async def _notifications(self):
         """
         An async generator for processing server notifications.
@@ -210,7 +233,10 @@ class LSPProcess:
         await self._send_payload(self._process.stdin, payload)
 
         try:
-            return await future
+            result = await future
+            if method == "initialize":
+                self._initialize_result = t.cast(types.InitializeResult, result)
+            return result
         finally:
             self._pending_requests.pop(request_id, None)
 

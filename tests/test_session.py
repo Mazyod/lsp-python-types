@@ -531,6 +531,10 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
             initial_code="def func1(): return 1",
             pool=pool,
         )
+        first_server_info = session1.server_info
+        first_backend_legend = session1.backend_legend
+        assert first_server_info is not None
+        assert first_backend_legend is not None
 
         # Verify it works
         hover_info = await session1.get_hover_info(
@@ -552,6 +556,12 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
             initial_code="def func2(): return 2",
             pool=pool,
         )
+
+        # Initialization metadata belongs to the reused process, not the factory
+        # closure (which is deliberately skipped when the process is recycled).
+        assert pool.current_size == 1
+        assert session2.server_info == first_server_info
+        assert session2.backend_legend == first_backend_legend
 
         # Verify new code is active
         hover_info = await session2.get_hover_info(

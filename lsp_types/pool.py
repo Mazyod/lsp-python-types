@@ -18,6 +18,7 @@ class ProcessMetadata(t.TypedDict):
     """Metadata for tracking pooled processes"""
 
     base_path: str
+    compatibility_key: t.Hashable | None
     created_at: float
 
 
@@ -49,13 +50,27 @@ class LSPProcessPool:
         return len(self._available)
 
     async def acquire(
-        self, process_factory: t.Callable[[], t.Awaitable[LSPProcess]], base_path: str
+        self,
+        process_factory: t.Callable[[], t.Awaitable[LSPProcess]],
+        base_path: str,
+        *,
+        compatibility_key: t.Hashable | None = None,
     ) -> LSPProcess:
-        """Acquire a process from the pool or create a new one"""
+        """Acquire a compatible process from the pool or create a new one.
+
+        Callers that omit ``compatibility_key`` retain the original base-path-only
+        pooling behavior. Keyed and unkeyed processes are kept separate so callers
+        with stronger compatibility requirements never receive an unkeyed process.
+        """
 
         # Try to find a compatible available process
         compatible_process = next(
-            (p for p in self._available if self._metadata[p]["base_path"] == base_path),
+            (
+                process
+                for process in self._available
+                if self._metadata[process]["base_path"] == base_path
+                and self._metadata[process]["compatibility_key"] == compatibility_key
+            ),
             None,
         )
 
@@ -68,7 +83,9 @@ class LSPProcessPool:
 
         lsp_process = await process_factory()
         self._metadata[lsp_process] = ProcessMetadata(
-            base_path=base_path, created_at=asyncio.get_event_loop().time()
+            base_path=base_path,
+            compatibility_key=compatibility_key,
+            created_at=asyncio.get_event_loop().time(),
         )
 
         if self.current_size < self.max_size:

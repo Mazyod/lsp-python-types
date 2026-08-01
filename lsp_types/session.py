@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses as dc
+import enum
 import typing as t
 from pathlib import Path
 
@@ -62,6 +63,69 @@ class DiagnosticsResult:
     value: list[types.Diagnostic]
 
 
+@dc.dataclass(frozen=True)
+class _ProcessCompatibilityKey:
+    """Inputs that must match before an initialized process can be reused."""
+
+    backend_type: type[t.Any]
+    base_path: str
+    command: tuple[str, ...]
+    environment: tuple[tuple[str, str], ...]
+    working_directory: str
+    options: t.Hashable
+    initialize_params: t.Hashable
+
+
+def _freeze_for_compatibility(value: t.Any) -> t.Hashable:
+    """Convert nested protocol/config values into a deterministic hashable value."""
+    # Enum members have the same wire representation as their scalar values.
+    if isinstance(value, enum.Enum):
+        return _freeze_for_compatibility(value.value)
+    if isinstance(value, t.Mapping):
+        items = [
+            (
+                _freeze_for_compatibility(key),
+                _freeze_for_compatibility(item_value),
+            )
+            for key, item_value in value.items()
+        ]
+        return ("mapping", tuple(sorted(items, key=lambda item: repr(item[0]))))
+    if isinstance(value, (list, tuple)):
+        return ("sequence", tuple(_freeze_for_compatibility(item) for item in value))
+
+    if isinstance(value, float):
+        # ``0.0 == -0.0`` even though their serialized forms can differ.
+        return ("scalar", float, value.hex())
+    if value is None or isinstance(value, (bool, int, str)):
+        return ("scalar", type(value), value)
+
+    # Hashability does not guarantee immutability or safe equality. Unknown values
+    # therefore get a unique token so custom configurations remain valid but never
+    # risk reusing a process initialized from stale state.
+    return ("unsupported", type(value), object())
+
+
+def _build_process_compatibility_key(
+    backend: LSPBackend,
+    *,
+    base_path: str,
+    process_launch_info: ProcessLaunchInfo,
+    resolved_environment: t.Mapping[str, str],
+    options: t.Mapping,
+    initialize_params: types.InitializeParams,
+) -> _ProcessCompatibilityKey:
+    """Build the complete identity of an initialized language-server process."""
+    return _ProcessCompatibilityKey(
+        backend_type=type(backend),
+        base_path=base_path,
+        command=tuple(process_launch_info.cmd),
+        environment=tuple(sorted(resolved_environment.items())),
+        working_directory=str(process_launch_info.cwd.resolve()),
+        options=_freeze_for_compatibility(options),
+        initialize_params=_freeze_for_compatibility(initialize_params),
+    )
+
+
 class Session:
     """Concrete LSP session implementation using pluggable backends"""
 
@@ -83,39 +147,36 @@ class Session:
         # Write backend-specific configuration
         backend.write_config(base_path, options)
 
-        # Capture the server's semantic tokens legend during initialization
-        captured_legend: types.SemanticTokensLegend | None = None
-        captured_server_info: types.ServerInfo | None = None
+        process_launch_info = backend.create_process_launch_info(base_path, options)
+        resolved_environment = process_launch_info.resolved_environment()
+        resolved_initialize_params: types.InitializeParams = {
+            "processId": None,
+            "rootUri": f"file://{base_path}",
+            "rootPath": base_path_str,
+            "capabilities": backend.get_lsp_capabilities(),
+        }
+
+        if initialize_params is not None:
+            resolved_initialize_params = resolved_initialize_params | initialize_params
+
+        compatibility_key = _build_process_compatibility_key(
+            backend,
+            base_path=base_path_str,
+            process_launch_info=process_launch_info,
+            resolved_environment=resolved_environment,
+            options=options,
+            initialize_params=resolved_initialize_params,
+        )
 
         async def create_lsp_process():
-            nonlocal captured_legend, captured_server_info
-
-            proc_info = backend.create_process_launch_info(base_path, options)
-            lsp_process = LSPProcess(proc_info)
+            lsp_process = LSPProcess(
+                process_launch_info,
+                resolved_environment=resolved_environment,
+            )
             await lsp_process.start()
 
             # Initialize LSP connection
-            resolved_initialize_params: types.InitializeParams = {
-                "processId": None,
-                "rootUri": f"file://{base_path}",
-                "rootPath": base_path_str,
-                "capabilities": backend.get_lsp_capabilities(),
-            }
-
-            if initialize_params is not None:
-                resolved_initialize_params = (
-                    resolved_initialize_params | initialize_params
-                )
-
-            init_result = await lsp_process.send.initialize(resolved_initialize_params)
-
-            # Extract semantic tokens legend from server capabilities
-            if init_result:
-                caps = init_result.get("capabilities", {})
-                provider = caps.get("semanticTokensProvider")
-                if provider and "legend" in provider:
-                    captured_legend = provider["legend"]
-                captured_server_info = init_result.get("serverInfo")
+            await lsp_process.send.initialize(resolved_initialize_params)
 
             # Send initialized notification (required by LSP spec)
             await lsp_process.notify.initialized({})
@@ -126,10 +187,24 @@ class Session:
         if pool is None:
             pool = LSPProcessPool(max_size=0)  # No recycling, immediate shutdown
 
-        lsp_process = await pool.acquire(create_lsp_process, base_path_str)
+        lsp_process = await pool.acquire(
+            create_lsp_process,
+            base_path_str,
+            compatibility_key=compatibility_key,
+        )
         try:
-            # Use server legend if captured, otherwise fall back to backend's legend
-            legend = captured_legend or backend.get_semantic_tokens_legend()
+            init_result = lsp_process.initialize_result
+            server_legend: types.SemanticTokensLegend | None = None
+            server_info: types.ServerInfo | None = None
+            if init_result:
+                capabilities = init_result.get("capabilities", {})
+                provider = capabilities.get("semanticTokensProvider")
+                if provider and "legend" in provider:
+                    server_legend = provider["legend"]
+                server_info = init_result.get("serverInfo")
+
+            # Use server legend if advertised, otherwise fall back to backend's legend
+            legend = server_legend or backend.get_semantic_tokens_legend()
 
             session = cls(
                 lsp_process,
@@ -137,7 +212,7 @@ class Session:
                 base_path,
                 pool=pool,
                 legend=legend,
-                server_info=captured_server_info,
+                server_info=server_info,
             )
 
             # Update settings via didChangeConfiguration

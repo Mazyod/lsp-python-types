@@ -48,6 +48,7 @@ async def test_timeout_when_server_hangs():
         )
         assert init_result is not None
         assert "capabilities" in init_result
+        assert process.initialize_result == init_result
 
         await process.notify.initialized({})
 
