@@ -19,7 +19,7 @@ class ProcessMetadata(t.TypedDict):
 
     base_path: str
     compatibility_key: t.Hashable | None
-    created_at: float
+    idle_since: t.NotRequired[float]
 
 
 class LSPProcessPool:
@@ -77,6 +77,7 @@ class LSPProcessPool:
         if compatible_process:
             self._available.remove(compatible_process)
             self._active.add(compatible_process)
+            self._metadata[compatible_process].pop("idle_since")
             await self._reset_process(compatible_process)
             logger.debug("Reusing compatible process from pool")
             return compatible_process
@@ -85,7 +86,6 @@ class LSPProcessPool:
         self._metadata[lsp_process] = ProcessMetadata(
             base_path=base_path,
             compatibility_key=compatibility_key,
-            created_at=asyncio.get_event_loop().time(),
         )
 
         if self.current_size < self.max_size:
@@ -99,6 +99,8 @@ class LSPProcessPool:
     async def release(self, process: LSPProcess) -> None:
         """Release a process back to the pool"""
         if process in self._active:
+            metadata = self._metadata[process]
+            metadata["idle_since"] = asyncio.get_running_loop().time()
             self._active.remove(process)
             self._available.append(process)
             logger.debug("Released process back to pool")
@@ -154,12 +156,15 @@ class LSPProcessPool:
 
     async def _remove_idle_processes(self) -> None:
         """Remove processes that have been idle too long"""
-        current_time = asyncio.get_event_loop().time()
+        current_time = asyncio.get_running_loop().time()
         processes_to_remove = []
 
         for process in self._available:
             metadata = self._metadata[process]
-            idle_time = current_time - metadata["created_at"]
+            idle_since = metadata.get("idle_since")
+            if idle_since is None:
+                raise RuntimeError("Available process is missing an idle timestamp")
+            idle_time = current_time - idle_since
             if idle_time > self._max_idle_time:
                 processes_to_remove.append(process)
 

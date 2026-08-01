@@ -49,6 +49,21 @@ class _StubLSPProcess(LSPProcess):
         self.stop_count += 1
 
 
+class _ManualClock:
+    def __init__(self) -> None:
+        self.current_time = 0.0
+
+    def time(self) -> float:
+        return self.current_time
+
+    def advance(self, seconds: float) -> None:
+        self.current_time += seconds
+
+
+async def _unexpected_process_factory() -> LSPProcess:
+    raise AssertionError("Expected the available process to be reused")
+
+
 def test_compatibility_values_are_structural_and_type_safe():
     """Equivalent mappings match without conflating distinct scalar types."""
     left = {"nested": {"first": True, "second": [1, "1"]}, "other": None}
@@ -112,6 +127,21 @@ class TestLSPProcessPool:
         await pool.cleanup()
 
     @pytest.fixture
+    async def idle_pool(self, monkeypatch: pytest.MonkeyPatch):
+        """Create an active stub process governed by a manual monotonic clock."""
+        clock = _ManualClock()
+        monkeypatch.setattr(asyncio, "get_running_loop", lambda: clock)
+        pool = LSPProcessPool(max_idle_time=10.0, cleanup_interval=3_600.0)
+        process = _StubLSPProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        acquired = await pool.acquire(create_process, "/workspace")
+        yield pool, clock, acquired
+        await pool.cleanup()
+
+    @pytest.fixture
     def base_path(self, tmp_path: Path) -> Path:
         """Provide a temp directory as base_path for sessions"""
         return tmp_path
@@ -166,6 +196,48 @@ class TestLSPProcessPool:
             await pool.release(legacy_reused)
         finally:
             await pool.cleanup()
+
+    async def test_idle_timeout_starts_when_active_process_is_released(self, idle_pool):
+        """Time spent actively leased does not count toward the idle timeout."""
+        pool, clock, process = idle_pool
+        clock.advance(100.0)
+        await pool.release(process)
+        await pool._remove_idle_processes()
+
+        assert pool.available_count == 1
+        assert process.stop_count == 0
+
+    async def test_releasing_reacquired_process_resets_idle_timeout(self, idle_pool):
+        """Every return to the pool starts a fresh idle window."""
+        pool, clock, process = idle_pool
+        await pool.release(process)
+        clock.advance(8.0)
+
+        second_lease = await pool.acquire(_unexpected_process_factory, "/workspace")
+        clock.advance(100.0)
+        await pool.release(second_lease)
+        clock.advance(9.0)
+        await pool._remove_idle_processes()
+
+        assert pool.available_count == 1
+        assert process.reset_count == 1
+        assert process.stop_count == 0
+
+    async def test_idle_process_expires_after_release_timeout(self, idle_pool):
+        """A genuinely idle process is stopped after its idle window."""
+        pool, clock, process = idle_pool
+        await pool.release(process)
+        clock.advance(10.0)
+        await pool._remove_idle_processes()
+
+        assert pool.available_count == 1
+        assert process.stop_count == 0
+
+        clock.advance(1.0)
+        await pool._remove_idle_processes()
+
+        assert pool.current_size == 0
+        assert process.stop_count == 1
 
     async def test_sessions_with_different_backends_do_not_share_processes(
         self, session_pool, base_path
