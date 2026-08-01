@@ -13,6 +13,8 @@ from . import requests, types
 
 CONTENT_LENGTH = "Content-Length: "
 ENCODING = "utf-8"
+_GRACEFUL_SHUTDOWN_TIMEOUT = 5.0
+_PROCESS_EXIT_TIMEOUT = 5.0
 
 
 logger = logging.getLogger("lsp-types")
@@ -89,8 +91,9 @@ class LSPProcess:
         self._notification_listeners: list[asyncio.Queue[types.LSPObject]] = []
         self._pending_requests: dict[int | str, asyncio.Future[t.Any]] = {}
         self._request_id_gen = itertools.count(1)
-        self._tasks: list[asyncio.Task] = []
-        self._shutdown = False
+        self._tasks: set[asyncio.Task[t.Any]] = set()
+        self._lifecycle_lock = asyncio.Lock()
+        self._stopped = False
         self._open_documents: set[str] = set()
         self._write_lock = asyncio.Lock()
         self._initialize_result: types.InitializeResult | None = None
@@ -110,63 +113,163 @@ class LSPProcess:
 
     async def start(self) -> None:
         """Start the LSP server process and initialize communication."""
-        if self._process:
-            raise RuntimeError("LSP process already started")
+        async with self._lifecycle_lock:
+            if self._stopped:
+                raise RuntimeError(
+                    "LSP process cannot be restarted after it is stopped"
+                )
+            if self._process:
+                raise RuntimeError("LSP process already started")
 
-        child_proc_env = (
-            self._process_launch_info.resolved_environment()
-            if self._resolved_environment is None
-            else self._resolved_environment.copy()
-        )
+            child_proc_env = (
+                self._process_launch_info.resolved_environment()
+                if self._resolved_environment is None
+                else self._resolved_environment.copy()
+            )
 
-        self._process = await asyncio.create_subprocess_exec(
-            *self._process_launch_info.cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stdin=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=child_proc_env,
-            cwd=self._process_launch_info.cwd,
-        )
+            self._process = await asyncio.create_subprocess_exec(
+                *self._process_launch_info.cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stdin=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=child_proc_env,
+                cwd=self._process_launch_info.cwd,
+            )
 
-        self._tasks.extend(
-            [
-                asyncio.create_task(self._read_stdout()),
-                asyncio.create_task(self._read_stderr()),
-            ]
-        )
+            self._track_task(asyncio.create_task(self._read_stdout()))
+            self._track_task(asyncio.create_task(self._read_stderr()))
 
     async def stop(self) -> None:
         """Stop the LSP server and clean up resources."""
-        if not self._shutdown:
-            try:
-                await self.send.shutdown()
-                await self.notify.exit()
-            except ConnectionResetError:
-                pass  # Server already closed
+        async with self._lifecycle_lock:
+            process = self._process
+            if process is None:
+                await self._cancel_tasks()
+                self._stopped = True
+                return
 
-            self._shutdown = True
+            cleanup_task = asyncio.create_task(self._stop_process(process))
+            await self._await_cleanup(cleanup_task)
 
-        for task in self._tasks:
-            task.cancel()
-
-        if self._process:
-            # Close stdin before terminating to prevent "Event loop is closed"
-            # errors during garbage collection
-            if self._process.stdin:
-                self._process.stdin.close()
-
-            try:
-                self._process.terminate()
-                return_code = await asyncio.wait_for(self._process.wait(), timeout=5.0)
-                if return_code not in (0, -15):
-                    logger.warning("Server exited with return code: %d", return_code)
-            except asyncio.TimeoutError:
-                try:
-                    logger.warning("Killing process")
-                    self._process.kill()
-                except ProcessLookupError:
-                    pass
+    async def _stop_process(self, process: asyncio.subprocess.Process) -> None:
+        """Complete subprocess cleanup independently of caller cancellation."""
+        try:
+            graceful_exit_sent = await self._request_graceful_shutdown()
+            if graceful_exit_sent:
+                await self._wait_for_exit(process, _PROCESS_EXIT_TIMEOUT)
+        finally:
+            await self._terminate_and_reap(process)
+            await self._close_stdin(process)
+            await self._cancel_tasks()
             self._process = None
+            self._stopped = True
+
+    @staticmethod
+    async def _await_cleanup(cleanup_task: asyncio.Task[None]) -> None:
+        """Wait for cleanup to finish before propagating caller cancellation."""
+        cancellation: asyncio.CancelledError | None = None
+
+        while not cleanup_task.done():
+            try:
+                await asyncio.shield(cleanup_task)
+            except asyncio.CancelledError as error:
+                cancellation = error
+
+        cleanup_task.result()
+        if cancellation is not None:
+            raise cancellation
+
+    async def _request_graceful_shutdown(self) -> bool:
+        """Ask the server to shut down without allowing it to block cleanup."""
+        try:
+            async with asyncio.timeout(_GRACEFUL_SHUTDOWN_TIMEOUT):
+                await self.send.shutdown()
+                try:
+                    await self.notify.exit()
+                except ConnectionError:
+                    # Closing the transport immediately after `exit` is valid LSP
+                    # server behavior; the notification has already been attempted.
+                    logger.debug("LSP server closed while receiving exit notification")
+        except TimeoutError:
+            logger.warning("Graceful LSP shutdown timed out")
+            return False
+        except ConnectionError:
+            logger.debug("LSP server closed before graceful shutdown completed")
+            return False
+        return True
+
+    @staticmethod
+    async def _wait_for_exit(
+        process: asyncio.subprocess.Process, timeout: float
+    ) -> bool:
+        """Wait up to ``timeout`` seconds for a subprocess to exit."""
+        if process.returncode is not None:
+            return True
+
+        try:
+            async with asyncio.timeout(timeout):
+                await process.wait()
+        except TimeoutError:
+            return False
+        return True
+
+    async def _terminate_and_reap(self, process: asyncio.subprocess.Process) -> None:
+        """Escalate from terminate to kill and always wait for process exit."""
+        if process.returncode is None:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+
+        if not await self._wait_for_exit(process, _PROCESS_EXIT_TIMEOUT):
+            logger.warning("LSP server did not terminate; killing process")
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            await process.wait()
+
+        if process.returncode not in (0, -15, -9):
+            logger.warning("Server exited with return code: %d", process.returncode)
+
+    async def _close_stdin(self, process: asyncio.subprocess.Process) -> None:
+        """Close the subprocess input transport after the process has exited."""
+        if process.stdin is None:
+            return
+
+        async with self._write_lock:
+            process.stdin.close()
+            try:
+                await process.stdin.wait_closed()
+            except OSError:
+                pass
+
+    def _track_task[ResultT](
+        self, task: asyncio.Task[ResultT]
+    ) -> asyncio.Task[ResultT]:
+        """Own an internal task only while it is running."""
+        self._tasks.add(task)
+        task.add_done_callback(self._on_task_done)
+        return task
+
+    def _on_task_done(self, task: asyncio.Task[t.Any]) -> None:
+        """Release a completed task and consume any unobserved exception."""
+        self._tasks.discard(task)
+        if task.cancelled():
+            return
+
+        error = task.exception()
+        if error is not None:
+            logger.debug("Internal LSP task failed: %s", error)
+
+    async def _cancel_tasks(self) -> None:
+        """Cancel and join every internal task still owned by this process."""
+        while self._tasks:
+            tasks = list(self._tasks)
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            self._tasks.difference_update(tasks)
 
     async def reset(self) -> None:
         """Reset the LSP process state for reuse."""
@@ -249,10 +352,9 @@ class LSPProcess:
             return asyncio.create_task(asyncio.sleep(0))
 
         payload = _make_notification(method, params)
-        task = asyncio.create_task(self._send_payload(self._process.stdin, payload))
-        self._tasks.append(task)
-
-        return task
+        return self._track_task(
+            asyncio.create_task(self._send_payload(self._process.stdin, payload))
+        )
 
     def _on_notification(
         self, method: str, timeout: float | None = None
@@ -268,11 +370,7 @@ class LSPProcess:
         if timeout is not None:
             coroutine = asyncio.wait_for(coroutine, timeout)
 
-        wait_task = asyncio.create_task(coroutine)
-        self._tasks.append(wait_task)
-        wait_task.add_done_callback(self._tasks.remove)
-
-        return wait_task
+        return self._track_task(asyncio.create_task(coroutine))
 
     async def _send_payload(
         self, stream: asyncio.StreamWriter, payload: types.LSPObject

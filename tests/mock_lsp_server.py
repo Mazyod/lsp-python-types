@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 from typing import Any
 
@@ -190,8 +191,16 @@ def main():
         type=str,
         help="Method to return malformed JSON-RPC for",
     )
+    parser.add_argument(
+        "--ignore-sigterm",
+        action="store_true",
+        help="Ignore SIGTERM to test forced process cleanup",
+    )
 
     args = parser.parse_args()
+
+    if args.ignore_sigterm:
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
     server = MockLSPServer(
         hang_on=args.hang_on,

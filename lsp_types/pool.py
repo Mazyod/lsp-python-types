@@ -37,7 +37,10 @@ class LSPProcessPool:
         self._available: deque[LSPProcess] = deque()
         self._active: set[LSPProcess] = set()
         self._metadata: dict[LSPProcess, ProcessMetadata] = {}
-        self._cleanup_task = asyncio.create_task(self._cleanup_idle_processes())
+        self._cleanup_task: asyncio.Task[None] | None = asyncio.create_task(
+            self._cleanup_idle_processes()
+        )
+        self._cleanup_lock = asyncio.Lock()
 
     @property
     def current_size(self) -> int:
@@ -113,11 +116,20 @@ class LSPProcessPool:
 
     async def cleanup(self) -> None:
         """Clean up all processes in the pool"""
+        async with self._cleanup_lock:
+            cleanup_task = asyncio.create_task(self._cleanup_resources())
+            await self._await_cleanup(cleanup_task)
 
+    async def _cleanup_resources(self) -> None:
+        """Join the maintenance worker and stop every process owned by the pool."""
         # Cancel cleanup task
-        if self._cleanup_task:
-            self._cleanup_task.cancel()
+        cleanup_task = self._cleanup_task
+        if cleanup_task is not None:
             self._cleanup_task = None
+            cleanup_task.cancel()
+            [worker_result] = await asyncio.gather(cleanup_task, return_exceptions=True)
+            if isinstance(worker_result, Exception):
+                logger.warning("Pool cleanup worker failed: %s", worker_result)
 
         # Shutdown all processes
         all_processes = list(self._available) + list(self._active)
@@ -133,6 +145,21 @@ class LSPProcessPool:
                 logger.warning(f"Error shutting down pooled process: {e}")
 
         logger.debug("Pool cleanup completed")
+
+    @staticmethod
+    async def _await_cleanup(cleanup_task: asyncio.Task[None]) -> None:
+        """Wait for pool cleanup before propagating caller cancellation."""
+        cancellation: asyncio.CancelledError | None = None
+
+        while not cleanup_task.done():
+            try:
+                await asyncio.shield(cleanup_task)
+            except asyncio.CancelledError as error:
+                cancellation = error
+
+        cleanup_task.result()
+        if cancellation is not None:
+            raise cancellation
 
     async def _reset_process(self, process: LSPProcess) -> None:
         """Reset a process for reuse.

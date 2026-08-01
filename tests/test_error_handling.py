@@ -10,12 +10,14 @@ These tests verify that the LSP client properly handles:
 from __future__ import annotations
 
 import asyncio
+import signal
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+import lsp_types.process as process_module
 from lsp_types import types
 from lsp_types.pool import LSPProcessPool
 from lsp_types.process import Error, LSPProcess, ProcessLaunchInfo
@@ -142,6 +144,204 @@ async def test_shutdown_after_timeout():
         # (stop() handles cleanup even after failed requests)
     finally:
         await process.stop()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="uses POSIX process signals")
+async def test_stop_times_out_hung_shutdown_and_reaps_process(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    """A server that ignores shutdown cannot block cleanup or remain alive."""
+    monkeypatch.setattr(process_module, "_GRACEFUL_SHUTDOWN_TIMEOUT", 0.05)
+    monkeypatch.setattr(process_module, "_PROCESS_EXIT_TIMEOUT", 0.05)
+    process = LSPProcess(
+        ProcessLaunchInfo(
+            cmd=get_mock_server_cmd("--hang-on", "shutdown", "--ignore-sigterm")
+        )
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    await asyncio.wait_for(process.stop(), timeout=1.0)
+
+    assert process._process is None
+    assert subprocess.returncode == -signal.SIGKILL
+    assert not process._tasks
+    assert not process._pending_requests
+    assert "did not terminate; killing process" in caplog.text
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="uses POSIX process signals")
+async def test_cancelled_stop_finishes_reaping_before_propagating(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Caller cancellation cannot interrupt subprocess reaping."""
+    monkeypatch.setattr(process_module, "_GRACEFUL_SHUTDOWN_TIMEOUT", 0.05)
+    monkeypatch.setattr(process_module, "_PROCESS_EXIT_TIMEOUT", 0.05)
+    process = LSPProcess(
+        ProcessLaunchInfo(
+            cmd=get_mock_server_cmd("--hang-on", "shutdown", "--ignore-sigterm")
+        )
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    terminate_wait_started = asyncio.Event()
+    original_wait_for_exit = process._wait_for_exit
+
+    async def tracked_wait_for_exit(
+        child: asyncio.subprocess.Process, timeout: float
+    ) -> bool:
+        terminate_wait_started.set()
+        return await original_wait_for_exit(child, timeout)
+
+    monkeypatch.setattr(process, "_wait_for_exit", tracked_wait_for_exit)
+    stop_task = asyncio.create_task(process.stop())
+    await asyncio.wait_for(terminate_wait_started.wait(), timeout=1.0)
+    stop_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await stop_task
+
+    assert subprocess.returncode == -signal.SIGKILL
+    assert process._process is None
+    assert not process._tasks
+    assert not process._pending_requests
+
+
+async def test_completed_notification_tasks_are_not_retained(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Fire-and-forget notifications leave the internal task registry promptly."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    release_notifications = asyncio.Event()
+    all_notifications_started = asyncio.Event()
+    notifications_started = 0
+    original_send_payload = process._send_payload
+
+    async def gated_send_payload(stream, payload):  # type: ignore[no-untyped-def]
+        nonlocal notifications_started
+        if payload.get("method") == "initialized":
+            notifications_started += 1
+            if notifications_started == 100:
+                all_notifications_started.set()
+            await release_notifications.wait()
+        await original_send_payload(stream, payload)
+
+    monkeypatch.setattr(process, "_send_payload", gated_send_payload)
+    notifications = [process.notify.initialized({}) for _ in range(100)]
+
+    try:
+        await asyncio.wait_for(all_notifications_started.wait(), timeout=1.0)
+        assert len(process._tasks) == 102
+
+        release_notifications.set()
+        await asyncio.gather(*notifications)
+        await asyncio.sleep(0)
+
+        assert len(process._tasks) == 2
+    finally:
+        release_notifications.set()
+        await asyncio.gather(*notifications, return_exceptions=True)
+        await process.stop()
+
+    assert not process._tasks
+
+
+async def test_task_cleanup_drains_tasks_added_during_cancellation():
+    """Tasks created while cancellation is unwinding remain owned and are joined."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    late_tasks: list[asyncio.Task[None]] = []
+
+    async def wait_forever() -> None:
+        await asyncio.Event().wait()
+
+    async def add_late_task_during_cleanup() -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            late_task = process._track_task(asyncio.create_task(wait_forever()))
+            late_tasks.append(late_task)
+
+    process._track_task(asyncio.create_task(add_late_task_during_cleanup()))
+    await asyncio.sleep(0)
+
+    await process._cancel_tasks()
+
+    assert len(late_tasks) == 1
+    assert late_tasks[0].cancelled()
+    assert not process._tasks
+
+
+async def test_concurrent_stop_calls_share_cleanup(monkeypatch: pytest.MonkeyPatch):
+    """Concurrent callers can safely wait for one idempotent cleanup."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    shutdown_count = 0
+    original_request_graceful_shutdown = process._request_graceful_shutdown
+
+    async def counted_graceful_shutdown() -> bool:
+        nonlocal shutdown_count
+        shutdown_count += 1
+        return await original_request_graceful_shutdown()
+
+    monkeypatch.setattr(
+        process, "_request_graceful_shutdown", counted_graceful_shutdown
+    )
+
+    await asyncio.gather(process.stop(), process.stop())
+
+    assert shutdown_count == 1
+    assert process._process is None
+    assert not process._tasks
+
+
+async def test_stopped_process_cannot_restart():
+    """Stopping is a terminal lifecycle transition."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    await process.stop()
+
+    with pytest.raises(RuntimeError, match="cannot be restarted"):
+        await process.start()
+
+
+async def test_start_and_stop_are_serialized(monkeypatch: pytest.MonkeyPatch):
+    """Stopping during startup cannot publish a process after terminal shutdown."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    spawn_started = asyncio.Event()
+    allow_spawn = asyncio.Event()
+    original_create_subprocess_exec = asyncio.create_subprocess_exec
+
+    async def gated_create_subprocess_exec(*args, **kwargs):  # type: ignore[no-untyped-def]
+        spawn_started.set()
+        await allow_spawn.wait()
+        return await original_create_subprocess_exec(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", gated_create_subprocess_exec)
+    start_task = asyncio.create_task(process.start())
+    await asyncio.wait_for(spawn_started.wait(), timeout=1.0)
+    stop_task = asyncio.create_task(process.stop())
+    await asyncio.sleep(0)
+
+    assert not stop_task.done()
+
+    allow_spawn.set()
+    await start_task
+    await stop_task
+
+    assert process._process is None
+    assert process._stopped
+    assert not process._tasks
 
 
 class FailingBackend:

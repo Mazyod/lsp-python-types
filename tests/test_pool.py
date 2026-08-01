@@ -239,6 +239,108 @@ class TestLSPProcessPool:
         assert pool.current_size == 0
         assert process.stop_count == 1
 
+    async def test_cleanup_awaits_inflight_idle_cleanup(self):
+        """Pool cleanup joins its worker before returning."""
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+        stop_finished = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                try:
+                    await allow_stop.wait()
+                finally:
+                    stop_finished.set()
+
+        pool = LSPProcessPool(max_idle_time=0.0, cleanup_interval=0.01)
+        process = BlockingStopProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        try:
+            acquired = await pool.acquire(create_process, "/workspace")
+            await pool.release(acquired)
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+
+            await pool.cleanup()
+
+            assert stop_finished.is_set()
+            assert process.stop_count == 1
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_cancelled_cleanup_stops_every_owned_process(self):
+        """Caller cancellation is propagated only after all processes stop."""
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                await allow_stop.wait()
+
+        pool = LSPProcessPool(max_size=2, cleanup_interval=3_600.0)
+        processes = [BlockingStopProcess(), BlockingStopProcess()]
+
+        async def create_first() -> LSPProcess:
+            return processes[0]
+
+        async def create_second() -> LSPProcess:
+            return processes[1]
+
+        try:
+            await pool.acquire(create_first, "/workspace/one")
+            await pool.acquire(create_second, "/workspace/two")
+            cleanup_task = asyncio.create_task(pool.cleanup())
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+            cleanup_task.cancel()
+            await asyncio.sleep(0)
+
+            assert not cleanup_task.done()
+
+            allow_stop.set()
+            with pytest.raises(asyncio.CancelledError):
+                await cleanup_task
+
+            assert [process.stop_count for process in processes] == [1, 1]
+            assert pool.current_size == 0
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_cleanup_continues_after_worker_failure(
+        self, caplog: pytest.LogCaptureFixture
+    ):
+        """A failed maintenance worker cannot prevent foreground cleanup."""
+        pool = LSPProcessPool(cleanup_interval=3_600.0)
+        process = _StubLSPProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        original_worker = pool._cleanup_task
+        assert original_worker is not None
+        original_worker.cancel()
+        await asyncio.gather(original_worker, return_exceptions=True)
+
+        async def fail_worker() -> None:
+            raise RuntimeError("simulated cleanup worker failure")
+
+        pool._cleanup_task = asyncio.create_task(fail_worker())
+        await asyncio.sleep(0)
+        await pool.acquire(create_process, "/workspace")
+
+        await pool.cleanup()
+
+        assert process.stop_count == 1
+        assert pool.current_size == 0
+        assert "simulated cleanup worker failure" in caplog.text
+
     async def test_sessions_with_different_backends_do_not_share_processes(
         self, session_pool, base_path
     ):
