@@ -24,4 +24,4 @@ This document describes known limitations and behavioral differences when using 
 
 ## Version Information
 
-These limitations were last verified with Pyrefly 1.1.1 (June 2026). Future versions may address some of these limitations.
+These limitations were last verified with Pyrefly 1.2.0 (August 2026): `completionItem/resolve` remains a no-op (the resolved item is returned byte-identical), and the semantic-tokens legend is still not advertised via LSP (`semanticTokensProvider` has no legend in the initialize result), so the hardcoded `PYREFLY_LEGEND` remains required. Future versions may address some of these limitations.

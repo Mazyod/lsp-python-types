@@ -76,7 +76,7 @@ The following LSPs are available out of the box:
 ### Pyrefly CLI tools
 
 This library drives Pyrefly's LSP server (`pyrefly lsp`), but Pyrefly also ships a broader
-standalone CLI worth knowing about (verified with Pyrefly 1.1.1):
+standalone CLI worth knowing about (verified with Pyrefly 1.2.0):
 
 | Command | What it does |
 |---------|--------------|
@@ -88,6 +88,7 @@ standalone CLI worth knowing about (verified with Pyrefly 1.1.1):
 | `pyrefly suppress` | Add ignore comments for existing errors, or remove unused ignores |
 | `pyrefly stubgen` | Generate `.pyi` stub files from Python source |
 | `pyrefly dump-config` | Print Pyrefly's resolved configuration |
+| `pyrefly tsp` | Start a TSP (Type Server Protocol) server (new in 1.2.x) |
 
 Run `pyrefly <command> --help` for details, or see the [Pyrefly docs](https://pyrefly.org/).
 
@@ -104,7 +105,7 @@ Run `pyrefly <command> --help` for details, or see the [Pyrefly docs](https://py
 
 ### Features by Backend
 
-> Last verified: basedpyright 1.39.9, Pyrefly 1.1.1, ty 0.0.61, Zuban 0.9.0
+> Last verified: basedpyright 1.39.9, Pyrefly 1.2.0, ty 0.0.61, Zuban 0.9.0
 
 | Feature | Pyright | Pyrefly | ty | Zuban | Notes |
 |---------|:-------:|:-------:|:--:|:-----:|-------|
