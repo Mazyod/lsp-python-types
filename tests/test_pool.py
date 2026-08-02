@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 import lsp_types
+import lsp_types.pool
 from lsp_types.pool import LSPProcessPool
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
 from lsp_types.pyrefly.backend import PyreflyBackend
@@ -285,10 +286,15 @@ class TestLSPProcessPool:
         await pool.cleanup()
 
     @pytest.fixture
-    async def idle_pool(self, monkeypatch: pytest.MonkeyPatch):
-        """Create an active stub process governed by a manual monotonic clock."""
+    def manual_clock(self, monkeypatch: pytest.MonkeyPatch) -> _ManualClock:
+        """Drive pool idle timing from a deterministic clock instead of the loop."""
         clock = _ManualClock()
-        monkeypatch.setattr(asyncio, "get_running_loop", lambda: clock)
+        monkeypatch.setattr(lsp_types.pool, "_now", clock.time)
+        return clock
+
+    @pytest.fixture
+    async def idle_pool(self, manual_clock: _ManualClock):
+        """Create an active stub process governed by a manual monotonic clock."""
         pool = LSPProcessPool(max_idle_time=10.0, cleanup_interval=3_600.0)
         process = _StubLSPProcess()
 
@@ -296,7 +302,7 @@ class TestLSPProcessPool:
             return process
 
         acquired = await pool.acquire(create_process, "/workspace")
-        yield pool, clock, acquired
+        yield pool, manual_clock, acquired
         await pool.cleanup()
 
     @pytest.fixture
@@ -566,12 +572,9 @@ class TestLSPProcessPool:
         assert "simulated cleanup worker failure" in caplog.text
 
     async def test_idle_sweep_skips_a_process_acquired_mid_sweep(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, manual_clock: _ManualClock
     ):
         """Checking a candidate out while the sweep is stopping another is safe."""
-        clock = _ManualClock()
-        monkeypatch.setattr(asyncio, "get_running_loop", lambda: clock)
-
         stop_started = asyncio.Event()
         allow_stop = asyncio.Event()
 
@@ -596,7 +599,7 @@ class TestLSPProcessPool:
             second = await pool.acquire(create_contested, "/workspace")
             await pool.release(first)
             await pool.release(second)
-            clock.advance(100.0)
+            manual_clock.advance(100.0)
 
             sweep = asyncio.create_task(pool._remove_idle_processes())
             await asyncio.wait_for(stop_started.wait(), timeout=1.0)
@@ -615,12 +618,9 @@ class TestLSPProcessPool:
             await pool.cleanup()
 
     async def test_idle_sweep_spares_a_process_returned_mid_sweep(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, manual_clock: _ManualClock
     ):
         """A process handed back mid-sweep keeps the fresh idle window it earned."""
-        clock = _ManualClock()
-        monkeypatch.setattr(asyncio, "get_running_loop", lambda: clock)
-
         stop_started = asyncio.Event()
         allow_stop = asyncio.Event()
 
@@ -645,7 +645,7 @@ class TestLSPProcessPool:
             second = await pool.acquire(create_contested, "/workspace")
             await pool.release(first)
             await pool.release(second)
-            clock.advance(100.0)
+            manual_clock.advance(100.0)
 
             sweep = asyncio.create_task(pool._remove_idle_processes())
             await asyncio.wait_for(stop_started.wait(), timeout=1.0)
@@ -1232,13 +1232,15 @@ class TestLSPProcessPool:
         for session in active_sessions:
             await session.shutdown()
 
-    async def test_idle_process_cleanup(self, lsp_backend, tmp_path: Path):
+    async def test_idle_process_cleanup(
+        self, lsp_backend, tmp_path: Path, manual_clock: _ManualClock
+    ):
         """Test that idle processes are automatically removed from the pool"""
-        # Create pool with very short idle time and cleanup interval for fast test
+        # The manual clock drives idle expiry, so the background worker is parked.
         pool = LSPProcessPool(
             max_size=3,
-            max_idle_time=0.1,  # 100ms idle time
-            cleanup_interval=0.05,  # Check every 50ms
+            max_idle_time=10.0,
+            cleanup_interval=3_600.0,
         )
 
         try:
@@ -1255,11 +1257,8 @@ class TestLSPProcessPool:
             assert pool.available_count == 1
             assert pool.current_size == 1
 
-            # Wait for process to become idle and be cleaned up
-            # Wait a bit longer than idle_time + cleanup_interval
-            await asyncio.sleep(0.2)
-
-            # Force a cleanup check by calling the method directly
+            # Push the clock past the idle window and sweep
+            manual_clock.advance(11.0)
             await pool._remove_idle_processes()
 
             # Pool should be empty now (process was idle too long)
@@ -1270,13 +1269,13 @@ class TestLSPProcessPool:
             await pool.cleanup()
 
     async def test_idle_cleanup_preserves_active_processes(
-        self, lsp_backend, tmp_path: Path
+        self, lsp_backend, tmp_path: Path, manual_clock: _ManualClock
     ):
         """Test that idle cleanup only removes available processes, not active ones"""
         pool = LSPProcessPool(
             max_size=3,
-            max_idle_time=0.1,  # 100ms idle time
-            cleanup_interval=0.05,  # Check every 50ms
+            max_idle_time=10.0,
+            cleanup_interval=3_600.0,
         )
 
         try:
@@ -1302,8 +1301,8 @@ class TestLSPProcessPool:
             assert pool.available_count == 0
             assert pool.current_size == 1
 
-            # Wait for idle cleanup
-            await asyncio.sleep(0.2)
+            # An active process has no idle window to expire
+            manual_clock.advance(11.0)
             await pool._remove_idle_processes()
 
             # No idle processes to remove, active process should still be there
@@ -1317,8 +1316,8 @@ class TestLSPProcessPool:
             assert pool.available_count == 1
             assert pool.current_size == 1
 
-            # Wait and cleanup idle processes
-            await asyncio.sleep(0.2)
+            # Its idle window starts at release, so advance again before sweeping
+            manual_clock.advance(11.0)
             await pool._remove_idle_processes()
 
             # Now the idle process should be cleaned up
@@ -1328,12 +1327,14 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_idle_cleanup_timing_precision(self, lsp_backend, tmp_path: Path):
+    async def test_idle_cleanup_timing_precision(
+        self, lsp_backend, tmp_path: Path, manual_clock: _ManualClock
+    ):
         """Test that idle cleanup respects the max_idle_time precisely"""
         pool = LSPProcessPool(
             max_size=2,
-            max_idle_time=0.15,  # 150ms idle time
-            cleanup_interval=0.05,  # Check every 50ms
+            max_idle_time=10.0,
+            cleanup_interval=3_600.0,
         )
 
         try:
@@ -1348,14 +1349,14 @@ class TestLSPProcessPool:
 
             assert pool.available_count == 1
 
-            # Wait less than idle time - process should still be there
-            await asyncio.sleep(0.1)  # 100ms < 150ms
+            # Inside the idle window - process must be kept
+            manual_clock.advance(9.0)
             await pool._remove_idle_processes()
 
             assert pool.available_count == 1  # Still there
 
-            # Wait more than idle time - process should be removed
-            await asyncio.sleep(0.1)  # Total 200ms > 150ms
+            # Past the idle window - process must be removed
+            manual_clock.advance(2.0)
             await pool._remove_idle_processes()
 
             assert pool.available_count == 0  # Should be removed now

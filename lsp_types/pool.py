@@ -14,6 +14,14 @@ from .process import LSPProcess, _run_protected
 logger = logging.getLogger("lsp-types")
 
 
+def _now() -> float:
+    """Return the current event-loop time.
+
+    Indirection exists so tests can drive pool timing with a manual clock.
+    """
+    return asyncio.get_running_loop().time()
+
+
 class ProcessMetadata(t.TypedDict):
     """Metadata for tracking pooled processes"""
 
@@ -132,7 +140,7 @@ class LSPProcessPool:
             await self._stop_quietly(process)
             return
 
-        self._metadata[process]["idle_since"] = asyncio.get_running_loop().time()
+        self._metadata[process]["idle_since"] = _now()
         self._available.append(process)
         logger.debug("Released process back to pool")
 
@@ -260,7 +268,7 @@ class LSPProcessPool:
 
     async def _remove_idle_processes(self) -> None:
         """Remove processes that have been idle too long"""
-        current_time = asyncio.get_running_loop().time()
+        current_time = _now()
         processes_to_remove = []
 
         for process in self._available:
