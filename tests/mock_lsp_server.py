@@ -17,6 +17,9 @@ Usage:
 
     # Return malformed JSON-RPC for a specific method
     python mock_lsp_server.py --malformed-on textDocument/hover
+
+    # Exit without responding (simulates a server dying mid-request)
+    python mock_lsp_server.py --exit-on shutdown
 """
 
 from __future__ import annotations
@@ -38,12 +41,14 @@ class MockLSPServer:
         error_code: int = -32600,
         error_message: str = "Mock error",
         malformed_on: str | None = None,
+        exit_on: str | None = None,
     ):
         self.hang_on = hang_on
         self.error_on = error_on
         self.error_code = error_code
         self.error_message = error_message
         self.malformed_on = malformed_on
+        self.exit_on = exit_on
         self._initialized = False
 
     def read_message(self) -> dict[str, Any] | None:
@@ -93,6 +98,10 @@ class MockLSPServer:
         if method == self.hang_on:
             # Don't respond - simulate hang/timeout
             return
+
+        if method == self.exit_on:
+            # Die without responding - the client sees EOF while waiting
+            sys.exit(0)
 
         if method == self.malformed_on and not is_notification:
             self.write_malformed()
@@ -192,6 +201,11 @@ def main():
         help="Method to return malformed JSON-RPC for",
     )
     parser.add_argument(
+        "--exit-on",
+        type=str,
+        help="Method to exit on without responding",
+    )
+    parser.add_argument(
         "--ignore-sigterm",
         action="store_true",
         help="Ignore SIGTERM to test forced process cleanup",
@@ -208,6 +222,7 @@ def main():
         error_code=args.error_code,
         error_message=args.error_message,
         malformed_on=args.malformed_on,
+        exit_on=args.exit_on,
     )
     server.run()
 

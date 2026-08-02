@@ -71,10 +71,29 @@ async def _run_protected(coroutine: t.Coroutine[t.Any, t.Any, None]) -> None:
             await asyncio.shield(cleanup_task)
         except asyncio.CancelledError as error:
             cancellation = error
+        except BaseException:
+            # Anything thrown into the caller while cleanup is still pending
+            # (e.g. GeneratorExit during teardown) must propagate untouched.
+            if not cleanup_task.done():
+                raise
+            # The cleanup task itself failed; its outcome is resolved below so a
+            # caller cancellation saved earlier still wins.
+            break
 
-    cleanup_task.result()
-    if cancellation is not None:
-        raise cancellation
+    if cancellation is None:
+        cleanup_task.result()
+        return
+
+    # Caller cancellation outranks a cleanup failure: a cancelled caller must never
+    # surface a different exception. The task outcome is still consumed so asyncio
+    # never reports it as an unretrieved exception.
+    if not cleanup_task.cancelled():
+        failure = cleanup_task.exception()
+        if failure is not None:
+            logger.debug(
+                "Cleanup failed while its caller was cancelled", exc_info=failure
+            )
+    raise cancellation
 
 
 class LSPProcess:
@@ -198,8 +217,12 @@ class LSPProcess:
         except TimeoutError:
             logger.warning("Graceful LSP shutdown timed out")
             return False
-        except ConnectionError:
-            logger.debug("LSP server closed before graceful shutdown completed")
+        except Exception as error:
+            # Best effort only: the caller's `finally` reaps the subprocess either
+            # way, so a server that errors on - or dies during - `shutdown` merely
+            # costs us the clean exit. Cancellation is a BaseException and still
+            # propagates, because it can only come from cancelling cleanup itself.
+            logger.debug("Graceful LSP shutdown failed", exc_info=error)
             return False
         return True
 

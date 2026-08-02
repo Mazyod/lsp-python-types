@@ -344,6 +344,68 @@ async def test_start_and_stop_are_serialized(monkeypatch: pytest.MonkeyPatch):
     assert not process._tasks
 
 
+async def test_stop_tolerates_error_reply_to_shutdown():
+    """A JSON-RPC error answer to `shutdown` cannot make cleanup fail."""
+    process = LSPProcess(
+        ProcessLaunchInfo(cmd=get_mock_server_cmd("--error-on", "shutdown"))
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    await process.stop()
+
+    assert process._process is None
+    assert process._stopped
+    assert subprocess.returncode is not None
+    assert not process._tasks
+
+
+async def test_stop_tolerates_server_exit_before_shutdown_reply():
+    """A server that dies while answering `shutdown` cannot make cleanup fail."""
+    process = LSPProcess(
+        ProcessLaunchInfo(cmd=get_mock_server_cmd("--exit-on", "shutdown"))
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    await process.stop()
+
+    assert process._process is None
+    assert process._stopped
+    assert subprocess.returncode is not None
+    assert not process._tasks
+
+
+async def test_run_protected_prefers_caller_cancellation_over_cleanup_failure():
+    """A cancelled caller never completes with a cleanup exception instead."""
+    started = asyncio.Event()
+    allow_finish = asyncio.Event()
+
+    async def failing_cleanup() -> None:
+        started.set()
+        await allow_finish.wait()
+        raise RuntimeError("cleanup failed")
+
+    runner = asyncio.create_task(_run_protected(failing_cleanup()))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+    runner.cancel()
+    await asyncio.sleep(0)
+
+    assert not runner.done()
+
+    allow_finish.set()
+    with pytest.raises(asyncio.CancelledError):
+        await runner
+
+
 class FailingBackend:
     """A mock backend that fails during workspace settings retrieval."""
 
@@ -530,3 +592,23 @@ async def test_run_protected_defers_caller_cancellation():
         await runner
 
     assert finished
+
+
+async def test_session_shutdown_survives_failing_server_shutdown(tmp_path: Path):
+    """The default non-pooled session closes cleanly even if `shutdown` errors."""
+
+    class ErrorOnShutdownBackend(MockBackend):
+        def create_process_launch_info(
+            self, base_path: Path, options: dict
+        ) -> ProcessLaunchInfo:
+            return ProcessLaunchInfo(cmd=get_mock_server_cmd("--error-on", "shutdown"))
+
+    session = await Session.create(
+        ErrorOnShutdownBackend(consumes_config=True),
+        base_path=tmp_path,
+        initial_code="x = 1",
+    )
+
+    await session.shutdown()
+
+    assert not session._pool._metadata

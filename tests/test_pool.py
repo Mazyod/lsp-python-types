@@ -313,6 +313,31 @@ class TestLSPProcessPool:
             allow_stop.set()
             await pool.cleanup()
 
+    async def test_release_forgets_non_pooled_process_when_stop_fails(self):
+        """A failed shutdown cannot leave stale metadata behind."""
+
+        class FailingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                raise RuntimeError("stop failed")
+
+        pool = LSPProcessPool(max_size=0, cleanup_interval=3_600.0)
+        process = FailingStopProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        try:
+            acquired = await pool.acquire(create_process, "/workspace")
+
+            with pytest.raises(RuntimeError, match="stop failed"):
+                await pool.release(acquired)
+
+            assert process.stop_count == 1
+            assert acquired not in pool._metadata
+        finally:
+            await pool.cleanup()
+
     async def test_cleanup_continues_after_worker_failure(
         self, caplog: pytest.LogCaptureFixture
     ):

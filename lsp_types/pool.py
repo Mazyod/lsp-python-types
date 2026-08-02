@@ -108,10 +108,12 @@ class LSPProcessPool:
             self._available.append(process)
             logger.debug("Released process back to pool")
         else:
-            # Non-pooled process, just shutdown
-            await process.stop()
-            # Clean up metadata
-            self._metadata.pop(process, None)
+            # Non-pooled process, just shutdown. The pool must forget it even when
+            # the shutdown fails, because it is never handed out again either way.
+            try:
+                await process.stop()
+            finally:
+                self._metadata.pop(process, None)
             logger.debug("Shutdown non-pooled process")
 
     async def cleanup(self) -> None:
