@@ -1,27 +1,12 @@
 import * as monaco from "monaco-editor";
+import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import type { BackendAdapter, DiagnosticInfo } from "./backends/interface";
 
-// Configure Monaco workers
+// Configure Monaco workers. Vite's `?worker` import replaces the bare-specifier
+// `new URL(...)` pattern, which Vite 8's rolldown bundler no longer resolves.
 self.MonacoEnvironment = {
-  getWorker(_workerId: string, label: string) {
-    switch (label) {
-      case "editorWorkerService":
-        return new Worker(
-          new URL(
-            "monaco-editor/esm/vs/editor/editor.worker.js",
-            import.meta.url,
-          ),
-          { type: "module" },
-        );
-      default:
-        return new Worker(
-          new URL(
-            "monaco-editor/esm/vs/editor/editor.worker.js",
-            import.meta.url,
-          ),
-          { type: "module" },
-        );
-    }
+  getWorker(_workerId: string, _label: string) {
+    return new EditorWorker();
   },
 };
 
@@ -50,7 +35,7 @@ export function createEditor(): monaco.editor.IStandaloneCodeEditor {
     selectOnLineNumbers: true,
     minimap: { enabled: false },
     fixedOverflowWidgets: true,
-    hover: { enabled: true },
+    hover: { enabled: "on" },
     scrollBeyondLastLine: false,
     autoIndent: "full",
     fontFamily: 'Monaco, Menlo, Consolas, "Courier New", monospace',
