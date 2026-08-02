@@ -173,3 +173,5 @@ The `examples/` directory contains demo scripts showing library usage:
 - Easy addition of new LSP backends
 - Consistent API while supporting diverse configuration needs
 - Testable isolation of backend-specific behavior
+
+**Lifecycle State Pattern**: Model an object's semantic lifecycle explicitly instead of making required collaborators optional. Keep dependencies such as a session's process and pool non-optional, revoke access through one typed guard when the lifecycle closes, and raise an explicit runtime error for invalid post-close use. This preserves strong internal invariants and avoids spreading `None` checks through otherwise-valid operations.
