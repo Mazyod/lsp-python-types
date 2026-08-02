@@ -366,6 +366,133 @@ class TestLSPProcessPool:
         assert pool.current_size == 0
         assert "simulated cleanup worker failure" in caplog.text
 
+    async def test_idle_sweep_skips_a_process_acquired_mid_sweep(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Checking a candidate out while the sweep is stopping another is safe."""
+        clock = _ManualClock()
+        monkeypatch.setattr(asyncio, "get_running_loop", lambda: clock)
+
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                await allow_stop.wait()
+
+        pool = LSPProcessPool(max_size=2, max_idle_time=10.0, cleanup_interval=3_600.0)
+        blocking = BlockingStopProcess()
+        contested = _StubLSPProcess()
+
+        async def create_blocking() -> LSPProcess:
+            return blocking
+
+        async def create_contested() -> LSPProcess:
+            return contested
+
+        try:
+            first = await pool.acquire(create_blocking, "/workspace")
+            second = await pool.acquire(create_contested, "/workspace")
+            await pool.release(first)
+            await pool.release(second)
+            clock.advance(100.0)
+
+            sweep = asyncio.create_task(pool._remove_idle_processes())
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+
+            reacquired = await pool.acquire(_unexpected_process_factory, "/workspace")
+            assert reacquired is contested
+
+            allow_stop.set()
+            await sweep
+
+            assert contested.stop_count == 0
+            assert blocking.stop_count == 1
+            assert pool.current_size == 1
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_idle_sweep_spares_a_process_returned_mid_sweep(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A process handed back mid-sweep keeps the fresh idle window it earned."""
+        clock = _ManualClock()
+        monkeypatch.setattr(asyncio, "get_running_loop", lambda: clock)
+
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                await allow_stop.wait()
+
+        pool = LSPProcessPool(max_size=2, max_idle_time=10.0, cleanup_interval=3_600.0)
+        blocking = BlockingStopProcess()
+        contested = _StubLSPProcess()
+
+        async def create_blocking() -> LSPProcess:
+            return blocking
+
+        async def create_contested() -> LSPProcess:
+            return contested
+
+        try:
+            first = await pool.acquire(create_blocking, "/workspace")
+            second = await pool.acquire(create_contested, "/workspace")
+            await pool.release(first)
+            await pool.release(second)
+            clock.advance(100.0)
+
+            sweep = asyncio.create_task(pool._remove_idle_processes())
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+
+            reacquired = await pool.acquire(_unexpected_process_factory, "/workspace")
+            await pool.release(reacquired)
+
+            allow_stop.set()
+            await sweep
+
+            assert contested.stop_count == 0
+            assert pool.available_count == 1
+            assert list(pool._available) == [contested]
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_maintenance_worker_survives_a_failing_sweep(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ):
+        """One broken sweep is logged; the worker keeps reaping afterwards."""
+        pool = LSPProcessPool(cleanup_interval=0.01)
+        sweeps = 0
+        failed = asyncio.Event()
+        recovered = asyncio.Event()
+
+        async def flaky_sweep() -> None:
+            nonlocal sweeps
+            sweeps += 1
+            if sweeps == 1:
+                failed.set()
+                raise ValueError("simulated sweep failure")
+            recovered.set()
+
+        monkeypatch.setattr(pool, "_remove_idle_processes", flaky_sweep)
+
+        try:
+            await asyncio.wait_for(failed.wait(), timeout=1.0)
+            await asyncio.wait_for(recovered.wait(), timeout=1.0)
+
+            assert pool._cleanup_task is not None
+            assert not pool._cleanup_task.done()
+            assert "simulated sweep failure" in caplog.text
+        finally:
+            await pool.cleanup()
+
     async def test_sessions_with_different_backends_do_not_share_processes(
         self, session_pool, base_path
     ):

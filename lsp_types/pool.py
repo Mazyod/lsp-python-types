@@ -140,12 +140,37 @@ class LSPProcessPool:
         self._metadata.clear()
 
         for process in all_processes:
-            try:
-                await process.stop()
-            except Exception as e:
-                logger.warning(f"Error shutting down pooled process: {e}")
+            await self._stop_quietly(process)
 
         logger.debug("Pool cleanup completed")
+
+    def _claim_available(self, process: LSPProcess) -> bool:
+        """Take an available process out of the pool without yielding control.
+
+        Returns False when a concurrent acquire already checked the process out.
+        The caller owns the process once this returns True and must stop it.
+        """
+        if process not in self._available:
+            return False
+
+        self._available.remove(process)
+        self._metadata.pop(process, None)
+        return True
+
+    def _is_idle_expired(self, process: LSPProcess, current_time: float) -> bool:
+        """Whether the process is still idle past its deadline at ``current_time``."""
+        metadata = self._metadata.get(process)
+        idle_since = metadata.get("idle_since") if metadata else None
+        return (
+            idle_since is not None and current_time - idle_since > self._max_idle_time
+        )
+
+    async def _stop_quietly(self, process: LSPProcess) -> None:
+        """Stop a pool-owned process, logging rather than propagating failures."""
+        try:
+            await process.stop()
+        except Exception as e:
+            logger.warning(f"Error shutting down pooled process: {e}")
 
     async def _reset_process(self, process: LSPProcess) -> None:
         """Reset a process for reuse.
@@ -163,7 +188,10 @@ class LSPProcessPool:
         try:
             while True:
                 await asyncio.sleep(self._cleanup_interval)
-                await self._remove_idle_processes()
+                try:
+                    await self._remove_idle_processes()
+                except Exception as e:
+                    logger.warning(f"Idle process sweep failed: {e}")
         except asyncio.CancelledError:
             pass
 
@@ -182,10 +210,15 @@ class LSPProcessPool:
                 processes_to_remove.append(process)
 
         for process in processes_to_remove:
-            self._available.remove(process)
-            self._metadata.pop(process, None)
-            try:
-                await process.stop()
-                logger.debug("Removed idle process from pool")
-            except Exception as e:
-                logger.warning(f"Error shutting down idle process: {e}")
+            # Stopping an earlier candidate suspends this sweep, so re-check the
+            # process against live pool state: a concurrent acquire may have
+            # checked it out, or checked it out and returned it with a fresh idle
+            # window. Both checks run without awaiting so acquire cannot
+            # interleave between them.
+            if not self._is_idle_expired(process, current_time):
+                continue
+            if not self._claim_available(process):
+                continue
+
+            await self._stop_quietly(process)
+            logger.debug("Removed idle process from pool")
