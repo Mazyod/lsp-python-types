@@ -168,18 +168,26 @@ class Session:
             initialize_params=resolved_initialize_params,
         )
 
-        async def create_lsp_process():
+        async def create_lsp_process() -> LSPProcess:
             lsp_process = LSPProcess(
                 process_launch_info,
                 resolved_environment=resolved_environment,
             )
-            await lsp_process.start()
+            try:
+                await lsp_process.start()
 
-            # Initialize LSP connection
-            await lsp_process.send.initialize(resolved_initialize_params)
+                # Initialize LSP connection
+                await lsp_process.send.initialize(resolved_initialize_params)
 
-            # Send initialized notification (required by LSP spec)
-            await lsp_process.notify.initialized({})
+                # Send initialized notification (required by LSP spec)
+                await lsp_process.notify.initialized({})
+            except BaseException:
+                # Nothing owns the process until this factory returns - the pool
+                # only records it afterwards - so it must stop itself on every
+                # failure, cancellation included. `stop()` is cancellation-safe:
+                # it finishes reaping before re-raising, so no shield is needed.
+                await lsp_process.stop()
+                raise
 
             return lsp_process
 
@@ -231,9 +239,13 @@ class Session:
             await session._open_document(initial_code)
 
             return session
-        except Exception:
-            # Release the process back to the pool (or shutdown for non-pooled)
-            # to avoid resource leaks on initialization failure
+        except BaseException:
+            # Release the process back to the pool (or shut it down for non-pooled)
+            # to avoid resource leaks on initialization failure. Cancellation is the
+            # most likely trigger - a caller timing out a slow server - so it must be
+            # caught too. The release still completes: the pooled branch never awaits,
+            # and the non-pooled branch's `stop()` defers cancellation until cleanup
+            # has finished.
             await pool.release(lsp_process)
             raise
 

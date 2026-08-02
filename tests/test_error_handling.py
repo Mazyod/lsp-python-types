@@ -612,3 +612,138 @@ async def test_session_shutdown_survives_failing_server_shutdown(tmp_path: Path)
     await session.shutdown()
 
     assert not session._pool._metadata
+
+
+async def test_session_create_stops_process_when_cancelled_during_initialize(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Cancelling create while the server is initializing cannot orphan it."""
+
+    class HangingInitializeBackend(MockBackend):
+        def create_process_launch_info(
+            self, base_path: Path, options: dict
+        ) -> ProcessLaunchInfo:
+            return ProcessLaunchInfo(cmd=get_mock_server_cmd("--hang-on", "initialize"))
+
+    processes: list[LSPProcess] = []
+    subprocesses: list[asyncio.subprocess.Process] = []
+    initialize_sent = asyncio.Event()
+    original_start = LSPProcess.start
+    original_send_payload = LSPProcess._send_payload
+
+    async def recording_start(self: LSPProcess) -> None:
+        await original_start(self)
+        assert self._process is not None
+        processes.append(self)
+        subprocesses.append(self._process)
+
+    async def recording_send_payload(self, stream, payload):  # type: ignore[no-untyped-def]
+        await original_send_payload(self, stream, payload)
+        if payload.get("method") == "initialize":
+            initialize_sent.set()
+
+    monkeypatch.setattr(LSPProcess, "start", recording_start)
+    monkeypatch.setattr(LSPProcess, "_send_payload", recording_send_payload)
+
+    try:
+        create_task = asyncio.create_task(
+            Session.create(
+                HangingInitializeBackend(consumes_config=True),
+                base_path=tmp_path,
+                initial_code="x = 1",
+            )
+        )
+        await asyncio.wait_for(initialize_sent.wait(), timeout=5.0)
+        create_task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await create_task
+
+        assert len(subprocesses) == 1
+        assert subprocesses[0].returncode is not None
+        assert processes[0]._process is None
+        assert not processes[0]._tasks
+    finally:
+        for child in subprocesses:
+            if child.returncode is None:
+                child.kill()
+                await child.wait()
+
+
+async def test_session_create_stops_process_when_initialize_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """A server that rejects `initialize` cannot leave the process running."""
+
+    class ErrorOnInitializeBackend(MockBackend):
+        def create_process_launch_info(
+            self, base_path: Path, options: dict
+        ) -> ProcessLaunchInfo:
+            return ProcessLaunchInfo(
+                cmd=get_mock_server_cmd("--error-on", "initialize")
+            )
+
+    subprocesses: list[asyncio.subprocess.Process] = []
+    original_start = LSPProcess.start
+
+    async def recording_start(self: LSPProcess) -> None:
+        await original_start(self)
+        assert self._process is not None
+        subprocesses.append(self._process)
+
+    monkeypatch.setattr(LSPProcess, "start", recording_start)
+
+    try:
+        with pytest.raises(Error, match="Mock error"):
+            await Session.create(
+                ErrorOnInitializeBackend(consumes_config=True),
+                base_path=tmp_path,
+                initial_code="x = 1",
+            )
+
+        assert len(subprocesses) == 1
+        assert subprocesses[0].returncode is not None
+    finally:
+        for child in subprocesses:
+            if child.returncode is None:
+                child.kill()
+                await child.wait()
+
+
+async def test_session_create_releases_process_when_cancelled_after_acquire(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Cancellation between acquire and readiness still returns the lease."""
+    pool = LSPProcessPool(max_size=2, cleanup_interval=3_600.0)
+    document_opening = asyncio.Event()
+    release_document = asyncio.Event()
+    original_send_payload = LSPProcess._send_payload
+
+    async def gated_send_payload(self, stream, payload):  # type: ignore[no-untyped-def]
+        if payload.get("method") == "textDocument/didOpen":
+            document_opening.set()
+            await release_document.wait()
+        await original_send_payload(self, stream, payload)
+
+    monkeypatch.setattr(LSPProcess, "_send_payload", gated_send_payload)
+
+    try:
+        create_task = asyncio.create_task(
+            Session.create(
+                MockBackend(consumes_config=True),
+                base_path=tmp_path,
+                initial_code="x = 1",
+                pool=pool,
+            )
+        )
+        await asyncio.wait_for(document_opening.wait(), timeout=5.0)
+        create_task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await create_task
+
+        assert len(pool._active) == 0
+        assert pool.available_count == 1
+    finally:
+        release_document.set()
+        await pool.cleanup()
