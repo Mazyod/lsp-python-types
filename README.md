@@ -158,7 +158,13 @@ def greet(name: str) -> str:
 ```
 
 After `shutdown()`, a session's operational methods raise `RuntimeError`; its
-captured server and semantic-token metadata remain readable.
+captured server and semantic-token metadata remain readable. Calling
+`shutdown()` while other operations are in flight is safe: it waits up to five
+seconds for them to finish, and if any are still running it stops the language
+server process instead of returning it to the pool, keeping stale operations
+out of the next session's protocol stream. (One narrow exception: cancelling
+an operation ends its in-flight accounting even if a notification write it
+already queued is still being flushed.)
 
 ## Development
 

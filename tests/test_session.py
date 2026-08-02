@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import typing as t
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -6,7 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 import lsp_types
+from lsp_types import session as session_module
 from lsp_types.pool import LSPProcessPool
+from lsp_types.process import LSPProcess, ProcessLaunchInfo
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 from lsp_types.pyright.backend import PyrightBackend
@@ -730,6 +733,174 @@ async def test_shutdown_release_failure_leaves_session_closed(tmp_path: Path):
     pool.release.assert_awaited_once_with(process)
     assert process.mock_calls == []
     assert session.server_info == server_info
+
+
+class _GatedProcess(LSPProcess):
+    """A process whose requests stay suspended until the test releases them."""
+
+    def __init__(self) -> None:
+        super().__init__(ProcessLaunchInfo(cmd=["stub-lsp-process"]))
+        self.request_started = asyncio.Event()
+        self.allow_response = asyncio.Event()
+        self.stop_count = 0
+        self.alive = True
+
+    @property
+    def is_alive(self) -> bool:
+        return self.alive
+
+    async def _send_request(self, method: str, params: t.Any = None) -> t.Any:
+        self.request_started.set()
+        await self.allow_response.wait()
+        return None
+
+    async def reset(self) -> None:
+        return None
+
+    async def stop(self) -> None:
+        self.stop_count += 1
+        self.alive = False
+
+
+async def test_shutdown_waits_for_borrowed_operation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A process borrowed by a running operation is not returned to the pool."""
+    # The drain must outlast any real-time stall so the assertions below stay
+    # event-gated rather than racing the production timeout.
+    monkeypatch.setattr(session_module, "_INFLIGHT_DRAIN_TIMEOUT", 3_600.0)
+    pool = LSPProcessPool(max_size=2)
+    created: list[_GatedProcess] = []
+
+    async def create_process() -> LSPProcess:
+        process = _GatedProcess()
+        created.append(process)
+        return process
+
+    try:
+        leased = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        process = created[0]
+        session = Session(leased, MagicMock(), tmp_path, pool=pool)
+
+        hover = asyncio.create_task(
+            session.get_hover_info(lsp_types.Position(line=0, character=0))
+        )
+        await process.request_started.wait()
+
+        shutdown = asyncio.create_task(session.shutdown())
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(shutdown), timeout=0.05)
+
+        # The lease is revoked, but the process stays checked out: a successor
+        # asking for the same process family must get a different process.
+        assert pool.available_count == 0
+        successor = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        assert successor is not leased
+        await pool.release(successor)
+
+        process.allow_response.set()
+        assert await hover is None
+        await shutdown
+
+        assert process.stop_count == 0, "a drained process is reusable"
+        assert leased in pool._available
+    finally:
+        await pool.cleanup()
+
+
+async def test_shutdown_discards_process_when_operation_never_drains(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """A stuck operation poisons the process instead of returning it to the pool."""
+    monkeypatch.setattr(session_module, "_INFLIGHT_DRAIN_TIMEOUT", 0.05)
+    pool = LSPProcessPool(max_size=2)
+    created: list[_GatedProcess] = []
+
+    async def create_process() -> LSPProcess:
+        process = _GatedProcess()
+        created.append(process)
+        return process
+
+    hover: asyncio.Task[t.Any] | None = None
+    try:
+        leased = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        process = created[0]
+        session = Session(leased, MagicMock(), tmp_path, pool=pool)
+
+        hover = asyncio.create_task(
+            session.get_hover_info(lsp_types.Position(line=0, character=0))
+        )
+        await process.request_started.wait()
+
+        with caplog.at_level(logging.WARNING, logger="lsp-types"):
+            await session.shutdown()
+
+        assert process.stop_count == 1
+        assert pool.current_size == 0
+        assert pool.available_count == 0
+        assert leased not in pool._metadata
+        assert any("borrowed" in record.getMessage() for record in caplog.records), (
+            caplog.text
+        )
+    finally:
+        # The stub never answers, so the stranded request is cancelled here; a
+        # real process would have failed it when stop() closed the connection.
+        if hover is not None:
+            hover.cancel()
+            await asyncio.gather(hover, return_exceptions=True)
+        await pool.cleanup()
+
+
+async def test_cancelled_shutdown_discards_borrowed_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Cancelling shutdown mid-drain still removes the process from the pool."""
+    # The drain must outlast any real-time stall so cancel() always lands while
+    # the shutdown task is still draining.
+    monkeypatch.setattr(session_module, "_INFLIGHT_DRAIN_TIMEOUT", 3_600.0)
+    pool = LSPProcessPool(max_size=2)
+    created: list[_GatedProcess] = []
+
+    async def create_process() -> LSPProcess:
+        process = _GatedProcess()
+        created.append(process)
+        return process
+
+    hover: asyncio.Task[t.Any] | None = None
+    try:
+        leased = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        process = created[0]
+        session = Session(leased, MagicMock(), tmp_path, pool=pool)
+
+        hover = asyncio.create_task(
+            session.get_hover_info(lsp_types.Position(line=0, character=0))
+        )
+        await process.request_started.wait()
+
+        shutdown = asyncio.create_task(session.shutdown())
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(shutdown), timeout=0.05)
+
+        shutdown.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await shutdown
+
+        assert process.stop_count == 1
+        assert pool.current_size == 0
+        assert leased not in pool._metadata
+    finally:
+        if hover is not None:
+            hover.cancel()
+            await asyncio.gather(hover, return_exceptions=True)
+        await pool.cleanup()
 
 
 async def test_session_recycling_with_diagnostics(

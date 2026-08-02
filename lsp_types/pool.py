@@ -144,6 +144,24 @@ class LSPProcessPool:
         self._available.append(process)
         logger.debug("Released process back to pool")
 
+    async def discard(self, process: LSPProcess) -> None:
+        """Permanently remove a process from the pool and stop it.
+
+        Used for processes that must never be leased again — for example one
+        whose session shut down while an operation was still borrowing it,
+        because that operation's queued writes would otherwise interleave with
+        the next session's protocol stream.
+        """
+        # Bookkeeping is dropped before the process is stopped so a failing or
+        # cancelled stop can never leave a dead process visible to acquire().
+        self._active.discard(process)
+        if process in self._available:
+            self._available.remove(process)
+        self._metadata.pop(process, None)
+
+        await self._stop_quietly(process)
+        logger.debug("Discarded process from pool")
+
     async def cleanup(self) -> None:
         """Clean up all processes in the pool"""
         async with self._cleanup_lock:

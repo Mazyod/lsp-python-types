@@ -361,6 +361,35 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
+    async def test_discard_removes_process_and_stops_it(self):
+        """A discarded process is stopped and can never be leased again."""
+        pool = LSPProcessPool(max_size=2)
+        created: list[_StubLSPProcess] = []
+
+        async def create_process() -> LSPProcess:
+            process = _StubLSPProcess()
+            created.append(process)
+            return process
+
+        try:
+            leased = await pool.acquire(
+                create_process, "/workspace", compatibility_key=("backend", "pyright")
+            )
+            await pool.discard(leased)
+
+            assert created[0].stop_count == 1
+            assert pool.current_size == 0
+            assert pool.available_count == 0
+            assert leased not in pool._metadata
+
+            replacement = await pool.acquire(
+                create_process, "/workspace", compatibility_key=("backend", "pyright")
+            )
+            assert replacement is not leased
+            await pool.release(replacement)
+        finally:
+            await pool.cleanup()
+
     async def test_keyed_acquire_never_reuses_unkeyed_process(self):
         """A keyed caller never receives a process that was pooled without a key."""
         pool = LSPProcessPool(max_size=4)
