@@ -71,8 +71,7 @@ class LSPProcessPool:
             (
                 process
                 for process in self._available
-                if self._metadata[process]["base_path"] == base_path
-                and self._metadata[process]["compatibility_key"] == compatibility_key
+                if self._matches(process, base_path, compatibility_key)
             ),
             None,
         )
@@ -90,6 +89,14 @@ class LSPProcessPool:
             base_path=base_path,
             compatibility_key=compatibility_key,
         )
+
+        if self.current_size >= self.max_size:
+            # Trade-off: a workload strictly alternating between incompatible
+            # configurations on a pool smaller than its number of families now
+            # evicts and recreates per acquire (equal to never pooling) instead
+            # of pinning one family forever. Any max_size >= live families
+            # avoids the thrash entirely.
+            await self._evict_unusable_idle_process(base_path, compatibility_key)
 
         if self.current_size < self.max_size:
             logger.debug("Added new process to the pool")
@@ -144,6 +151,19 @@ class LSPProcessPool:
 
         logger.debug("Pool cleanup completed")
 
+    def _matches(
+        self,
+        process: LSPProcess,
+        base_path: str,
+        compatibility_key: t.Hashable | None,
+    ) -> bool:
+        """Whether an owned process was initialized for exactly these inputs."""
+        metadata = self._metadata[process]
+        return (
+            metadata["base_path"] == base_path
+            and metadata["compatibility_key"] == compatibility_key
+        )
+
     def _claim_available(self, process: LSPProcess) -> bool:
         """Take an available process out of the pool without yielding control.
 
@@ -171,6 +191,30 @@ class LSPProcessPool:
             await process.stop()
         except Exception as e:
             logger.warning(f"Error shutting down pooled process: {e}")
+
+    async def _evict_unusable_idle_process(
+        self, base_path: str, compatibility_key: t.Hashable | None
+    ) -> bool:
+        """Free a slot by stopping the longest-idle process this request cannot use.
+
+        Only available processes are eligible: an active process is still leased by
+        a caller. Returns True when a slot was freed.
+        """
+        candidate = min(
+            (
+                process
+                for process in self._available
+                if not self._matches(process, base_path, compatibility_key)
+            ),
+            key=lambda process: self._metadata[process].get("idle_since", 0.0),
+            default=None,
+        )
+        if candidate is None or not self._claim_available(candidate):
+            return False
+
+        logger.debug("Evicted unusable idle process to free a pool slot")
+        await self._stop_quietly(candidate)
+        return True
 
     async def _reset_process(self, process: LSPProcess) -> None:
         """Reset a process for reuse.

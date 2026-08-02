@@ -493,6 +493,71 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
+    async def test_full_pool_evicts_an_unusable_idle_process(self):
+        """An idle process nobody can reuse gives up its slot instead of pooling."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        created: list[_StubLSPProcess] = []
+
+        def factory(
+            process: _StubLSPProcess,
+        ) -> t.Callable[[], t.Awaitable[LSPProcess]]:
+            async def create() -> LSPProcess:
+                created.append(process)
+                return process
+
+            return create
+
+        first = _StubLSPProcess()
+        second = _StubLSPProcess()
+
+        try:
+            legacy = await pool.acquire(
+                factory(first), "/workspace", compatibility_key="A"
+            )
+            await pool.release(legacy)
+            assert pool.available_count == 1
+
+            replacement = await pool.acquire(
+                factory(second), "/workspace", compatibility_key="B"
+            )
+
+            assert first.stop_count == 1
+            assert pool.available_count == 0
+            assert pool.current_size == 1
+
+            await pool.release(replacement)
+            assert pool.available_count == 1
+
+            reused = await pool.acquire(
+                _unexpected_process_factory, "/workspace", compatibility_key="B"
+            )
+            assert reused is second
+            assert created == [first, second]
+            await pool.release(reused)
+        finally:
+            await pool.cleanup()
+
+    async def test_full_pool_keeps_active_processes_when_no_slot_can_be_freed(self):
+        """Leased processes are never evicted; the extra process stays untracked."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        leased = _StubLSPProcess()
+        extra = _StubLSPProcess()
+
+        async def create_leased() -> LSPProcess:
+            return leased
+
+        async def create_extra() -> LSPProcess:
+            return extra
+
+        try:
+            await pool.acquire(create_leased, "/workspace", compatibility_key="A")
+            await pool.acquire(create_extra, "/workspace", compatibility_key="B")
+
+            assert leased.stop_count == 0
+            assert pool.current_size == 1
+        finally:
+            await pool.cleanup()
+
     async def test_sessions_with_different_backends_do_not_share_processes(
         self, session_pool, base_path
     ):
