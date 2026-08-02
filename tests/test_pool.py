@@ -41,12 +41,18 @@ class _StubLSPProcess(LSPProcess):
         super().__init__(ProcessLaunchInfo(cmd=["stub-lsp-process"]))
         self.reset_count = 0
         self.stop_count = 0
+        self.alive = True
+
+    @property
+    def is_alive(self) -> bool:
+        return self.alive
 
     async def reset(self) -> None:
         self.reset_count += 1
 
     async def stop(self) -> None:
         self.stop_count += 1
+        self.alive = False
 
 
 class _ManualClock:
@@ -555,6 +561,85 @@ class TestLSPProcessPool:
 
             assert leased.stop_count == 0
             assert pool.current_size == 1
+        finally:
+            await pool.cleanup()
+
+    async def test_release_discards_a_dead_process(self):
+        """A server that died while checked out never returns to the pool."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        dead = _StubLSPProcess()
+        replacement = _StubLSPProcess()
+
+        async def create_dead() -> LSPProcess:
+            return dead
+
+        async def create_replacement() -> LSPProcess:
+            return replacement
+
+        try:
+            acquired = await pool.acquire(create_dead, "/workspace")
+            dead.alive = False  # the language server crashed mid-session
+
+            await pool.release(acquired)
+
+            assert pool.available_count == 0
+            assert pool.current_size == 0
+            assert dead.stop_count == 1
+
+            fresh = await pool.acquire(create_replacement, "/workspace")
+            assert fresh is replacement
+        finally:
+            await pool.cleanup()
+
+    async def test_acquire_skips_a_process_that_died_while_idle(self):
+        """A corpse in the available queue is never handed to a caller."""
+        pool = LSPProcessPool(max_size=2, cleanup_interval=3_600.0)
+        dead = _StubLSPProcess()
+        replacement = _StubLSPProcess()
+
+        async def create_dead() -> LSPProcess:
+            return dead
+
+        async def create_replacement() -> LSPProcess:
+            return replacement
+
+        try:
+            acquired = await pool.acquire(create_dead, "/workspace")
+            await pool.release(acquired)
+            dead.alive = False  # the idle server crashed in the pool
+
+            fresh = await pool.acquire(create_replacement, "/workspace")
+
+            assert fresh is replacement
+            assert dead.reset_count == 0
+        finally:
+            await pool.cleanup()
+
+    async def test_full_pool_evicts_a_dead_idle_process(self):
+        """A corpse holding the last slot is reaped so a live process can be pooled."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        dead = _StubLSPProcess()
+        replacement = _StubLSPProcess()
+
+        async def create_dead() -> LSPProcess:
+            return dead
+
+        async def create_replacement() -> LSPProcess:
+            return replacement
+
+        try:
+            acquired = await pool.acquire(create_dead, "/workspace")
+            await pool.release(acquired)
+            dead.alive = False  # the idle server crashed in the pool
+
+            fresh = await pool.acquire(create_replacement, "/workspace")
+
+            assert fresh is replacement
+            assert dead.stop_count == 1
+            assert pool.current_size == 1
+
+            await pool.release(fresh)
+            assert pool.available_count == 1
         finally:
             await pool.cleanup()
 

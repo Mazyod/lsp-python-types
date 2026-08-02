@@ -243,9 +243,9 @@ class Session:
             # Release the process back to the pool (or shut it down for non-pooled)
             # to avoid resource leaks on initialization failure. Cancellation is the
             # most likely trigger - a caller timing out a slow server - so it must be
-            # caught too. The release still completes: the pooled branch never awaits,
-            # and the non-pooled branch's `stop()` defers cancellation until cleanup
-            # has finished.
+            # caught too. The release still completes: its bookkeeping runs before
+            # any suspension point, and any `stop()` it awaits defers cancellation
+            # until cleanup has finished.
             await pool.release(lsp_process)
             raise
 

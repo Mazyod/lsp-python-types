@@ -72,6 +72,7 @@ class LSPProcessPool:
                 process
                 for process in self._available
                 if self._matches(process, base_path, compatibility_key)
+                and process.is_alive
             ),
             None,
         )
@@ -107,14 +108,13 @@ class LSPProcessPool:
         return lsp_process
 
     async def release(self, process: LSPProcess) -> None:
-        """Release a process back to the pool"""
-        if process in self._active:
-            metadata = self._metadata[process]
-            metadata["idle_since"] = asyncio.get_running_loop().time()
-            self._active.remove(process)
-            self._available.append(process)
-            logger.debug("Released process back to pool")
-        else:
+        """Release a process back to the pool.
+
+        A process whose server is gone is dropped instead of pooled: reusing it
+        would hand a dead server to the next caller, and because every release
+        restarts the idle window, the idle sweep would never expire it either.
+        """
+        if process not in self._active:
             # Non-pooled process, just shutdown. The pool must forget it even when
             # the shutdown fails, because it is never handed out again either way.
             try:
@@ -122,6 +122,19 @@ class LSPProcessPool:
             finally:
                 self._metadata.pop(process, None)
             logger.debug("Shutdown non-pooled process")
+            return
+
+        self._active.remove(process)
+
+        if not process.is_alive:
+            self._metadata.pop(process, None)
+            logger.debug("Discarded dead process instead of returning it to the pool")
+            await self._stop_quietly(process)
+            return
+
+        self._metadata[process]["idle_since"] = asyncio.get_running_loop().time()
+        self._available.append(process)
+        logger.debug("Released process back to pool")
 
     async def cleanup(self) -> None:
         """Clean up all processes in the pool"""
@@ -205,8 +218,14 @@ class LSPProcessPool:
                 process
                 for process in self._available
                 if not self._matches(process, base_path, compatibility_key)
+                or not process.is_alive
             ),
-            key=lambda process: self._metadata[process].get("idle_since", 0.0),
+            # Dead candidates first: a corpse must never keep its slot while a
+            # live (merely non-matching) server is stopped in its place.
+            key=lambda process: (
+                process.is_alive,
+                self._metadata[process].get("idle_since", 0.0),
+            ),
             default=None,
         )
         if candidate is None or not self._claim_available(candidate):

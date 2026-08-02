@@ -747,3 +747,39 @@ async def test_session_create_releases_process_when_cancelled_after_acquire(
     finally:
         release_document.set()
         await pool.cleanup()
+
+
+async def test_is_alive_tracks_the_server_lifetime():
+    """Liveness is false before start, true while serving, false after stop."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    assert not process.is_alive
+
+    await process.start()
+    try:
+        await process.send.initialize(
+            {"processId": None, "capabilities": {}, "rootUri": None}
+        )
+        assert process.is_alive
+    finally:
+        await process.stop()
+
+    assert not process.is_alive
+
+
+async def test_is_alive_is_false_after_the_server_crashes():
+    """A crashed server is reported dead before anything tries to reuse it."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    try:
+        await process.send.initialize(
+            {"processId": None, "capabilities": {}, "rootUri": None}
+        )
+
+        child = process._process
+        assert child is not None
+        child.kill()
+        await child.wait()
+
+        assert not process.is_alive
+    finally:
+        await process.stop()

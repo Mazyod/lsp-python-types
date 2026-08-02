@@ -137,6 +137,7 @@ class LSPProcess:
         self._open_documents: set[str] = set()
         self._write_lock = asyncio.Lock()
         self._initialize_result: types.InitializeResult | None = None
+        self._connection_closed = False
 
         # Maintain typed interface
         self.send = requests.RequestFunctions(self._send_request)
@@ -328,6 +329,24 @@ class LSPProcess:
         self._open_documents.add(uri)
 
     @property
+    def is_alive(self) -> bool:
+        """Whether this process can still serve LSP traffic.
+
+        False before ``start()``, after ``stop()``, once the server subprocess has
+        exited, and once the stdout reader has left the transport. The reader owns
+        the only connection to the server, so its exit is the earliest reliable
+        signal that the server is gone; the subprocess return code is only visible
+        after the event loop reaps the child.
+        """
+        process = self._process
+        return (
+            not self._stopped
+            and not self._connection_closed
+            and process is not None
+            and process.returncode is None
+        )
+
+    @property
     def initialize_result(self) -> types.InitializeResult | None:
         """The initialize response associated with this process."""
         return self._initialize_result
@@ -472,6 +491,7 @@ class LSPProcess:
         except Exception:
             logger.exception("Client - Error reading stdout")
         finally:
+            self._connection_closed = True
             # Server closed the connection (EOF, crash, or task cancel) — reject
             # any outstanding requests so callers don't await forever.
             for future in list(self._pending_requests.values()):
