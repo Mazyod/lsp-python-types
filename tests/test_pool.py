@@ -203,6 +203,47 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
+    async def test_keyed_acquire_never_reuses_unkeyed_process(self):
+        """A keyed caller never receives a process that was pooled without a key."""
+        pool = LSPProcessPool(max_size=4)
+        created: list[_StubLSPProcess] = []
+
+        async def create_process() -> LSPProcess:
+            process = _StubLSPProcess()
+            created.append(process)
+            return process
+
+        try:
+            unkeyed = await pool.acquire(create_process, "/workspace")
+            await pool.release(unkeyed)
+            assert pool.available_count == 1
+
+            keyed = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyright"),
+            )
+
+            # The unkeyed process must not be handed to a keyed caller, and it must
+            # be left untouched in the pool rather than reset or stopped.
+            assert keyed is not unkeyed
+            assert len(created) == 2
+            assert created[0].reset_count == 0
+            assert created[0].stop_count == 0
+            assert pool.available_count == 1
+            assert pool.current_size == 2
+
+            await pool.release(keyed)
+
+            unkeyed_reused = await pool.acquire(
+                _unexpected_process_factory, "/workspace"
+            )
+            assert unkeyed_reused is unkeyed
+            assert created[0].reset_count == 1
+            await pool.release(unkeyed_reused)
+        finally:
+            await pool.cleanup()
+
     async def test_idle_timeout_starts_when_active_process_is_released(self, idle_pool):
         """Time spent actively leased does not count toward the idle timeout."""
         pool, clock, process = idle_pool
