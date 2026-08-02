@@ -617,6 +617,46 @@ async def test_session_create_cleanup_without_pool(tmp_path: Path):
         )
 
 
+async def test_recycled_process_retains_initialize_result():
+    """A pooled process keeps the initialize result across re-lease.
+
+    The pool re-leases an initialized process without re-sending `initialize`,
+    so the result has to live on the recycled object — this is why LSPProcess
+    captures it instead of the caller that happens to send the request.
+    """
+    pool = LSPProcessPool(max_size=2)
+    compatibility_key = ("mock-server", "initialize-capture")
+
+    async def create_process() -> LSPProcess:
+        process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+        await process.start()
+        await process.send.initialize(
+            {"processId": None, "capabilities": {}, "rootUri": None}
+        )
+        return process
+
+    async def unexpected_process() -> LSPProcess:
+        raise AssertionError("Expected the pooled process to be reused")
+
+    try:
+        first = await pool.acquire(
+            create_process, "/workspace", compatibility_key=compatibility_key
+        )
+        captured = first.initialize_result
+        assert captured is not None
+        assert "capabilities" in captured
+
+        await pool.release(first)
+
+        second = await pool.acquire(
+            unexpected_process, "/workspace", compatibility_key=compatibility_key
+        )
+        assert second is first
+        assert second.initialize_result == captured
+    finally:
+        await pool.cleanup()
+
+
 async def test_run_protected_defers_caller_cancellation():
     """Cancelling the caller cannot interrupt protected cleanup work."""
     started = asyncio.Event()

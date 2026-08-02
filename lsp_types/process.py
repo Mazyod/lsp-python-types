@@ -9,7 +9,7 @@ import os
 import typing as t
 from pathlib import Path
 
-from . import requests, types
+from . import methods, requests, types
 
 CONTENT_LENGTH = "Content-Length: "
 ENCODING = "utf-8"
@@ -394,7 +394,11 @@ class LSPProcess:
 
         try:
             result = await future
-            if method == "initialize":
+            if method == methods.Request.INITIALIZE:
+                # Captured here rather than at the call site because the pool
+                # re-leases initialized processes without re-sending `initialize`:
+                # the result has to survive on the recycled object, which
+                # `Session.create` reads back after `acquire`.
                 self._initialize_result = t.cast(types.InitializeResult, result)
             return result
         finally:
