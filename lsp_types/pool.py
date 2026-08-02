@@ -9,7 +9,7 @@ import logging
 import typing as t
 from collections import deque
 
-from .process import LSPProcess
+from .process import LSPProcess, _run_protected
 
 logger = logging.getLogger("lsp-types")
 
@@ -117,8 +117,7 @@ class LSPProcessPool:
     async def cleanup(self) -> None:
         """Clean up all processes in the pool"""
         async with self._cleanup_lock:
-            cleanup_task = asyncio.create_task(self._cleanup_resources())
-            await self._await_cleanup(cleanup_task)
+            await _run_protected(self._cleanup_resources())
 
     async def _cleanup_resources(self) -> None:
         """Join the maintenance worker and stop every process owned by the pool."""
@@ -145,21 +144,6 @@ class LSPProcessPool:
                 logger.warning(f"Error shutting down pooled process: {e}")
 
         logger.debug("Pool cleanup completed")
-
-    @staticmethod
-    async def _await_cleanup(cleanup_task: asyncio.Task[None]) -> None:
-        """Wait for pool cleanup before propagating caller cancellation."""
-        cancellation: asyncio.CancelledError | None = None
-
-        while not cleanup_task.done():
-            try:
-                await asyncio.shield(cleanup_task)
-            except asyncio.CancelledError as error:
-                cancellation = error
-
-        cleanup_task.result()
-        if cancellation is not None:
-            raise cancellation
 
     async def _reset_process(self, process: LSPProcess) -> None:
         """Reset a process for reuse.

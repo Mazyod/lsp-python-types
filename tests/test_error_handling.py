@@ -20,7 +20,7 @@ import pytest
 import lsp_types.process as process_module
 from lsp_types import types
 from lsp_types.pool import LSPProcessPool
-from lsp_types.process import Error, LSPProcess, ProcessLaunchInfo
+from lsp_types.process import Error, LSPProcess, ProcessLaunchInfo, _run_protected
 from lsp_types.session import Session
 
 # Path to the mock LSP server script
@@ -503,3 +503,30 @@ async def test_session_create_cleanup_without_pool(tmp_path: Path):
         assert len(stop_called) == 1, (
             "Process should be stopped when no pool and creation fails"
         )
+
+
+async def test_run_protected_defers_caller_cancellation():
+    """Cancelling the caller cannot interrupt protected cleanup work."""
+    started = asyncio.Event()
+    allow_finish = asyncio.Event()
+    finished = False
+
+    async def cleanup() -> None:
+        nonlocal finished
+        started.set()
+        await allow_finish.wait()
+        finished = True
+
+    runner = asyncio.create_task(_run_protected(cleanup()))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+    runner.cancel()
+    await asyncio.sleep(0)
+
+    assert not runner.done()
+    assert not finished
+
+    allow_finish.set()
+    with pytest.raises(asyncio.CancelledError):
+        await runner
+
+    assert finished

@@ -56,6 +56,27 @@ class Error(Exception):
         return f"{super().__str__()} ({self.code})"
 
 
+async def _run_protected(coroutine: t.Coroutine[t.Any, t.Any, None]) -> None:
+    """Run ``coroutine`` to completion before propagating caller cancellation.
+
+    Cleanup must never be interrupted halfway, so the coroutine runs as its own
+    task behind ``asyncio.shield``. Cancellation delivered to the caller while it
+    waits is saved and re-raised once the task has finished.
+    """
+    cleanup_task = asyncio.create_task(coroutine)
+    cancellation: asyncio.CancelledError | None = None
+
+    while not cleanup_task.done():
+        try:
+            await asyncio.shield(cleanup_task)
+        except asyncio.CancelledError as error:
+            cancellation = error
+
+    cleanup_task.result()
+    if cancellation is not None:
+        raise cancellation
+
+
 class LSPProcess:
     """
     A process manager for Language Server Protocol communication.
@@ -148,8 +169,7 @@ class LSPProcess:
                 self._stopped = True
                 return
 
-            cleanup_task = asyncio.create_task(self._stop_process(process))
-            await self._await_cleanup(cleanup_task)
+            await _run_protected(self._stop_process(process))
 
     async def _stop_process(self, process: asyncio.subprocess.Process) -> None:
         """Complete subprocess cleanup independently of caller cancellation."""
@@ -163,21 +183,6 @@ class LSPProcess:
             await self._cancel_tasks()
             self._process = None
             self._stopped = True
-
-    @staticmethod
-    async def _await_cleanup(cleanup_task: asyncio.Task[None]) -> None:
-        """Wait for cleanup to finish before propagating caller cancellation."""
-        cancellation: asyncio.CancelledError | None = None
-
-        while not cleanup_task.done():
-            try:
-                await asyncio.shield(cleanup_task)
-            except asyncio.CancelledError as error:
-                cancellation = error
-
-        cleanup_task.result()
-        if cancellation is not None:
-            raise cancellation
 
     async def _request_graceful_shutdown(self) -> bool:
         """Ask the server to shut down without allowing it to block cleanup."""
