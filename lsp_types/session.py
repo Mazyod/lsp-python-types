@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import dataclasses as dc
+import datetime as dt
+import decimal
 import enum
+import logging
 import typing as t
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from . import semantic_tokens, types
 from .pool import LSPProcessPool
 from .process import LSPProcess, ProcessLaunchInfo
+
+logger = logging.getLogger("lsp-types")
 
 
 class LSPBackend[TConfig: t.Mapping](t.Protocol):
@@ -76,6 +81,20 @@ class _ProcessCompatibilityKey:
     initialize_params: t.Hashable
 
 
+def _stable_repr(frozen: t.Hashable) -> str:
+    """Render a frozen token deterministically for sorting mapping items.
+
+    ``repr`` alone is not stable for frozensets: their iteration order depends on
+    element insertion history, so equal sets can render differently within one
+    process. Sorting their element renderings removes that variance.
+    """
+    if isinstance(frozen, frozenset):
+        return "{" + ", ".join(sorted(_stable_repr(item) for item in frozen)) + "}"
+    if isinstance(frozen, tuple):
+        return "(" + ", ".join(_stable_repr(item) for item in frozen) + ")"
+    return repr(frozen)
+
+
 def _freeze_for_compatibility(value: t.Any) -> t.Hashable:
     """Convert nested protocol/config values into a deterministic hashable value."""
     # Enum members have the same wire representation as their scalar values.
@@ -89,19 +108,46 @@ def _freeze_for_compatibility(value: t.Any) -> t.Hashable:
             )
             for key, item_value in value.items()
         ]
-        return ("mapping", tuple(sorted(items, key=lambda item: repr(item[0]))))
+        return ("mapping", tuple(sorted(items, key=lambda item: _stable_repr(item[0]))))
     if isinstance(value, (list, tuple)):
         return ("sequence", tuple(_freeze_for_compatibility(item) for item in value))
+    if isinstance(value, (set, frozenset)):
+        # Frozen elements are not guaranteed to be mutually orderable, so
+        # membership rather than a sort order canonicalizes the token.
+        return ("set", frozenset(_freeze_for_compatibility(item) for item in value))
 
     if isinstance(value, float):
         # ``0.0 == -0.0`` even though their serialized forms can differ.
         return ("scalar", float, value.hex())
+    if isinstance(value, (bytes, bytearray)):
+        # Buffers are snapshotted like the mutable sequences handled above.
+        return ("scalar", bytes, bytes(value))
+    if isinstance(value, PurePath):
+        # Matches pathlib's own equality; a path never matches a plain string.
+        return ("path", str(value))
+    if isinstance(value, decimal.Decimal):
+        # ``Decimal("1.0") == Decimal("1.00")`` even though they serialize apart.
+        return ("scalar", decimal.Decimal, str(value))
+    if isinstance(value, (dt.date, dt.time)):
+        # ``datetime`` subclasses ``date``; the exact type keeps the two apart.
+        return ("scalar", type(value), value.isoformat())
+    if isinstance(value, dt.timedelta):
+        return (
+            "scalar",
+            dt.timedelta,
+            (value.days, value.seconds, value.microseconds),
+        )
     if value is None or isinstance(value, (bool, int, str)):
         return ("scalar", type(value), value)
 
     # Hashability does not guarantee immutability or safe equality. Unknown values
     # therefore get a unique token so custom configurations remain valid but never
     # risk reusing a process initialized from stale state.
+    logger.debug(
+        "Config value of type %s cannot be compared safely; "
+        "process reuse is disabled for this session",
+        type(value).__name__,
+    )
     return ("unsupported", type(value), object())
 
 

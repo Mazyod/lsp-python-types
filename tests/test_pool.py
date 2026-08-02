@@ -3,10 +3,12 @@ Tests for session pool functionality.
 """
 
 import asyncio
+import datetime as dt
 import logging
 import tempfile
 import time
 import typing as t
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -120,6 +122,156 @@ def test_process_compatibility_key_includes_all_launch_inputs(tmp_path: Path):
     assert baseline != build_key(command=["other-server", "--stdio"])
     assert baseline != build_key(environment={"PATH": "/other-bin"})
     assert baseline != build_key(cwd=tmp_path / "other-workspace")
+
+
+@pytest.mark.parametrize(
+    "left, right, different",
+    [
+        (b"token", b"token", b"other"),
+        (bytearray(b"token"), bytearray(b"token"), bytearray(b"other")),
+        (Path("/lib/site-packages"), Path("/lib/site-packages"), Path("/lib/other")),
+        (frozenset({"a", "b"}), frozenset({"b", "a"}), frozenset({"a", "c"})),
+        ({"a", "b"}, {"b", "a"}, {"a", "c"}),
+        (Decimal("1.50"), Decimal("1.50"), Decimal("1.51")),
+        (dt.date(2024, 1, 31), dt.date(2024, 1, 31), dt.date(2024, 2, 1)),
+        (
+            dt.datetime(2024, 1, 31, 12, 30),
+            dt.datetime(2024, 1, 31, 12, 30),
+            dt.datetime(2024, 1, 31, 12, 31),
+        ),
+        (dt.time(12, 30), dt.time(12, 30), dt.time(12, 31)),
+        (
+            dt.timedelta(seconds=90),
+            dt.timedelta(minutes=1, seconds=30),
+            dt.timedelta(seconds=91),
+        ),
+    ],
+    ids=[
+        "bytes",
+        "bytearray",
+        "path",
+        "frozenset",
+        "set",
+        "decimal",
+        "date",
+        "datetime",
+        "time",
+        "timedelta",
+    ],
+)
+def test_common_immutable_values_freeze_to_stable_tokens(left, right, different):
+    """Equal config values of these types keep a pooled process reusable."""
+    frozen_left = _freeze_for_compatibility(left)
+
+    assert frozen_left == _freeze_for_compatibility(right)
+    assert hash(frozen_left) == hash(_freeze_for_compatibility(right))
+    assert frozen_left != _freeze_for_compatibility(different)
+
+
+def test_frozen_values_do_not_conflate_distinct_types():
+    """Widening the supported types must not merge values that serialize apart."""
+    assert _freeze_for_compatibility(Path("/lib")) != _freeze_for_compatibility("/lib")
+    assert _freeze_for_compatibility(b"1") != _freeze_for_compatibility("1")
+    assert _freeze_for_compatibility({"a"}) != _freeze_for_compatibility(["a"])
+    assert _freeze_for_compatibility(Decimal("1")) != _freeze_for_compatibility(1)
+    assert _freeze_for_compatibility(
+        dt.datetime(2024, 1, 31)
+    ) != _freeze_for_compatibility(dt.date(2024, 1, 31))
+
+
+def test_frozen_values_distinguish_subtle_serialization_pairs():
+    """Pairs that compare equal-ish but serialize apart must not share a process."""
+    assert _freeze_for_compatibility(Decimal("1.0")) != _freeze_for_compatibility(
+        Decimal("1.00")
+    )
+    assert _freeze_for_compatibility({True: "x"}) != _freeze_for_compatibility({1: "x"})
+    naive = dt.datetime(2024, 1, 31, 12, 30)
+    aware = dt.datetime(2024, 1, 31, 12, 30, tzinfo=dt.timezone.utc)
+    assert _freeze_for_compatibility(naive) != _freeze_for_compatibility(aware)
+
+
+def test_frozen_mappings_with_set_keys_are_order_independent():
+    """Equal mappings must freeze identically regardless of set insertion order."""
+    left = {frozenset([1, 57]): "v", frozenset([1]): "w"}
+    right = {frozenset([57, 1]): "v", frozenset([1]): "w"}
+    assert _freeze_for_compatibility(left) == _freeze_for_compatibility(right)
+
+
+def test_frozen_containers_nest_and_ignore_set_order_only():
+    """Sets compare by membership; sequences still compare by position."""
+    left = {"search_path": [Path("/a"), Path("/b")], "tags": {"x", "y"}}
+    reordered_set = {"tags": {"y", "x"}, "search_path": [Path("/a"), Path("/b")]}
+    reordered_sequence = {"search_path": [Path("/b"), Path("/a")], "tags": {"x", "y"}}
+
+    assert _freeze_for_compatibility(left) == _freeze_for_compatibility(reordered_set)
+    assert _freeze_for_compatibility(left) != _freeze_for_compatibility(
+        reordered_sequence
+    )
+
+
+def test_unsupported_values_stay_unique_and_are_logged(
+    caplog: pytest.LogCaptureFixture,
+):
+    """Un-comparable values still disable reuse, but say so at debug level."""
+
+    class UnsupportedValue:
+        pass
+
+    unsupported = UnsupportedValue()
+
+    with caplog.at_level(logging.DEBUG, logger="lsp-types"):
+        first = _freeze_for_compatibility(unsupported)
+        second = _freeze_for_compatibility(unsupported)
+
+    assert first != second
+    assert any(
+        "UnsupportedValue" in record.getMessage() for record in caplog.records
+    ), caplog.text
+
+
+async def test_path_options_do_not_defeat_process_reuse(tmp_path: Path):
+    """Identical Path/bytes-bearing options must lease one pooled process."""
+    backend = PyrightBackend()
+    initialize_params: lsp_types.InitializeParams = {
+        "processId": None,
+        "rootUri": f"file://{tmp_path}",
+        "capabilities": {},
+    }
+
+    def build_key(search_path: Path):
+        return _build_process_compatibility_key(
+            backend,
+            base_path=str(tmp_path),
+            process_launch_info=ProcessLaunchInfo(
+                cmd=["language-server", "--stdio"], cwd=tmp_path
+            ),
+            resolved_environment={"PATH": "/bin"},
+            options={"search_path": [search_path], "markers": {b"raw"}},
+            initialize_params=initialize_params,
+        )
+
+    assert build_key(Path("/lib")) == build_key(Path("/lib"))
+    assert build_key(Path("/lib")) != build_key(Path("/other"))
+
+    async def create_process() -> LSPProcess:
+        return _StubLSPProcess()
+
+    pool = LSPProcessPool(max_size=2)
+    try:
+        first = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=build_key(Path("/lib"))
+        )
+        await pool.release(first)
+
+        reused = await pool.acquire(
+            _unexpected_process_factory,
+            str(tmp_path),
+            compatibility_key=build_key(Path("/lib")),
+        )
+        assert reused is first
+        await pool.release(reused)
+    finally:
+        await pool.cleanup()
 
 
 class TestLSPProcessPool:
