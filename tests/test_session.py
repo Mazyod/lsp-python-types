@@ -1,4 +1,5 @@
-import time
+import asyncio
+import logging
 import typing as t
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -6,7 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 import lsp_types
+from lsp_types import session as session_module
 from lsp_types.pool import LSPProcessPool
+from lsp_types.process import LSPProcess, ProcessLaunchInfo
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 from lsp_types.pyright.backend import PyrightBackend
@@ -69,10 +72,14 @@ def test_requires_file_on_disk_protocol():
 )
 async def test_get_completion_normalizes_response_shape(raw, expected):
     """Session normalizes all three LSP-spec completion shapes to CompletionList."""
-    session = Session.__new__(Session)
-    session._document_uri = "file:///doesnt-matter.py"
-    session._process = MagicMock()
-    session._process.send.completion = AsyncMock(return_value=raw)
+    process = MagicMock()
+    process.send.completion = AsyncMock(return_value=raw)
+    session = Session(
+        process,
+        MagicMock(),
+        Path("/doesnt-matter"),
+        pool=MagicMock(),
+    )
 
     result = await session.get_completion(lsp_types.Position(line=0, character=0))
     assert result == expected
@@ -531,6 +538,10 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
             initial_code="def func1(): return 1",
             pool=pool,
         )
+        first_server_info = session1.server_info
+        first_backend_legend = session1.backend_legend
+        assert first_server_info is not None
+        assert first_backend_legend is not None
 
         # Verify it works
         hover_info = await session1.get_hover_info(
@@ -553,6 +564,12 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
             pool=pool,
         )
 
+        # Initialization metadata belongs to the reused process, not the factory
+        # closure (which is deliberately skipped when the process is recycled).
+        assert pool.current_size == 1
+        assert session2.server_info == first_server_info
+        assert session2.backend_legend == first_backend_legend
+
         # Verify new code is active
         hover_info = await session2.get_hover_info(
             lsp_types.Position(line=0, character=4)
@@ -562,6 +579,327 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
 
         await session2.shutdown()
     finally:
+        await pool.cleanup()
+
+
+async def test_shutdown_session_cannot_mutate_reused_process(tmp_path: Path):
+    """A closed session cannot act through a process leased to its successor."""
+    pool = LSPProcessPool(max_size=1)
+    backend = PyrightBackend()
+    initial_code = "value: int = 1"
+
+    try:
+        first_session = await lsp_types.Session.create(
+            backend,
+            base_path=tmp_path,
+            initial_code=initial_code,
+            pool=pool,
+        )
+        process = first_session._process
+        await first_session.shutdown()
+
+        second_session = await lsp_types.Session.create(
+            backend,
+            base_path=tmp_path,
+            initial_code=initial_code,
+            pool=pool,
+        )
+        assert second_session._process is process
+
+        with pytest.raises(RuntimeError, match="Session has been shut down"):
+            await first_session.update_code('value: int = "invalid"')
+
+        assert first_session._document_text == initial_code
+        assert first_session._document_version == 1
+        assert await second_session.get_diagnostics() == []
+
+        await second_session.shutdown()
+    finally:
+        await pool.cleanup()
+
+
+async def test_post_shutdown_operations_fail_before_mutation(tmp_path: Path):
+    """Closed-session operations fail before touching local, disk, or server state."""
+    process = MagicMock()
+    pool = MagicMock(spec=LSPProcessPool)
+    pool.release = AsyncMock()
+    legend: lsp_types.SemanticTokensLegend = {
+        "tokenTypes": ["variable"],
+        "tokenModifiers": [],
+    }
+    server_info: lsp_types.ServerInfo = {"name": "test-server"}
+    session = Session(
+        process,
+        MagicMock(),
+        tmp_path,
+        pool=pool,
+        legend=legend,
+        server_info=server_info,
+    )
+    session._document_text = "original"
+    session._file_on_disk = True
+    session._file_path.write_text("original")
+    canonical_legend = session.canonical_legend
+
+    await session.shutdown()
+
+    position = lsp_types.Position(line=0, character=0)
+    operations: list[tuple[str, t.Callable[[], t.Awaitable[t.Any]]]] = [
+        ("update_code", lambda: session.update_code("mutated")),
+        ("get_diagnostics", session.get_diagnostics),
+        ("get_hover_info", lambda: session.get_hover_info(position)),
+        ("get_rename_edits", lambda: session.get_rename_edits(position, "renamed")),
+        ("get_signature_help", lambda: session.get_signature_help(position)),
+        ("get_completion", lambda: session.get_completion(position)),
+        (
+            "resolve_completion",
+            lambda: session.resolve_completion({"label": "value"}),
+        ),
+        ("get_semantic_tokens", session.get_semantic_tokens),
+        ("_open_document", lambda: session._open_document("mutated")),
+    ]
+
+    for operation_name, operation in operations:
+        try:
+            await operation()
+        except RuntimeError as error:
+            assert str(error) == "Session has been shut down", operation_name
+        else:
+            pytest.fail(f"{operation_name} succeeded after shutdown")
+
+    assert session._document_text == "original"
+    assert session._document_version == 1
+    assert session._file_path.read_text() == "original"
+    assert process.mock_calls == []
+    pool.release.assert_awaited_once_with(process)
+
+    # Informational metadata remains useful after the process lease is revoked.
+    assert session.server_info == server_info
+    assert session.backend_legend == legend
+    assert session.canonical_legend is canonical_legend
+
+
+async def test_concurrent_shutdown_releases_process_once(tmp_path: Path):
+    """The session revokes access before awaiting its single process release."""
+    process = MagicMock()
+    pool = MagicMock(spec=LSPProcessPool)
+    release_started = asyncio.Event()
+    allow_release = asyncio.Event()
+
+    async def release(_process):
+        release_started.set()
+        await allow_release.wait()
+
+    pool.release = AsyncMock(side_effect=release)
+    session = Session(process, MagicMock(), tmp_path, pool=pool)
+
+    first_shutdown = asyncio.create_task(session.shutdown())
+    await release_started.wait()
+
+    # The lease is already revoked even though the release is still suspended.
+    with pytest.raises(RuntimeError, match="Session has been shut down"):
+        await session.get_diagnostics()
+
+    await asyncio.gather(session.shutdown(), session.shutdown())
+    allow_release.set()
+    await first_shutdown
+    await session.shutdown()
+
+    pool.release.assert_awaited_once_with(process)
+
+
+async def test_shutdown_release_failure_leaves_session_closed(tmp_path: Path):
+    """A failed release cannot restore access to a partially transferred process."""
+    process = MagicMock()
+    pool = MagicMock(spec=LSPProcessPool)
+    pool.release = AsyncMock(side_effect=RuntimeError("release failed"))
+    server_info: lsp_types.ServerInfo = {"name": "test-server"}
+    session = Session(
+        process,
+        MagicMock(),
+        tmp_path,
+        pool=pool,
+        server_info=server_info,
+    )
+
+    with pytest.raises(RuntimeError, match="release failed"):
+        await session.shutdown()
+
+    with pytest.raises(RuntimeError, match="Session has been shut down"):
+        await session.get_diagnostics()
+
+    # A retry is a no-op: releasing twice could stop a process already handed off.
+    await session.shutdown()
+    pool.release.assert_awaited_once_with(process)
+    assert process.mock_calls == []
+    assert session.server_info == server_info
+
+
+class _GatedProcess(LSPProcess):
+    """A process whose requests stay suspended until the test releases them."""
+
+    def __init__(self) -> None:
+        super().__init__(ProcessLaunchInfo(cmd=["stub-lsp-process"]))
+        self.request_started = asyncio.Event()
+        self.allow_response = asyncio.Event()
+        self.stop_count = 0
+        self.alive = True
+
+    @property
+    def is_alive(self) -> bool:
+        return self.alive
+
+    async def _send_request(self, method: str, params: t.Any = None) -> t.Any:
+        self.request_started.set()
+        await self.allow_response.wait()
+        return None
+
+    async def reset(self) -> None:
+        return None
+
+    async def stop(self) -> None:
+        self.stop_count += 1
+        self.alive = False
+
+
+async def test_shutdown_waits_for_borrowed_operation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A process borrowed by a running operation is not returned to the pool."""
+    # The drain must outlast any real-time stall so the assertions below stay
+    # event-gated rather than racing the production timeout.
+    monkeypatch.setattr(session_module, "_INFLIGHT_DRAIN_TIMEOUT", 3_600.0)
+    pool = LSPProcessPool(max_size=2)
+    created: list[_GatedProcess] = []
+
+    async def create_process() -> LSPProcess:
+        process = _GatedProcess()
+        created.append(process)
+        return process
+
+    try:
+        leased = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        process = created[0]
+        session = Session(leased, MagicMock(), tmp_path, pool=pool)
+
+        hover = asyncio.create_task(
+            session.get_hover_info(lsp_types.Position(line=0, character=0))
+        )
+        await process.request_started.wait()
+
+        shutdown = asyncio.create_task(session.shutdown())
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(shutdown), timeout=0.05)
+
+        # The lease is revoked, but the process stays checked out: a successor
+        # asking for the same process family must get a different process.
+        assert pool.available_count == 0
+        successor = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        assert successor is not leased
+        await pool.release(successor)
+
+        process.allow_response.set()
+        assert await hover is None
+        await shutdown
+
+        assert process.stop_count == 0, "a drained process is reusable"
+        assert leased in pool._available
+    finally:
+        await pool.cleanup()
+
+
+async def test_shutdown_discards_process_when_operation_never_drains(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """A stuck operation poisons the process instead of returning it to the pool."""
+    monkeypatch.setattr(session_module, "_INFLIGHT_DRAIN_TIMEOUT", 0.05)
+    pool = LSPProcessPool(max_size=2)
+    created: list[_GatedProcess] = []
+
+    async def create_process() -> LSPProcess:
+        process = _GatedProcess()
+        created.append(process)
+        return process
+
+    hover: asyncio.Task[t.Any] | None = None
+    try:
+        leased = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        process = created[0]
+        session = Session(leased, MagicMock(), tmp_path, pool=pool)
+
+        hover = asyncio.create_task(
+            session.get_hover_info(lsp_types.Position(line=0, character=0))
+        )
+        await process.request_started.wait()
+
+        with caplog.at_level(logging.WARNING, logger="lsp-types"):
+            await session.shutdown()
+
+        assert process.stop_count == 1
+        assert pool.current_size == 0
+        assert pool.available_count == 0
+        assert leased not in pool._metadata
+        assert any("borrowed" in record.getMessage() for record in caplog.records), (
+            caplog.text
+        )
+    finally:
+        # The stub never answers, so the stranded request is cancelled here; a
+        # real process would have failed it when stop() closed the connection.
+        if hover is not None:
+            hover.cancel()
+            await asyncio.gather(hover, return_exceptions=True)
+        await pool.cleanup()
+
+
+async def test_cancelled_shutdown_discards_borrowed_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Cancelling shutdown mid-drain still removes the process from the pool."""
+    # The drain must outlast any real-time stall so cancel() always lands while
+    # the shutdown task is still draining.
+    monkeypatch.setattr(session_module, "_INFLIGHT_DRAIN_TIMEOUT", 3_600.0)
+    pool = LSPProcessPool(max_size=2)
+    created: list[_GatedProcess] = []
+
+    async def create_process() -> LSPProcess:
+        process = _GatedProcess()
+        created.append(process)
+        return process
+
+    hover: asyncio.Task[t.Any] | None = None
+    try:
+        leased = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=("gated",)
+        )
+        process = created[0]
+        session = Session(leased, MagicMock(), tmp_path, pool=pool)
+
+        hover = asyncio.create_task(
+            session.get_hover_info(lsp_types.Position(line=0, character=0))
+        )
+        await process.request_started.wait()
+
+        shutdown = asyncio.create_task(session.shutdown())
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(shutdown), timeout=0.05)
+
+        shutdown.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await shutdown
+
+        assert process.stop_count == 1
+        assert pool.current_size == 0
+        assert leased not in pool._metadata
+    finally:
+        if hover is not None:
+            hover.cancel()
+            await asyncio.gather(hover, return_exceptions=True)
         await pool.cleanup()
 
 
@@ -599,38 +937,31 @@ async def test_session_recycling_with_diagnostics(
         await pool.cleanup()
 
 
-async def test_session_recycling_performance(lsp_backend, tmp_path: Path):
-    """Test that recycling is faster than creating new sessions"""
-    pool = LSPProcessPool(max_size=2)
+async def test_session_recycling_reuses_process(lsp_backend, tmp_path: Path):
+    """Sequential compatible sessions reuse the same pooled process."""
+    pool = LSPProcessPool(max_size=1)
 
     try:
-        # Time creating fresh sessions
-        start_time = time.time()
+        first_session = await lsp_types.Session.create(
+            lsp_backend,
+            base_path=tmp_path,
+            initial_code="first = True",
+            pool=pool,
+        )
+        [pooled_process] = pool._active
+        await first_session.shutdown()
+
         for i in range(3):
             session = await lsp_types.Session.create(
-                lsp_backend, base_path=tmp_path, initial_code=f"x{i} = {i}"
+                lsp_backend,
+                base_path=tmp_path,
+                initial_code=f"value_{i} = {i}",
+                pool=pool,
             )
+            assert pool._active == {pooled_process}
+            assert pool.available_count == 0
             await session.shutdown()
-        fresh_time = time.time() - start_time
-
-        # Time using recycled sessions
-        start_time = time.time()
-        sessions = []
-        for i in range(3):
-            session = await lsp_types.Session.create(
-                lsp_backend, base_path=tmp_path, initial_code=f"y{i} = {i}", pool=pool
-            )
-            sessions.append(session)
-
-        # Recycle them
-        for session in sessions:
-            await session.shutdown()
-
-        recycled_time = time.time() - start_time
-
-        # Recycling should be at least somewhat faster
-        # Note: This is more of a performance indicator than a strict test
-        assert recycled_time <= fresh_time * 1.5  # Allow some variance
+            assert list(pool._available) == [pooled_process]
 
     finally:
         await pool.cleanup()

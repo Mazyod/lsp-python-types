@@ -1,12 +1,29 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import dataclasses as dc
+import datetime as dt
+import decimal
+import enum
+import logging
 import typing as t
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from . import semantic_tokens, types
 from .pool import LSPProcessPool
 from .process import LSPProcess, ProcessLaunchInfo
+
+logger = logging.getLogger("lsp-types")
+
+_INFLIGHT_DRAIN_TIMEOUT = 5.0
+"""Seconds ``Session.shutdown`` waits for borrowed operations to finish.
+
+Matched to ``lsp_types.process._GRACEFUL_SHUTDOWN_TIMEOUT``: an operation that
+has not returned within that window is waiting on a server the process layer
+already treats as unresponsive, so its process must not be handed to a
+successor session.
+"""
 
 
 class LSPBackend[TConfig: t.Mapping](t.Protocol):
@@ -62,8 +79,121 @@ class DiagnosticsResult:
     value: list[types.Diagnostic]
 
 
+@dc.dataclass(frozen=True)
+class _ProcessCompatibilityKey:
+    """Inputs that must match before an initialized process can be reused."""
+
+    backend_type: type[t.Any]
+    base_path: str
+    command: tuple[str, ...]
+    environment: tuple[tuple[str, str], ...]
+    working_directory: str
+    options: t.Hashable
+    initialize_params: t.Hashable
+
+
+def _stable_repr(frozen: t.Hashable) -> str:
+    """Render a frozen token deterministically for sorting mapping items.
+
+    ``repr`` alone is not stable for frozensets: their iteration order depends on
+    element insertion history, so equal sets can render differently within one
+    process. Sorting their element renderings removes that variance.
+    """
+    if isinstance(frozen, frozenset):
+        return "{" + ", ".join(sorted(_stable_repr(item) for item in frozen)) + "}"
+    if isinstance(frozen, tuple):
+        return "(" + ", ".join(_stable_repr(item) for item in frozen) + ")"
+    return repr(frozen)
+
+
+def _freeze_for_compatibility(value: t.Any) -> t.Hashable:
+    """Convert nested protocol/config values into a deterministic hashable value."""
+    # Enum members have the same wire representation as their scalar values.
+    if isinstance(value, enum.Enum):
+        return _freeze_for_compatibility(value.value)
+    if isinstance(value, t.Mapping):
+        items = [
+            (
+                _freeze_for_compatibility(key),
+                _freeze_for_compatibility(item_value),
+            )
+            for key, item_value in value.items()
+        ]
+        return ("mapping", tuple(sorted(items, key=lambda item: _stable_repr(item[0]))))
+    if isinstance(value, (list, tuple)):
+        return ("sequence", tuple(_freeze_for_compatibility(item) for item in value))
+    if isinstance(value, (set, frozenset)):
+        # Frozen elements are not guaranteed to be mutually orderable, so
+        # membership rather than a sort order canonicalizes the token.
+        return ("set", frozenset(_freeze_for_compatibility(item) for item in value))
+
+    if isinstance(value, float):
+        # ``0.0 == -0.0`` even though their serialized forms can differ.
+        return ("scalar", float, value.hex())
+    if isinstance(value, (bytes, bytearray)):
+        # Buffers are snapshotted like the mutable sequences handled above.
+        return ("scalar", bytes, bytes(value))
+    if isinstance(value, PurePath):
+        # Matches pathlib's own equality; a path never matches a plain string.
+        return ("path", str(value))
+    if isinstance(value, decimal.Decimal):
+        # ``Decimal("1.0") == Decimal("1.00")`` even though they serialize apart.
+        return ("scalar", decimal.Decimal, str(value))
+    if isinstance(value, (dt.date, dt.time)):
+        # ``datetime`` subclasses ``date``; the exact type keeps the two apart.
+        return ("scalar", type(value), value.isoformat())
+    if isinstance(value, dt.timedelta):
+        return (
+            "scalar",
+            dt.timedelta,
+            (value.days, value.seconds, value.microseconds),
+        )
+    if value is None or isinstance(value, (bool, int, str)):
+        return ("scalar", type(value), value)
+
+    # Hashability does not guarantee immutability or safe equality. Unknown values
+    # therefore get a unique token so custom configurations remain valid but never
+    # risk reusing a process initialized from stale state.
+    logger.debug(
+        "Config value of type %s cannot be compared safely; "
+        "process reuse is disabled for this session",
+        type(value).__name__,
+    )
+    return ("unsupported", type(value), object())
+
+
+def _build_process_compatibility_key(
+    backend: LSPBackend,
+    *,
+    base_path: str,
+    process_launch_info: ProcessLaunchInfo,
+    resolved_environment: t.Mapping[str, str],
+    options: t.Mapping,
+    initialize_params: types.InitializeParams,
+) -> _ProcessCompatibilityKey:
+    """Build the complete identity of an initialized language-server process."""
+    return _ProcessCompatibilityKey(
+        backend_type=type(backend),
+        base_path=base_path,
+        command=tuple(process_launch_info.cmd),
+        environment=tuple(sorted(resolved_environment.items())),
+        working_directory=str(process_launch_info.cwd.resolve()),
+        options=_freeze_for_compatibility(options),
+        initialize_params=_freeze_for_compatibility(initialize_params),
+    )
+
+
 class Session:
-    """Concrete LSP session implementation using pluggable backends"""
+    """Concrete LSP session implementation using pluggable backends.
+
+    A session owns one leased LSP process. Operations may run concurrently with
+    each other and with ``shutdown()``: shutting down rejects new operations
+    immediately, waits up to ``_INFLIGHT_DRAIN_TIMEOUT`` seconds for operations
+    that are already in flight, and discards the process instead of returning it
+    to the pool if any are still running. A discarded process is stopped, so the
+    stuck operation fails instead of leaking into the next session that would
+    otherwise have reused the process.
+    """
 
     @classmethod
     async def create(
@@ -83,42 +213,47 @@ class Session:
         # Write backend-specific configuration
         backend.write_config(base_path, options)
 
-        # Capture the server's semantic tokens legend during initialization
-        captured_legend: types.SemanticTokensLegend | None = None
-        captured_server_info: types.ServerInfo | None = None
+        process_launch_info = backend.create_process_launch_info(base_path, options)
+        resolved_environment = process_launch_info.resolved_environment()
+        resolved_initialize_params: types.InitializeParams = {
+            "processId": None,
+            "rootUri": f"file://{base_path}",
+            "rootPath": base_path_str,
+            "capabilities": backend.get_lsp_capabilities(),
+        }
 
-        async def create_lsp_process():
-            nonlocal captured_legend, captured_server_info
+        if initialize_params is not None:
+            resolved_initialize_params = resolved_initialize_params | initialize_params
 
-            proc_info = backend.create_process_launch_info(base_path, options)
-            lsp_process = LSPProcess(proc_info)
-            await lsp_process.start()
+        compatibility_key = _build_process_compatibility_key(
+            backend,
+            base_path=base_path_str,
+            process_launch_info=process_launch_info,
+            resolved_environment=resolved_environment,
+            options=options,
+            initialize_params=resolved_initialize_params,
+        )
 
-            # Initialize LSP connection
-            resolved_initialize_params: types.InitializeParams = {
-                "processId": None,
-                "rootUri": f"file://{base_path}",
-                "rootPath": base_path_str,
-                "capabilities": backend.get_lsp_capabilities(),
-            }
+        async def create_lsp_process() -> LSPProcess:
+            lsp_process = LSPProcess(
+                process_launch_info,
+                resolved_environment=resolved_environment,
+            )
+            try:
+                await lsp_process.start()
 
-            if initialize_params is not None:
-                resolved_initialize_params = (
-                    resolved_initialize_params | initialize_params
-                )
+                # Initialize LSP connection
+                await lsp_process.send.initialize(resolved_initialize_params)
 
-            init_result = await lsp_process.send.initialize(resolved_initialize_params)
-
-            # Extract semantic tokens legend from server capabilities
-            if init_result:
-                caps = init_result.get("capabilities", {})
-                provider = caps.get("semanticTokensProvider")
-                if provider and "legend" in provider:
-                    captured_legend = provider["legend"]
-                captured_server_info = init_result.get("serverInfo")
-
-            # Send initialized notification (required by LSP spec)
-            await lsp_process.notify.initialized({})
+                # Send initialized notification (required by LSP spec)
+                await lsp_process.notify.initialized({})
+            except BaseException:
+                # Nothing owns the process until this factory returns - the pool
+                # only records it afterwards - so it must stop itself on every
+                # failure, cancellation included. `stop()` is cancellation-safe:
+                # it finishes reaping before re-raising, so no shield is needed.
+                await lsp_process.stop()
+                raise
 
             return lsp_process
 
@@ -126,10 +261,24 @@ class Session:
         if pool is None:
             pool = LSPProcessPool(max_size=0)  # No recycling, immediate shutdown
 
-        lsp_process = await pool.acquire(create_lsp_process, base_path_str)
+        lsp_process = await pool.acquire(
+            create_lsp_process,
+            base_path_str,
+            compatibility_key=compatibility_key,
+        )
         try:
-            # Use server legend if captured, otherwise fall back to backend's legend
-            legend = captured_legend or backend.get_semantic_tokens_legend()
+            init_result = lsp_process.initialize_result
+            server_legend: types.SemanticTokensLegend | None = None
+            server_info: types.ServerInfo | None = None
+            if init_result:
+                capabilities = init_result.get("capabilities", {})
+                provider = capabilities.get("semanticTokensProvider")
+                if provider and "legend" in provider:
+                    server_legend = provider["legend"]
+                server_info = init_result.get("serverInfo")
+
+            # Use server legend if advertised, otherwise fall back to backend's legend
+            legend = server_legend or backend.get_semantic_tokens_legend()
 
             session = cls(
                 lsp_process,
@@ -137,7 +286,7 @@ class Session:
                 base_path,
                 pool=pool,
                 legend=legend,
-                server_info=captured_server_info,
+                server_info=server_info,
             )
 
             # Update settings via didChangeConfiguration
@@ -156,9 +305,13 @@ class Session:
             await session._open_document(initial_code)
 
             return session
-        except Exception:
-            # Release the process back to the pool (or shutdown for non-pooled)
-            # to avoid resource leaks on initialization failure
+        except BaseException:
+            # Release the process back to the pool (or shut it down for non-pooled)
+            # to avoid resource leaks on initialization failure. Cancellation is the
+            # most likely trigger - a caller timing out a slow server - so it must be
+            # caught too. The release still completes: its bookkeeping runs before
+            # any suspension point, and any `stop()` it awaits defers cancellation
+            # until cleanup has finished.
             await pool.release(lsp_process)
             raise
 
@@ -172,13 +325,17 @@ class Session:
         legend: types.SemanticTokensLegend | None = None,
         server_info: types.ServerInfo | None = None,
     ):
-        self._process = lsp_process
+        self.__process = lsp_process
+        self._pool = pool
+        self._closed = False
+        self._in_flight_operations = 0
+        self._operations_idle = asyncio.Event()
+        self._operations_idle.set()
         self._backend = backend
         self._file_path = base_path / "new.py"
         self._document_uri = f"file://{self._file_path}"
         self._document_version = 1
         self._document_text = ""
-        self._active_pool: LSPProcessPool | None = pool
         self._diag_result: DiagnosticsResult | None = None
         self._file_on_disk = (
             False  # Set to True if file was written for backends that require it
@@ -194,63 +351,101 @@ class Session:
             self._modifier_map = semantic_tokens.build_modifier_mapping(legend)
 
     async def shutdown(self) -> None:
-        """Shutdown and recycle the session back to the pool"""
-        if self._active_pool is None:
-            return  # Already recycled
+        """Close the session and release its process lease exactly once.
 
-        # Release back to pool (document cleanup handled by pool/process reset)
-        # For max_size=0 pools, this will immediately shutdown the process
-        await self._active_pool.release(self._process)
+        New operations are rejected immediately, then operations that borrowed
+        the process before the lease was revoked are given
+        ``_INFLIGHT_DRAIN_TIMEOUT`` seconds to finish. A process still borrowed
+        after that window is treated as poisoned and discarded instead of
+        returned to the pool, because a successor session would otherwise share
+        a protocol stream with a stale operation.
 
-        # Clear references to prevent further use
-        self._active_pool = None
+        Concurrent callers return as soon as the lease is revoked; the first
+        caller performs the drain and the release.
+
+        The session remains closed if releasing the process raises because
+        ownership may already have been partially transferred.
+        """
+        if self._closed:
+            return  # Already shut down
+
+        # Revoke this session's lease before yielding so concurrent shutdown calls
+        # cannot release the same process twice, and stale references cannot use a
+        # process after it has been returned to the pool.
+        self._closed = True
+
+        cancellation: asyncio.CancelledError | None = None
+        try:
+            drained = await self._drain_borrowed_operations()
+        except asyncio.CancelledError as error:
+            # A cancelled shutdown still owns the lease. Poison the process
+            # rather than leaking one that in-flight operations may still write to.
+            cancellation = error
+            drained = False
+
+        if drained:
+            # Release back to pool (document cleanup handled by pool/process reset)
+            # For max_size=0 pools, this will immediately shutdown the process
+            await self._pool.release(self.__process)
+        else:
+            logger.warning(
+                "Session shutdown discarded a process still borrowed by %d "
+                "operation(s)",
+                self._in_flight_operations,
+            )
+            await self._pool.discard(self.__process)
+
+        if cancellation is not None:
+            raise cancellation
 
     async def update_code(self, code: str) -> int:
         """Update the code in the current document"""
-        self._document_version += 1
-        self._document_text = code
+        with self._borrow_process() as process:
+            self._document_version += 1
+            self._document_text = code
 
-        # Keep file on disk in sync if required by backend
-        if self._file_on_disk:
-            self._file_path.write_text(code)
+            # Keep file on disk in sync if required by backend
+            if self._file_on_disk:
+                self._file_path.write_text(code)
 
-        document_version = self._document_version
-        await self._process.notify.did_change_text_document(
-            {
-                "textDocument": {
-                    "uri": self._document_uri,
-                    "version": self._document_version,
-                },
-                "contentChanges": [{"text": code}],
-            }
-        )
+            document_version = self._document_version
+            await process.notify.did_change_text_document(
+                {
+                    "textDocument": {
+                        "uri": self._document_uri,
+                        "version": self._document_version,
+                    },
+                    "contentChanges": [{"text": code}],
+                }
+            )
 
-        return document_version
+            return document_version
 
     async def get_diagnostics(self) -> list[types.Diagnostic]:
         """Pull diagnostics via textDocument/diagnostic (LSP-3.17)"""
-        params: types.DocumentDiagnosticParams = {
-            "textDocument": {"uri": self._document_uri},
-        }
+        with self._borrow_process() as process:
+            params: types.DocumentDiagnosticParams = {
+                "textDocument": {"uri": self._document_uri},
+            }
 
-        if result := self._diag_result:
-            params["previousResultId"] = result.id
+            if result := self._diag_result:
+                params["previousResultId"] = result.id
 
-        report = await self._process.send.text_document_diagnostic(params)
+            report = await process.send.text_document_diagnostic(params)
 
-        diagnostics: list[types.Diagnostic]
-        match report["kind"]:
-            case "full":
-                diagnostics = report["items"]
-            case "unchanged":
-                diagnostics = self._diag_result.value if self._diag_result else []
+            diagnostics: list[types.Diagnostic]
+            match report["kind"]:
+                case "full":
+                    diagnostics = report["items"]
+                case "unchanged":
+                    diagnostics = self._diag_result.value if self._diag_result else []
 
-        # Persist token for the next delta request (if present)
-        if result_id := report.get("resultId"):
-            self._diag_result = DiagnosticsResult(id=result_id, value=diagnostics)
+            # Persist token for the next delta request (if present)
+            if result_id := report.get("resultId"):
+                self._diag_result = DiagnosticsResult(id=result_id, value=diagnostics)
 
-        # For 'unchanged' nothing is appended ⇒ return cached view if desired
-        return diagnostics
+            # For 'unchanged' nothing is appended ⇒ return cached view if desired
+            return diagnostics
 
     async def get_hover_info(self, position: types.Position) -> types.Hover | None:
         """Get hover information at the given position.
@@ -261,32 +456,35 @@ class Session:
         not the symbol extent — consumers that need the symbol's actual span
         must compute it themselves.
         """
-        hover = await self._process.send.hover(
-            {"textDocument": {"uri": self._document_uri}, "position": position}
-        )
-        if hover is not None and "range" not in hover:
-            hover["range"] = {"start": position, "end": position}
-        return hover
+        with self._borrow_process() as process:
+            hover = await process.send.hover(
+                {"textDocument": {"uri": self._document_uri}, "position": position}
+            )
+            if hover is not None and "range" not in hover:
+                hover["range"] = {"start": position, "end": position}
+            return hover
 
     async def get_rename_edits(
         self, position: types.Position, new_name: str
     ) -> types.WorkspaceEdit | None:
         """Get rename edits for the given position"""
-        return await self._process.send.rename(
-            {
-                "textDocument": {"uri": self._document_uri},
-                "position": position,
-                "newName": new_name,
-            }
-        )
+        with self._borrow_process() as process:
+            return await process.send.rename(
+                {
+                    "textDocument": {"uri": self._document_uri},
+                    "position": position,
+                    "newName": new_name,
+                }
+            )
 
     async def get_signature_help(
         self, position: types.Position
     ) -> types.SignatureHelp | None:
         """Get signature help at the given position"""
-        return await self._process.send.signature_help(
-            {"textDocument": {"uri": self._document_uri}, "position": position}
-        )
+        with self._borrow_process() as process:
+            return await process.send.signature_help(
+                {"textDocument": {"uri": self._document_uri}, "position": position}
+            )
 
     async def get_completion(self, position: types.Position) -> types.CompletionList:
         """Get completion items at the given position.
@@ -297,40 +495,43 @@ class Session:
         ``null`` and a bare list both map to ``isIncomplete: False`` (the spec
         treats them as complete result sets — empty and given, respectively).
         """
-        result = await self._process.send.completion(
-            {"textDocument": {"uri": self._document_uri}, "position": position}
-        )
-        if result is None:
-            return {"items": [], "isIncomplete": False}
-        if isinstance(result, list):
-            return {"items": result, "isIncomplete": False}
-        return result
+        with self._borrow_process() as process:
+            result = await process.send.completion(
+                {"textDocument": {"uri": self._document_uri}, "position": position}
+            )
+            if result is None:
+                return {"items": [], "isIncomplete": False}
+            if isinstance(result, list):
+                return {"items": result, "isIncomplete": False}
+            return result
 
     async def resolve_completion(
         self, completion_item: types.CompletionItem
     ) -> types.CompletionItem:
         """Resolve the given completion item"""
-        return await self._process.send.resolve_completion_item(completion_item)
+        with self._borrow_process() as process:
+            return await process.send.resolve_completion_item(completion_item)
 
     async def get_semantic_tokens(
         self, *, normalize: bool = False
     ) -> types.SemanticTokens | None:
         """Get semantic tokens for the current document."""
-        tokens = await self._process.send.semantic_tokens_full(
-            {"textDocument": {"uri": self._document_uri}}
-        )
+        with self._borrow_process() as process:
+            tokens = await process.send.semantic_tokens_full(
+                {"textDocument": {"uri": self._document_uri}}
+            )
 
-        if not normalize or tokens is None:
-            return tokens
+            if not normalize or tokens is None:
+                return tokens
 
-        # Remap indices to canonical legend
-        if self._type_map is None or self._modifier_map is None:
-            # No legend captured, can't normalize
-            return tokens
+            # Remap indices to canonical legend
+            if self._type_map is None or self._modifier_map is None:
+                # No legend captured, can't normalize
+                return tokens
 
-        return semantic_tokens.normalize_tokens(
-            tokens, self._type_map, self._modifier_map
-        )
+            return semantic_tokens.normalize_tokens(
+                tokens, self._type_map, self._modifier_map
+            )
 
     @property
     def canonical_legend(self) -> types.SemanticTokensLegend:
@@ -349,18 +550,64 @@ class Session:
 
     # Private methods
 
+    @property
+    def _process(self) -> LSPProcess:
+        """Return the process while this session owns its lease."""
+        if self._closed:
+            raise RuntimeError("Session has been shut down")
+        return self.__process
+
+    @contextlib.contextmanager
+    def _borrow_process(self) -> t.Iterator[LSPProcess]:
+        """Borrow the leased process for the duration of one operation.
+
+        ``shutdown()`` revokes the lease immediately but waits for every borrow
+        to end before the process is released, so an operation suspended
+        mid-request cannot interleave with a successor session's stream.
+
+        Residual gap: cancelling an operation ends its borrow even though a
+        notification write it already queued may still be in flight on the
+        process's writer task, so a shutdown racing that exact window can
+        still pool the process with the stale write pending. Closing it would
+        require the process layer to track and cancel queued writes on reset.
+        """
+        # No await between the guard and the increment: an operation that passed
+        # the guard is always visible to a concurrent shutdown.
+        process = self._process
+        self._in_flight_operations += 1
+        self._operations_idle.clear()
+        try:
+            yield process
+        finally:
+            self._in_flight_operations -= 1
+            if self._in_flight_operations == 0:
+                self._operations_idle.set()
+
+    async def _drain_borrowed_operations(self) -> bool:
+        """Wait for borrowed operations; ``False`` when the bounded wait expired."""
+        if self._in_flight_operations == 0:
+            return True
+
+        try:
+            async with asyncio.timeout(_INFLIGHT_DRAIN_TIMEOUT):
+                await self._operations_idle.wait()
+        except TimeoutError:
+            return False
+        return True
+
     async def _open_document(self, code: str) -> None:
         """Open a document with the given code"""
-        self._document_text = code
-        await self._process.notify.did_open_text_document(
-            {
-                "textDocument": {
-                    "languageId": types.LanguageKind.Python,
-                    "version": self._document_version,
-                    "uri": self._document_uri,
-                    "text": code,
+        with self._borrow_process() as process:
+            self._document_text = code
+            await process.notify.did_open_text_document(
+                {
+                    "textDocument": {
+                        "languageId": types.LanguageKind.Python,
+                        "version": self._document_version,
+                        "uri": self._document_uri,
+                        "text": code,
+                    }
                 }
-            }
-        )
-        # Track the opened document
-        self._process.track_document_open(self._document_uri)
+            )
+            # Track the opened document
+            process.track_document_open(self._document_uri)

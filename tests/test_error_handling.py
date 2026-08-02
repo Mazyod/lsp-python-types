@@ -10,15 +10,17 @@ These tests verify that the LSP client properly handles:
 from __future__ import annotations
 
 import asyncio
+import signal
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+import lsp_types.process as process_module
 from lsp_types import types
 from lsp_types.pool import LSPProcessPool
-from lsp_types.process import Error, LSPProcess, ProcessLaunchInfo
+from lsp_types.process import Error, LSPProcess, ProcessLaunchInfo, _run_protected
 from lsp_types.session import Session
 
 # Path to the mock LSP server script
@@ -48,6 +50,7 @@ async def test_timeout_when_server_hangs():
         )
         assert init_result is not None
         assert "capabilities" in init_result
+        assert process.initialize_result == init_result
 
         await process.notify.initialized({})
 
@@ -141,6 +144,316 @@ async def test_shutdown_after_timeout():
         # (stop() handles cleanup even after failed requests)
     finally:
         await process.stop()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="uses POSIX process signals")
+async def test_stop_times_out_hung_shutdown_and_reaps_process(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    """A server that ignores shutdown cannot block cleanup or remain alive."""
+    monkeypatch.setattr(process_module, "_GRACEFUL_SHUTDOWN_TIMEOUT", 0.05)
+    monkeypatch.setattr(process_module, "_PROCESS_EXIT_TIMEOUT", 0.05)
+    process = LSPProcess(
+        ProcessLaunchInfo(
+            cmd=get_mock_server_cmd("--hang-on", "shutdown", "--ignore-sigterm")
+        )
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    await asyncio.wait_for(process.stop(), timeout=1.0)
+
+    assert process._process is None
+    assert subprocess.returncode == -signal.SIGKILL
+    assert not process._tasks
+    assert not process._pending_requests
+    assert "did not terminate; killing process" in caplog.text
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="uses POSIX process signals")
+async def test_cancelled_stop_finishes_reaping_before_propagating(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Caller cancellation cannot interrupt subprocess reaping."""
+    monkeypatch.setattr(process_module, "_GRACEFUL_SHUTDOWN_TIMEOUT", 0.05)
+    monkeypatch.setattr(process_module, "_PROCESS_EXIT_TIMEOUT", 0.05)
+    process = LSPProcess(
+        ProcessLaunchInfo(
+            cmd=get_mock_server_cmd("--hang-on", "shutdown", "--ignore-sigterm")
+        )
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    terminate_wait_started = asyncio.Event()
+    original_wait_for_exit = process._wait_for_exit
+
+    async def tracked_wait_for_exit(
+        child: asyncio.subprocess.Process, timeout: float
+    ) -> bool:
+        terminate_wait_started.set()
+        return await original_wait_for_exit(child, timeout)
+
+    monkeypatch.setattr(process, "_wait_for_exit", tracked_wait_for_exit)
+    stop_task = asyncio.create_task(process.stop())
+    await asyncio.wait_for(terminate_wait_started.wait(), timeout=1.0)
+    stop_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await stop_task
+
+    assert subprocess.returncode == -signal.SIGKILL
+    assert process._process is None
+    assert not process._tasks
+    assert not process._pending_requests
+
+
+async def test_completed_notification_tasks_are_not_retained(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Fire-and-forget notifications leave the internal task registry promptly."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    release_notifications = asyncio.Event()
+    all_notifications_started = asyncio.Event()
+    notifications_started = 0
+    original_send_payload = process._send_payload
+
+    async def gated_send_payload(stream, payload):  # type: ignore[no-untyped-def]
+        nonlocal notifications_started
+        if payload.get("method") == "initialized":
+            notifications_started += 1
+            if notifications_started == 100:
+                all_notifications_started.set()
+            await release_notifications.wait()
+        await original_send_payload(stream, payload)
+
+    monkeypatch.setattr(process, "_send_payload", gated_send_payload)
+    notifications = [process.notify.initialized({}) for _ in range(100)]
+
+    try:
+        await asyncio.wait_for(all_notifications_started.wait(), timeout=1.0)
+        assert len(process._tasks) == 102
+
+        release_notifications.set()
+        await asyncio.gather(*notifications)
+        await asyncio.sleep(0)
+
+        assert len(process._tasks) == 2
+    finally:
+        release_notifications.set()
+        await asyncio.gather(*notifications, return_exceptions=True)
+        await process.stop()
+
+    assert not process._tasks
+
+
+async def test_task_cleanup_drains_tasks_added_during_cancellation():
+    """Tasks created while cancellation is unwinding remain owned and are joined."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    late_tasks: list[asyncio.Task[None]] = []
+
+    async def wait_forever() -> None:
+        await asyncio.Event().wait()
+
+    async def add_late_task_during_cleanup() -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            late_task = process._track_task(asyncio.create_task(wait_forever()))
+            late_tasks.append(late_task)
+
+    process._track_task(asyncio.create_task(add_late_task_during_cleanup()))
+    await asyncio.sleep(0)
+
+    await process._cancel_tasks()
+
+    assert len(late_tasks) == 1
+    assert late_tasks[0].cancelled()
+    assert not process._tasks
+
+
+async def test_concurrent_stop_calls_share_cleanup(monkeypatch: pytest.MonkeyPatch):
+    """Concurrent callers can safely wait for one idempotent cleanup."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    shutdown_count = 0
+    original_request_graceful_shutdown = process._request_graceful_shutdown
+
+    async def counted_graceful_shutdown() -> bool:
+        nonlocal shutdown_count
+        shutdown_count += 1
+        return await original_request_graceful_shutdown()
+
+    monkeypatch.setattr(
+        process, "_request_graceful_shutdown", counted_graceful_shutdown
+    )
+
+    await asyncio.gather(process.stop(), process.stop())
+
+    assert shutdown_count == 1
+    assert process._process is None
+    assert not process._tasks
+
+
+async def test_stopped_process_cannot_restart():
+    """Stopping is a terminal lifecycle transition."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    await process.stop()
+
+    with pytest.raises(RuntimeError, match="has been stopped: cannot restart"):
+        await process.start()
+
+
+async def test_running_process_rejects_second_start():
+    """Starting twice names the running state rather than a generic failure."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+
+    try:
+        with pytest.raises(RuntimeError, match="is already running: cannot start"):
+            await process.start()
+    finally:
+        await process.stop()
+
+
+async def test_unstarted_process_rejects_requests_and_notifications():
+    """A never-started process reports that state on every send path."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+
+    with pytest.raises(RuntimeError, match="has not been started: cannot send"):
+        await process.send.hover(
+            {
+                "textDocument": {"uri": "file:///test.py"},
+                "position": {"line": 0, "character": 0},
+            }
+        )
+
+    with pytest.raises(RuntimeError, match="has not been started: cannot send"):
+        process.notify.did_close_text_document(
+            {"textDocument": {"uri": "file:///test.py"}}
+        )
+
+
+async def test_stopped_process_rejects_requests_and_notifications():
+    """A stopped process raises on notifications instead of dropping them."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    await process.stop()
+
+    with pytest.raises(RuntimeError, match="has been stopped: cannot send"):
+        await process.send.hover(
+            {
+                "textDocument": {"uri": "file:///test.py"},
+                "position": {"line": 0, "character": 0},
+            }
+        )
+
+    with pytest.raises(RuntimeError, match="has been stopped: cannot send"):
+        process.notify.did_close_text_document(
+            {"textDocument": {"uri": "file:///test.py"}}
+        )
+
+
+async def test_start_and_stop_are_serialized(monkeypatch: pytest.MonkeyPatch):
+    """Stopping during startup cannot publish a process after terminal shutdown."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    spawn_started = asyncio.Event()
+    allow_spawn = asyncio.Event()
+    original_create_subprocess_exec = asyncio.create_subprocess_exec
+
+    async def gated_create_subprocess_exec(*args, **kwargs):  # type: ignore[no-untyped-def]
+        spawn_started.set()
+        await allow_spawn.wait()
+        return await original_create_subprocess_exec(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", gated_create_subprocess_exec)
+    start_task = asyncio.create_task(process.start())
+    await asyncio.wait_for(spawn_started.wait(), timeout=1.0)
+    stop_task = asyncio.create_task(process.stop())
+    await asyncio.sleep(0)
+
+    assert not stop_task.done()
+
+    allow_spawn.set()
+    await start_task
+    await stop_task
+
+    assert process._process is None
+    assert process._stopped
+    assert not process._tasks
+
+
+async def test_stop_tolerates_error_reply_to_shutdown():
+    """A JSON-RPC error answer to `shutdown` cannot make cleanup fail."""
+    process = LSPProcess(
+        ProcessLaunchInfo(cmd=get_mock_server_cmd("--error-on", "shutdown"))
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    await process.stop()
+
+    assert process._process is None
+    assert process._stopped
+    assert subprocess.returncode is not None
+    assert not process._tasks
+
+
+async def test_stop_tolerates_server_exit_before_shutdown_reply():
+    """A server that dies while answering `shutdown` cannot make cleanup fail."""
+    process = LSPProcess(
+        ProcessLaunchInfo(cmd=get_mock_server_cmd("--exit-on", "shutdown"))
+    )
+    await process.start()
+    await process.send.initialize(
+        {"processId": None, "capabilities": {}, "rootUri": None}
+    )
+    subprocess = process._process
+    assert subprocess is not None
+
+    await process.stop()
+
+    assert process._process is None
+    assert process._stopped
+    assert subprocess.returncode is not None
+    assert not process._tasks
+
+
+async def test_run_protected_prefers_caller_cancellation_over_cleanup_failure():
+    """A cancelled caller never completes with a cleanup exception instead."""
+    started = asyncio.Event()
+    allow_finish = asyncio.Event()
+
+    async def failing_cleanup() -> None:
+        started.set()
+        await allow_finish.wait()
+        raise RuntimeError("cleanup failed")
+
+    runner = asyncio.create_task(_run_protected(failing_cleanup()))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+    runner.cancel()
+    await asyncio.sleep(0)
+
+    assert not runner.done()
+
+    allow_finish.set()
+    with pytest.raises(asyncio.CancelledError):
+        await runner
 
 
 class FailingBackend:
@@ -302,3 +615,261 @@ async def test_session_create_cleanup_without_pool(tmp_path: Path):
         assert len(stop_called) == 1, (
             "Process should be stopped when no pool and creation fails"
         )
+
+
+async def test_recycled_process_retains_initialize_result():
+    """A pooled process keeps the initialize result across re-lease.
+
+    The pool re-leases an initialized process without re-sending `initialize`,
+    so the result has to live on the recycled object — this is why LSPProcess
+    captures it instead of the caller that happens to send the request.
+    """
+    pool = LSPProcessPool(max_size=2)
+    compatibility_key = ("mock-server", "initialize-capture")
+
+    async def create_process() -> LSPProcess:
+        process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+        await process.start()
+        await process.send.initialize(
+            {"processId": None, "capabilities": {}, "rootUri": None}
+        )
+        return process
+
+    async def unexpected_process() -> LSPProcess:
+        raise AssertionError("Expected the pooled process to be reused")
+
+    try:
+        first = await pool.acquire(
+            create_process, "/workspace", compatibility_key=compatibility_key
+        )
+        captured = first.initialize_result
+        assert captured is not None
+        assert "capabilities" in captured
+
+        await pool.release(first)
+
+        second = await pool.acquire(
+            unexpected_process, "/workspace", compatibility_key=compatibility_key
+        )
+        assert second is first
+        assert second.initialize_result == captured
+    finally:
+        await pool.cleanup()
+
+
+async def test_run_protected_defers_caller_cancellation():
+    """Cancelling the caller cannot interrupt protected cleanup work."""
+    started = asyncio.Event()
+    allow_finish = asyncio.Event()
+    finished = False
+
+    async def cleanup() -> None:
+        nonlocal finished
+        started.set()
+        await allow_finish.wait()
+        finished = True
+
+    runner = asyncio.create_task(_run_protected(cleanup()))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+    runner.cancel()
+    await asyncio.sleep(0)
+
+    assert not runner.done()
+    assert not finished
+
+    allow_finish.set()
+    with pytest.raises(asyncio.CancelledError):
+        await runner
+
+    assert finished
+
+
+async def test_session_shutdown_survives_failing_server_shutdown(tmp_path: Path):
+    """The default non-pooled session closes cleanly even if `shutdown` errors."""
+
+    class ErrorOnShutdownBackend(MockBackend):
+        def create_process_launch_info(
+            self, base_path: Path, options: dict
+        ) -> ProcessLaunchInfo:
+            return ProcessLaunchInfo(cmd=get_mock_server_cmd("--error-on", "shutdown"))
+
+    session = await Session.create(
+        ErrorOnShutdownBackend(consumes_config=True),
+        base_path=tmp_path,
+        initial_code="x = 1",
+    )
+
+    await session.shutdown()
+
+    assert not session._pool._metadata
+
+
+async def test_session_create_stops_process_when_cancelled_during_initialize(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Cancelling create while the server is initializing cannot orphan it."""
+
+    class HangingInitializeBackend(MockBackend):
+        def create_process_launch_info(
+            self, base_path: Path, options: dict
+        ) -> ProcessLaunchInfo:
+            return ProcessLaunchInfo(cmd=get_mock_server_cmd("--hang-on", "initialize"))
+
+    processes: list[LSPProcess] = []
+    subprocesses: list[asyncio.subprocess.Process] = []
+    initialize_sent = asyncio.Event()
+    original_start = LSPProcess.start
+    original_send_payload = LSPProcess._send_payload
+
+    async def recording_start(self: LSPProcess) -> None:
+        await original_start(self)
+        assert self._process is not None
+        processes.append(self)
+        subprocesses.append(self._process)
+
+    async def recording_send_payload(self, stream, payload):  # type: ignore[no-untyped-def]
+        await original_send_payload(self, stream, payload)
+        if payload.get("method") == "initialize":
+            initialize_sent.set()
+
+    monkeypatch.setattr(LSPProcess, "start", recording_start)
+    monkeypatch.setattr(LSPProcess, "_send_payload", recording_send_payload)
+
+    try:
+        create_task = asyncio.create_task(
+            Session.create(
+                HangingInitializeBackend(consumes_config=True),
+                base_path=tmp_path,
+                initial_code="x = 1",
+            )
+        )
+        await asyncio.wait_for(initialize_sent.wait(), timeout=5.0)
+        create_task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await create_task
+
+        assert len(subprocesses) == 1
+        assert subprocesses[0].returncode is not None
+        assert processes[0]._process is None
+        assert not processes[0]._tasks
+    finally:
+        for child in subprocesses:
+            if child.returncode is None:
+                child.kill()
+                await child.wait()
+
+
+async def test_session_create_stops_process_when_initialize_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """A server that rejects `initialize` cannot leave the process running."""
+
+    class ErrorOnInitializeBackend(MockBackend):
+        def create_process_launch_info(
+            self, base_path: Path, options: dict
+        ) -> ProcessLaunchInfo:
+            return ProcessLaunchInfo(
+                cmd=get_mock_server_cmd("--error-on", "initialize")
+            )
+
+    subprocesses: list[asyncio.subprocess.Process] = []
+    original_start = LSPProcess.start
+
+    async def recording_start(self: LSPProcess) -> None:
+        await original_start(self)
+        assert self._process is not None
+        subprocesses.append(self._process)
+
+    monkeypatch.setattr(LSPProcess, "start", recording_start)
+
+    try:
+        with pytest.raises(Error, match="Mock error"):
+            await Session.create(
+                ErrorOnInitializeBackend(consumes_config=True),
+                base_path=tmp_path,
+                initial_code="x = 1",
+            )
+
+        assert len(subprocesses) == 1
+        assert subprocesses[0].returncode is not None
+    finally:
+        for child in subprocesses:
+            if child.returncode is None:
+                child.kill()
+                await child.wait()
+
+
+async def test_session_create_releases_process_when_cancelled_after_acquire(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Cancellation between acquire and readiness still returns the lease."""
+    pool = LSPProcessPool(max_size=2, cleanup_interval=3_600.0)
+    document_opening = asyncio.Event()
+    release_document = asyncio.Event()
+    original_send_payload = LSPProcess._send_payload
+
+    async def gated_send_payload(self, stream, payload):  # type: ignore[no-untyped-def]
+        if payload.get("method") == "textDocument/didOpen":
+            document_opening.set()
+            await release_document.wait()
+        await original_send_payload(self, stream, payload)
+
+    monkeypatch.setattr(LSPProcess, "_send_payload", gated_send_payload)
+
+    try:
+        create_task = asyncio.create_task(
+            Session.create(
+                MockBackend(consumes_config=True),
+                base_path=tmp_path,
+                initial_code="x = 1",
+                pool=pool,
+            )
+        )
+        await asyncio.wait_for(document_opening.wait(), timeout=5.0)
+        create_task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await create_task
+
+        assert len(pool._active) == 0
+        assert pool.available_count == 1
+    finally:
+        release_document.set()
+        await pool.cleanup()
+
+
+async def test_is_alive_tracks_the_server_lifetime():
+    """Liveness is false before start, true while serving, false after stop."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    assert not process.is_alive
+
+    await process.start()
+    try:
+        await process.send.initialize(
+            {"processId": None, "capabilities": {}, "rootUri": None}
+        )
+        assert process.is_alive
+    finally:
+        await process.stop()
+
+    assert not process.is_alive
+
+
+async def test_is_alive_is_false_after_the_server_crashes():
+    """A crashed server is reported dead before anything tries to reuse it."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    try:
+        await process.send.initialize(
+            {"processId": None, "capabilities": {}, "rootUri": None}
+        )
+
+        child = process._process
+        assert child is not None
+        child.kill()
+        await child.wait()
+
+        assert not process.is_alive
+    finally:
+        await process.stop()

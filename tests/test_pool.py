@@ -3,18 +3,26 @@ Tests for session pool functionality.
 """
 
 import asyncio
+import datetime as dt
 import logging
 import tempfile
 import time
 import typing as t
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
 import lsp_types
+import lsp_types.pool
 from lsp_types.pool import LSPProcessPool
+from lsp_types.process import LSPProcess, ProcessLaunchInfo
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.session import (
+    _build_process_compatibility_key,
+    _freeze_for_compatibility,
+)
 from lsp_types.ty.backend import TyBackend
 from lsp_types.zuban.backend import ZubanBackend
 
@@ -31,6 +39,242 @@ def backend_name(lsp_backend):
     return lsp_backend.__class__.__name__.replace("Backend", "").lower()
 
 
+class _StubLSPProcess(LSPProcess):
+    def __init__(self) -> None:
+        super().__init__(ProcessLaunchInfo(cmd=["stub-lsp-process"]))
+        self.reset_count = 0
+        self.stop_count = 0
+        self.alive = True
+
+    @property
+    def is_alive(self) -> bool:
+        return self.alive
+
+    async def reset(self) -> None:
+        self.reset_count += 1
+
+    async def stop(self) -> None:
+        self.stop_count += 1
+        self.alive = False
+
+
+class _ManualClock:
+    def __init__(self) -> None:
+        self.current_time = 0.0
+
+    def time(self) -> float:
+        return self.current_time
+
+    def advance(self, seconds: float) -> None:
+        self.current_time += seconds
+
+
+async def _unexpected_process_factory() -> LSPProcess:
+    raise AssertionError("Expected the available process to be reused")
+
+
+def test_compatibility_values_are_structural_and_type_safe():
+    """Equivalent mappings match without conflating distinct scalar types."""
+    left = {"nested": {"first": True, "second": [1, "1"]}, "other": None}
+    right = {"other": None, "nested": {"second": [1, "1"], "first": True}}
+
+    assert _freeze_for_compatibility(left) == _freeze_for_compatibility(right)
+    assert _freeze_for_compatibility(True) != _freeze_for_compatibility(1)
+    assert _freeze_for_compatibility(1) != _freeze_for_compatibility(1.0)
+    assert _freeze_for_compatibility(0.0) != _freeze_for_compatibility(-0.0)
+
+    class UnsupportedValue:
+        pass
+
+    unsupported = UnsupportedValue()
+    assert _freeze_for_compatibility(unsupported) != _freeze_for_compatibility(
+        unsupported
+    )
+
+
+def test_process_compatibility_key_includes_all_launch_inputs(tmp_path: Path):
+    """Command, effective environment, and cwd each partition process families."""
+    backend = PyrightBackend()
+    initialize_params: lsp_types.InitializeParams = {
+        "processId": None,
+        "rootUri": f"file://{tmp_path}",
+        "capabilities": {},
+    }
+
+    def build_key(
+        *,
+        command: list[str] | None = None,
+        environment: dict[str, str] | None = None,
+        cwd: Path | None = None,
+    ):
+        return _build_process_compatibility_key(
+            backend,
+            base_path=str(tmp_path),
+            process_launch_info=ProcessLaunchInfo(
+                cmd=command or ["language-server", "--stdio"],
+                cwd=cwd or tmp_path,
+            ),
+            resolved_environment=environment or {"PATH": "/bin"},
+            options={},
+            initialize_params=initialize_params,
+        )
+
+    baseline = build_key()
+    assert baseline != build_key(command=["other-server", "--stdio"])
+    assert baseline != build_key(environment={"PATH": "/other-bin"})
+    assert baseline != build_key(cwd=tmp_path / "other-workspace")
+
+
+@pytest.mark.parametrize(
+    "left, right, different",
+    [
+        (b"token", b"token", b"other"),
+        (bytearray(b"token"), bytearray(b"token"), bytearray(b"other")),
+        (Path("/lib/site-packages"), Path("/lib/site-packages"), Path("/lib/other")),
+        (frozenset({"a", "b"}), frozenset({"b", "a"}), frozenset({"a", "c"})),
+        ({"a", "b"}, {"b", "a"}, {"a", "c"}),
+        (Decimal("1.50"), Decimal("1.50"), Decimal("1.51")),
+        (dt.date(2024, 1, 31), dt.date(2024, 1, 31), dt.date(2024, 2, 1)),
+        (
+            dt.datetime(2024, 1, 31, 12, 30),
+            dt.datetime(2024, 1, 31, 12, 30),
+            dt.datetime(2024, 1, 31, 12, 31),
+        ),
+        (dt.time(12, 30), dt.time(12, 30), dt.time(12, 31)),
+        (
+            dt.timedelta(seconds=90),
+            dt.timedelta(minutes=1, seconds=30),
+            dt.timedelta(seconds=91),
+        ),
+    ],
+    ids=[
+        "bytes",
+        "bytearray",
+        "path",
+        "frozenset",
+        "set",
+        "decimal",
+        "date",
+        "datetime",
+        "time",
+        "timedelta",
+    ],
+)
+def test_common_immutable_values_freeze_to_stable_tokens(left, right, different):
+    """Equal config values of these types keep a pooled process reusable."""
+    frozen_left = _freeze_for_compatibility(left)
+
+    assert frozen_left == _freeze_for_compatibility(right)
+    assert hash(frozen_left) == hash(_freeze_for_compatibility(right))
+    assert frozen_left != _freeze_for_compatibility(different)
+
+
+def test_frozen_values_do_not_conflate_distinct_types():
+    """Widening the supported types must not merge values that serialize apart."""
+    assert _freeze_for_compatibility(Path("/lib")) != _freeze_for_compatibility("/lib")
+    assert _freeze_for_compatibility(b"1") != _freeze_for_compatibility("1")
+    assert _freeze_for_compatibility({"a"}) != _freeze_for_compatibility(["a"])
+    assert _freeze_for_compatibility(Decimal("1")) != _freeze_for_compatibility(1)
+    assert _freeze_for_compatibility(
+        dt.datetime(2024, 1, 31)
+    ) != _freeze_for_compatibility(dt.date(2024, 1, 31))
+
+
+def test_frozen_values_distinguish_subtle_serialization_pairs():
+    """Pairs that compare equal-ish but serialize apart must not share a process."""
+    assert _freeze_for_compatibility(Decimal("1.0")) != _freeze_for_compatibility(
+        Decimal("1.00")
+    )
+    assert _freeze_for_compatibility({True: "x"}) != _freeze_for_compatibility({1: "x"})
+    naive = dt.datetime(2024, 1, 31, 12, 30)
+    aware = dt.datetime(2024, 1, 31, 12, 30, tzinfo=dt.timezone.utc)
+    assert _freeze_for_compatibility(naive) != _freeze_for_compatibility(aware)
+
+
+def test_frozen_mappings_with_set_keys_are_order_independent():
+    """Equal mappings must freeze identically regardless of set insertion order."""
+    left = {frozenset([1, 57]): "v", frozenset([1]): "w"}
+    right = {frozenset([57, 1]): "v", frozenset([1]): "w"}
+    assert _freeze_for_compatibility(left) == _freeze_for_compatibility(right)
+
+
+def test_frozen_containers_nest_and_ignore_set_order_only():
+    """Sets compare by membership; sequences still compare by position."""
+    left = {"search_path": [Path("/a"), Path("/b")], "tags": {"x", "y"}}
+    reordered_set = {"tags": {"y", "x"}, "search_path": [Path("/a"), Path("/b")]}
+    reordered_sequence = {"search_path": [Path("/b"), Path("/a")], "tags": {"x", "y"}}
+
+    assert _freeze_for_compatibility(left) == _freeze_for_compatibility(reordered_set)
+    assert _freeze_for_compatibility(left) != _freeze_for_compatibility(
+        reordered_sequence
+    )
+
+
+def test_unsupported_values_stay_unique_and_are_logged(
+    caplog: pytest.LogCaptureFixture,
+):
+    """Un-comparable values still disable reuse, but say so at debug level."""
+
+    class UnsupportedValue:
+        pass
+
+    unsupported = UnsupportedValue()
+
+    with caplog.at_level(logging.DEBUG, logger="lsp-types"):
+        first = _freeze_for_compatibility(unsupported)
+        second = _freeze_for_compatibility(unsupported)
+
+    assert first != second
+    assert any(
+        "UnsupportedValue" in record.getMessage() for record in caplog.records
+    ), caplog.text
+
+
+async def test_path_options_do_not_defeat_process_reuse(tmp_path: Path):
+    """Identical Path/bytes-bearing options must lease one pooled process."""
+    backend = PyrightBackend()
+    initialize_params: lsp_types.InitializeParams = {
+        "processId": None,
+        "rootUri": f"file://{tmp_path}",
+        "capabilities": {},
+    }
+
+    def build_key(search_path: Path):
+        return _build_process_compatibility_key(
+            backend,
+            base_path=str(tmp_path),
+            process_launch_info=ProcessLaunchInfo(
+                cmd=["language-server", "--stdio"], cwd=tmp_path
+            ),
+            resolved_environment={"PATH": "/bin"},
+            options={"search_path": [search_path], "markers": {b"raw"}},
+            initialize_params=initialize_params,
+        )
+
+    assert build_key(Path("/lib")) == build_key(Path("/lib"))
+    assert build_key(Path("/lib")) != build_key(Path("/other"))
+
+    async def create_process() -> LSPProcess:
+        return _StubLSPProcess()
+
+    pool = LSPProcessPool(max_size=2)
+    try:
+        first = await pool.acquire(
+            create_process, str(tmp_path), compatibility_key=build_key(Path("/lib"))
+        )
+        await pool.release(first)
+
+        reused = await pool.acquire(
+            _unexpected_process_factory,
+            str(tmp_path),
+            compatibility_key=build_key(Path("/lib")),
+        )
+        assert reused is first
+        await pool.release(reused)
+    finally:
+        await pool.cleanup()
+
+
 class TestLSPProcessPool:
     """Test session pool functionality"""
 
@@ -39,6 +283,26 @@ class TestLSPProcessPool:
         """Create a session pool for testing"""
         pool = LSPProcessPool(max_size=3)
         yield pool
+        await pool.cleanup()
+
+    @pytest.fixture
+    def manual_clock(self, monkeypatch: pytest.MonkeyPatch) -> _ManualClock:
+        """Drive pool idle timing from a deterministic clock instead of the loop."""
+        clock = _ManualClock()
+        monkeypatch.setattr(lsp_types.pool, "_now", clock.time)
+        return clock
+
+    @pytest.fixture
+    async def idle_pool(self, manual_clock: _ManualClock):
+        """Create an active stub process governed by a manual monotonic clock."""
+        pool = LSPProcessPool(max_idle_time=10.0, cleanup_interval=3_600.0)
+        process = _StubLSPProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        acquired = await pool.acquire(create_process, "/workspace")
+        yield pool, manual_clock, acquired
         await pool.cleanup()
 
     @pytest.fixture
@@ -51,6 +315,581 @@ class TestLSPProcessPool:
         assert session_pool.max_size == 3
         assert session_pool.current_size == 0
         assert session_pool.available_count == 0
+
+    async def test_acquire_selects_by_optional_compatibility_key(self):
+        """Keys isolate process families while omitted keys retain legacy reuse."""
+        pool = LSPProcessPool(max_size=4)
+        created: list[_StubLSPProcess] = []
+
+        async def create_process() -> LSPProcess:
+            process = _StubLSPProcess()
+            created.append(process)
+            return process
+
+        try:
+            first = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyright"),
+            )
+            await pool.release(first)
+
+            reused = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyright"),
+            )
+            assert reused is first
+            assert created[0].reset_count == 1
+            await pool.release(reused)
+
+            incompatible = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyrefly"),
+            )
+            assert incompatible is not first
+            await pool.release(incompatible)
+
+            legacy = await pool.acquire(create_process, "/workspace")
+            assert legacy not in (first, incompatible)
+            await pool.release(legacy)
+            legacy_reused = await pool.acquire(create_process, "/workspace")
+            assert legacy_reused is legacy
+            assert len(created) == 3
+            await pool.release(legacy_reused)
+        finally:
+            await pool.cleanup()
+
+    async def test_discard_removes_process_and_stops_it(self):
+        """A discarded process is stopped and can never be leased again."""
+        pool = LSPProcessPool(max_size=2)
+        created: list[_StubLSPProcess] = []
+
+        async def create_process() -> LSPProcess:
+            process = _StubLSPProcess()
+            created.append(process)
+            return process
+
+        try:
+            leased = await pool.acquire(
+                create_process, "/workspace", compatibility_key=("backend", "pyright")
+            )
+            await pool.discard(leased)
+
+            assert created[0].stop_count == 1
+            assert pool.current_size == 0
+            assert pool.available_count == 0
+            assert leased not in pool._metadata
+
+            replacement = await pool.acquire(
+                create_process, "/workspace", compatibility_key=("backend", "pyright")
+            )
+            assert replacement is not leased
+            await pool.release(replacement)
+        finally:
+            await pool.cleanup()
+
+    async def test_keyed_acquire_never_reuses_unkeyed_process(self):
+        """A keyed caller never receives a process that was pooled without a key."""
+        pool = LSPProcessPool(max_size=4)
+        created: list[_StubLSPProcess] = []
+
+        async def create_process() -> LSPProcess:
+            process = _StubLSPProcess()
+            created.append(process)
+            return process
+
+        try:
+            unkeyed = await pool.acquire(create_process, "/workspace")
+            await pool.release(unkeyed)
+            assert pool.available_count == 1
+
+            keyed = await pool.acquire(
+                create_process,
+                "/workspace",
+                compatibility_key=("backend", "pyright"),
+            )
+
+            # The unkeyed process must not be handed to a keyed caller, and it must
+            # be left untouched in the pool rather than reset or stopped.
+            assert keyed is not unkeyed
+            assert len(created) == 2
+            assert created[0].reset_count == 0
+            assert created[0].stop_count == 0
+            assert pool.available_count == 1
+            assert pool.current_size == 2
+
+            await pool.release(keyed)
+
+            unkeyed_reused = await pool.acquire(
+                _unexpected_process_factory, "/workspace"
+            )
+            assert unkeyed_reused is unkeyed
+            assert created[0].reset_count == 1
+            await pool.release(unkeyed_reused)
+        finally:
+            await pool.cleanup()
+
+    async def test_idle_timeout_starts_when_active_process_is_released(self, idle_pool):
+        """Time spent actively leased does not count toward the idle timeout."""
+        pool, clock, process = idle_pool
+        clock.advance(100.0)
+        await pool.release(process)
+        await pool._remove_idle_processes()
+
+        assert pool.available_count == 1
+        assert process.stop_count == 0
+
+    async def test_releasing_reacquired_process_resets_idle_timeout(self, idle_pool):
+        """Every return to the pool starts a fresh idle window."""
+        pool, clock, process = idle_pool
+        await pool.release(process)
+        clock.advance(8.0)
+
+        second_lease = await pool.acquire(_unexpected_process_factory, "/workspace")
+        clock.advance(100.0)
+        await pool.release(second_lease)
+        clock.advance(9.0)
+        await pool._remove_idle_processes()
+
+        assert pool.available_count == 1
+        assert process.reset_count == 1
+        assert process.stop_count == 0
+
+    async def test_idle_process_expires_after_release_timeout(self, idle_pool):
+        """A genuinely idle process is stopped after its idle window."""
+        pool, clock, process = idle_pool
+        await pool.release(process)
+        clock.advance(10.0)
+        await pool._remove_idle_processes()
+
+        assert pool.available_count == 1
+        assert process.stop_count == 0
+
+        clock.advance(1.0)
+        await pool._remove_idle_processes()
+
+        assert pool.current_size == 0
+        assert process.stop_count == 1
+
+    async def test_cleanup_awaits_inflight_idle_cleanup(self):
+        """Pool cleanup joins its worker before returning."""
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+        stop_finished = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                try:
+                    await allow_stop.wait()
+                finally:
+                    stop_finished.set()
+
+        pool = LSPProcessPool(max_idle_time=0.0, cleanup_interval=0.01)
+        process = BlockingStopProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        try:
+            acquired = await pool.acquire(create_process, "/workspace")
+            await pool.release(acquired)
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+
+            await pool.cleanup()
+
+            assert stop_finished.is_set()
+            assert process.stop_count == 1
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_cancelled_cleanup_stops_every_owned_process(self):
+        """Caller cancellation is propagated only after all processes stop."""
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                await allow_stop.wait()
+
+        pool = LSPProcessPool(max_size=2, cleanup_interval=3_600.0)
+        processes = [BlockingStopProcess(), BlockingStopProcess()]
+
+        async def create_first() -> LSPProcess:
+            return processes[0]
+
+        async def create_second() -> LSPProcess:
+            return processes[1]
+
+        try:
+            await pool.acquire(create_first, "/workspace/one")
+            await pool.acquire(create_second, "/workspace/two")
+            cleanup_task = asyncio.create_task(pool.cleanup())
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+            cleanup_task.cancel()
+            await asyncio.sleep(0)
+
+            assert not cleanup_task.done()
+
+            allow_stop.set()
+            with pytest.raises(asyncio.CancelledError):
+                await cleanup_task
+
+            assert [process.stop_count for process in processes] == [1, 1]
+            assert pool.current_size == 0
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_release_forgets_non_pooled_process_when_stop_fails(self):
+        """A failed shutdown cannot leave stale metadata behind."""
+
+        class FailingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                raise RuntimeError("stop failed")
+
+        pool = LSPProcessPool(max_size=0, cleanup_interval=3_600.0)
+        process = FailingStopProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        try:
+            acquired = await pool.acquire(create_process, "/workspace")
+
+            with pytest.raises(RuntimeError, match="stop failed"):
+                await pool.release(acquired)
+
+            assert process.stop_count == 1
+            assert acquired not in pool._metadata
+        finally:
+            await pool.cleanup()
+
+    async def test_cleanup_continues_after_worker_failure(
+        self, caplog: pytest.LogCaptureFixture
+    ):
+        """A failed maintenance worker cannot prevent foreground cleanup."""
+        pool = LSPProcessPool(cleanup_interval=3_600.0)
+        process = _StubLSPProcess()
+
+        async def create_process() -> LSPProcess:
+            return process
+
+        original_worker = pool._cleanup_task
+        assert original_worker is not None
+        original_worker.cancel()
+        await asyncio.gather(original_worker, return_exceptions=True)
+
+        async def fail_worker() -> None:
+            raise RuntimeError("simulated cleanup worker failure")
+
+        pool._cleanup_task = asyncio.create_task(fail_worker())
+        await asyncio.sleep(0)
+        await pool.acquire(create_process, "/workspace")
+
+        await pool.cleanup()
+
+        assert process.stop_count == 1
+        assert pool.current_size == 0
+        assert "simulated cleanup worker failure" in caplog.text
+
+    async def test_idle_sweep_skips_a_process_acquired_mid_sweep(
+        self, manual_clock: _ManualClock
+    ):
+        """Checking a candidate out while the sweep is stopping another is safe."""
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                await allow_stop.wait()
+
+        pool = LSPProcessPool(max_size=2, max_idle_time=10.0, cleanup_interval=3_600.0)
+        blocking = BlockingStopProcess()
+        contested = _StubLSPProcess()
+
+        async def create_blocking() -> LSPProcess:
+            return blocking
+
+        async def create_contested() -> LSPProcess:
+            return contested
+
+        try:
+            first = await pool.acquire(create_blocking, "/workspace")
+            second = await pool.acquire(create_contested, "/workspace")
+            await pool.release(first)
+            await pool.release(second)
+            manual_clock.advance(100.0)
+
+            sweep = asyncio.create_task(pool._remove_idle_processes())
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+
+            reacquired = await pool.acquire(_unexpected_process_factory, "/workspace")
+            assert reacquired is contested
+
+            allow_stop.set()
+            await sweep
+
+            assert contested.stop_count == 0
+            assert blocking.stop_count == 1
+            assert pool.current_size == 1
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_idle_sweep_spares_a_process_returned_mid_sweep(
+        self, manual_clock: _ManualClock
+    ):
+        """A process handed back mid-sweep keeps the fresh idle window it earned."""
+        stop_started = asyncio.Event()
+        allow_stop = asyncio.Event()
+
+        class BlockingStopProcess(_StubLSPProcess):
+            async def stop(self) -> None:
+                self.stop_count += 1
+                stop_started.set()
+                await allow_stop.wait()
+
+        pool = LSPProcessPool(max_size=2, max_idle_time=10.0, cleanup_interval=3_600.0)
+        blocking = BlockingStopProcess()
+        contested = _StubLSPProcess()
+
+        async def create_blocking() -> LSPProcess:
+            return blocking
+
+        async def create_contested() -> LSPProcess:
+            return contested
+
+        try:
+            first = await pool.acquire(create_blocking, "/workspace")
+            second = await pool.acquire(create_contested, "/workspace")
+            await pool.release(first)
+            await pool.release(second)
+            manual_clock.advance(100.0)
+
+            sweep = asyncio.create_task(pool._remove_idle_processes())
+            await asyncio.wait_for(stop_started.wait(), timeout=1.0)
+
+            reacquired = await pool.acquire(_unexpected_process_factory, "/workspace")
+            await pool.release(reacquired)
+
+            allow_stop.set()
+            await sweep
+
+            assert contested.stop_count == 0
+            assert pool.available_count == 1
+            assert list(pool._available) == [contested]
+        finally:
+            allow_stop.set()
+            await pool.cleanup()
+
+    async def test_maintenance_worker_survives_a_failing_sweep(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ):
+        """One broken sweep is logged; the worker keeps reaping afterwards."""
+        pool = LSPProcessPool(cleanup_interval=0.01)
+        sweeps = 0
+        failed = asyncio.Event()
+        recovered = asyncio.Event()
+
+        async def flaky_sweep() -> None:
+            nonlocal sweeps
+            sweeps += 1
+            if sweeps == 1:
+                failed.set()
+                raise ValueError("simulated sweep failure")
+            recovered.set()
+
+        monkeypatch.setattr(pool, "_remove_idle_processes", flaky_sweep)
+
+        try:
+            await asyncio.wait_for(failed.wait(), timeout=1.0)
+            await asyncio.wait_for(recovered.wait(), timeout=1.0)
+
+            assert pool._cleanup_task is not None
+            assert not pool._cleanup_task.done()
+            assert "simulated sweep failure" in caplog.text
+        finally:
+            await pool.cleanup()
+
+    async def test_full_pool_evicts_an_unusable_idle_process(self):
+        """An idle process nobody can reuse gives up its slot instead of pooling."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        created: list[_StubLSPProcess] = []
+
+        def factory(
+            process: _StubLSPProcess,
+        ) -> t.Callable[[], t.Awaitable[LSPProcess]]:
+            async def create() -> LSPProcess:
+                created.append(process)
+                return process
+
+            return create
+
+        first = _StubLSPProcess()
+        second = _StubLSPProcess()
+
+        try:
+            legacy = await pool.acquire(
+                factory(first), "/workspace", compatibility_key="A"
+            )
+            await pool.release(legacy)
+            assert pool.available_count == 1
+
+            replacement = await pool.acquire(
+                factory(second), "/workspace", compatibility_key="B"
+            )
+
+            assert first.stop_count == 1
+            assert pool.available_count == 0
+            assert pool.current_size == 1
+
+            await pool.release(replacement)
+            assert pool.available_count == 1
+
+            reused = await pool.acquire(
+                _unexpected_process_factory, "/workspace", compatibility_key="B"
+            )
+            assert reused is second
+            assert created == [first, second]
+            await pool.release(reused)
+        finally:
+            await pool.cleanup()
+
+    async def test_full_pool_keeps_active_processes_when_no_slot_can_be_freed(self):
+        """Leased processes are never evicted; the extra process stays untracked."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        leased = _StubLSPProcess()
+        extra = _StubLSPProcess()
+
+        async def create_leased() -> LSPProcess:
+            return leased
+
+        async def create_extra() -> LSPProcess:
+            return extra
+
+        try:
+            await pool.acquire(create_leased, "/workspace", compatibility_key="A")
+            await pool.acquire(create_extra, "/workspace", compatibility_key="B")
+
+            assert leased.stop_count == 0
+            assert pool.current_size == 1
+        finally:
+            await pool.cleanup()
+
+    async def test_release_discards_a_dead_process(self):
+        """A server that died while checked out never returns to the pool."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        dead = _StubLSPProcess()
+        replacement = _StubLSPProcess()
+
+        async def create_dead() -> LSPProcess:
+            return dead
+
+        async def create_replacement() -> LSPProcess:
+            return replacement
+
+        try:
+            acquired = await pool.acquire(create_dead, "/workspace")
+            dead.alive = False  # the language server crashed mid-session
+
+            await pool.release(acquired)
+
+            assert pool.available_count == 0
+            assert pool.current_size == 0
+            assert dead.stop_count == 1
+
+            fresh = await pool.acquire(create_replacement, "/workspace")
+            assert fresh is replacement
+        finally:
+            await pool.cleanup()
+
+    async def test_acquire_skips_a_process_that_died_while_idle(self):
+        """A corpse in the available queue is never handed to a caller."""
+        pool = LSPProcessPool(max_size=2, cleanup_interval=3_600.0)
+        dead = _StubLSPProcess()
+        replacement = _StubLSPProcess()
+
+        async def create_dead() -> LSPProcess:
+            return dead
+
+        async def create_replacement() -> LSPProcess:
+            return replacement
+
+        try:
+            acquired = await pool.acquire(create_dead, "/workspace")
+            await pool.release(acquired)
+            dead.alive = False  # the idle server crashed in the pool
+
+            fresh = await pool.acquire(create_replacement, "/workspace")
+
+            assert fresh is replacement
+            assert dead.reset_count == 0
+        finally:
+            await pool.cleanup()
+
+    async def test_full_pool_evicts_a_dead_idle_process(self):
+        """A corpse holding the last slot is reaped so a live process can be pooled."""
+        pool = LSPProcessPool(max_size=1, cleanup_interval=3_600.0)
+        dead = _StubLSPProcess()
+        replacement = _StubLSPProcess()
+
+        async def create_dead() -> LSPProcess:
+            return dead
+
+        async def create_replacement() -> LSPProcess:
+            return replacement
+
+        try:
+            acquired = await pool.acquire(create_dead, "/workspace")
+            await pool.release(acquired)
+            dead.alive = False  # the idle server crashed in the pool
+
+            fresh = await pool.acquire(create_replacement, "/workspace")
+
+            assert fresh is replacement
+            assert dead.stop_count == 1
+            assert pool.current_size == 1
+
+            await pool.release(fresh)
+            assert pool.available_count == 1
+        finally:
+            await pool.cleanup()
+
+    async def test_sessions_with_different_backends_do_not_share_processes(
+        self, session_pool, base_path
+    ):
+        """A process initialized as one backend cannot serve another backend."""
+        pyright_session = await lsp_types.Session.create(
+            PyrightBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            pool=session_pool,
+        )
+        await pyright_session.shutdown()
+
+        pyrefly_session = await lsp_types.Session.create(
+            PyreflyBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            pool=session_pool,
+        )
+        try:
+            assert session_pool.current_size == 2
+            server_info = pyrefly_session.server_info
+            assert server_info is not None
+            assert "pyrefly" in server_info["name"].lower()
+        finally:
+            await pyrefly_session.shutdown()
 
     async def test_session_pool_acquire_and_recycle(
         self, session_pool, lsp_backend, base_path
@@ -118,7 +957,7 @@ class TestLSPProcessPool:
     async def test_session_recycling_with_different_options(
         self, session_pool, lsp_backend, backend_name, base_path
     ):
-        """Test recycling sessions with different options"""
+        """Sessions with different options do not reuse initialized processes."""
 
         options1: t.Mapping[str, t.Any]
         options2: t.Mapping[str, t.Any]
@@ -148,7 +987,7 @@ class TestLSPProcessPool:
 
         await session1.shutdown()
 
-        # Second session with different options - should update configuration
+        # Second session with different options must use a separately initialized process
         session2 = await lsp_types.Session.create(
             lsp_backend,
             base_path=base_path,
@@ -157,10 +996,46 @@ class TestLSPProcessPool:
             pool=session_pool,
         )
 
+        assert session_pool.current_size == 2
+
         # Warm up the session with new code
         await session2.update_code(code2)
 
         await session2.shutdown()
+
+    async def test_sessions_with_different_initialize_params_do_not_share_processes(
+        self, session_pool, base_path
+    ):
+        """Initialization inputs are part of process compatibility."""
+
+        def initialize_params(client_name: str) -> lsp_types.InitializeParams:
+            return {
+                "processId": None,
+                "rootUri": f"file://{base_path}",
+                "capabilities": {},
+                "clientInfo": {"name": client_name},
+            }
+
+        first = await lsp_types.Session.create(
+            PyrightBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            initialize_params=initialize_params("first-client"),
+            pool=session_pool,
+        )
+        await first.shutdown()
+
+        second = await lsp_types.Session.create(
+            PyrightBackend(),
+            base_path=base_path,
+            initial_code="x = 1",
+            initialize_params=initialize_params("second-client"),
+            pool=session_pool,
+        )
+        try:
+            assert session_pool.current_size == 2
+        finally:
+            await second.shutdown()
 
     async def test_session_pool_max_size_limit(
         self, session_pool, lsp_backend, base_path
@@ -386,13 +1261,15 @@ class TestLSPProcessPool:
         for session in active_sessions:
             await session.shutdown()
 
-    async def test_idle_process_cleanup(self, lsp_backend, tmp_path: Path):
+    async def test_idle_process_cleanup(
+        self, lsp_backend, tmp_path: Path, manual_clock: _ManualClock
+    ):
         """Test that idle processes are automatically removed from the pool"""
-        # Create pool with very short idle time and cleanup interval for fast test
+        # The manual clock drives idle expiry, so the background worker is parked.
         pool = LSPProcessPool(
             max_size=3,
-            max_idle_time=0.1,  # 100ms idle time
-            cleanup_interval=0.05,  # Check every 50ms
+            max_idle_time=10.0,
+            cleanup_interval=3_600.0,
         )
 
         try:
@@ -409,11 +1286,8 @@ class TestLSPProcessPool:
             assert pool.available_count == 1
             assert pool.current_size == 1
 
-            # Wait for process to become idle and be cleaned up
-            # Wait a bit longer than idle_time + cleanup_interval
-            await asyncio.sleep(0.2)
-
-            # Force a cleanup check by calling the method directly
+            # Push the clock past the idle window and sweep
+            manual_clock.advance(11.0)
             await pool._remove_idle_processes()
 
             # Pool should be empty now (process was idle too long)
@@ -424,13 +1298,13 @@ class TestLSPProcessPool:
             await pool.cleanup()
 
     async def test_idle_cleanup_preserves_active_processes(
-        self, lsp_backend, tmp_path: Path
+        self, lsp_backend, tmp_path: Path, manual_clock: _ManualClock
     ):
         """Test that idle cleanup only removes available processes, not active ones"""
         pool = LSPProcessPool(
             max_size=3,
-            max_idle_time=0.1,  # 100ms idle time
-            cleanup_interval=0.05,  # Check every 50ms
+            max_idle_time=10.0,
+            cleanup_interval=3_600.0,
         )
 
         try:
@@ -456,8 +1330,8 @@ class TestLSPProcessPool:
             assert pool.available_count == 0
             assert pool.current_size == 1
 
-            # Wait for idle cleanup
-            await asyncio.sleep(0.2)
+            # An active process has no idle window to expire
+            manual_clock.advance(11.0)
             await pool._remove_idle_processes()
 
             # No idle processes to remove, active process should still be there
@@ -471,8 +1345,8 @@ class TestLSPProcessPool:
             assert pool.available_count == 1
             assert pool.current_size == 1
 
-            # Wait and cleanup idle processes
-            await asyncio.sleep(0.2)
+            # Its idle window starts at release, so advance again before sweeping
+            manual_clock.advance(11.0)
             await pool._remove_idle_processes()
 
             # Now the idle process should be cleaned up
@@ -482,12 +1356,14 @@ class TestLSPProcessPool:
         finally:
             await pool.cleanup()
 
-    async def test_idle_cleanup_timing_precision(self, lsp_backend, tmp_path: Path):
+    async def test_idle_cleanup_timing_precision(
+        self, lsp_backend, tmp_path: Path, manual_clock: _ManualClock
+    ):
         """Test that idle cleanup respects the max_idle_time precisely"""
         pool = LSPProcessPool(
             max_size=2,
-            max_idle_time=0.15,  # 150ms idle time
-            cleanup_interval=0.05,  # Check every 50ms
+            max_idle_time=10.0,
+            cleanup_interval=3_600.0,
         )
 
         try:
@@ -502,14 +1378,14 @@ class TestLSPProcessPool:
 
             assert pool.available_count == 1
 
-            # Wait less than idle time - process should still be there
-            await asyncio.sleep(0.1)  # 100ms < 150ms
+            # Inside the idle window - process must be kept
+            manual_clock.advance(9.0)
             await pool._remove_idle_processes()
 
             assert pool.available_count == 1  # Still there
 
-            # Wait more than idle time - process should be removed
-            await asyncio.sleep(0.1)  # Total 200ms > 150ms
+            # Past the idle window - process must be removed
+            manual_clock.advance(2.0)
             await pool._remove_idle_processes()
 
             assert pool.available_count == 0  # Should be removed now
