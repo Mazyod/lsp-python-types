@@ -311,8 +311,58 @@ async def test_stopped_process_cannot_restart():
     await process.start()
     await process.stop()
 
-    with pytest.raises(RuntimeError, match="cannot be restarted"):
+    with pytest.raises(RuntimeError, match="has been stopped: cannot restart"):
         await process.start()
+
+
+async def test_running_process_rejects_second_start():
+    """Starting twice names the running state rather than a generic failure."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+
+    try:
+        with pytest.raises(RuntimeError, match="is already running: cannot start"):
+            await process.start()
+    finally:
+        await process.stop()
+
+
+async def test_unstarted_process_rejects_requests_and_notifications():
+    """A never-started process reports that state on every send path."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+
+    with pytest.raises(RuntimeError, match="has not been started: cannot send"):
+        await process.send.hover(
+            {
+                "textDocument": {"uri": "file:///test.py"},
+                "position": {"line": 0, "character": 0},
+            }
+        )
+
+    with pytest.raises(RuntimeError, match="has not been started: cannot send"):
+        process.notify.did_close_text_document(
+            {"textDocument": {"uri": "file:///test.py"}}
+        )
+
+
+async def test_stopped_process_rejects_requests_and_notifications():
+    """A stopped process raises on notifications instead of dropping them."""
+    process = LSPProcess(ProcessLaunchInfo(cmd=get_mock_server_cmd()))
+    await process.start()
+    await process.stop()
+
+    with pytest.raises(RuntimeError, match="has been stopped: cannot send"):
+        await process.send.hover(
+            {
+                "textDocument": {"uri": "file:///test.py"},
+                "position": {"line": 0, "character": 0},
+            }
+        )
+
+    with pytest.raises(RuntimeError, match="has been stopped: cannot send"):
+        process.notify.did_close_text_document(
+            {"textDocument": {"uri": "file:///test.py"}}
+        )
 
 
 async def test_start_and_stop_are_serialized(monkeypatch: pytest.MonkeyPatch):

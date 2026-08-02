@@ -56,6 +56,14 @@ async with LSPProcess(process_info) as process:
     diagnostics = await diagnostics_listener
 ```
 
+`LSPProcess.stop()` is terminal — including the implicit stop() when the `async with`
+block exits. Calling `start()` on a stopped process raises `RuntimeError` instead
+of relaunching the server, and requests and notifications sent through it raise
+`RuntimeError` too (notifications are no longer dropped with a warning). The
+messages name the state they came from (`LSP process has been stopped` vs. `LSP
+process has not been started`). Construct a new `LSPProcess` when you need to
+restart a server.
+
 ## LSPs
 
 The following LSPs are available out of the box:

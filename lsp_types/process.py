@@ -152,15 +152,26 @@ class LSPProcess:
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.stop()
 
+    def _lifecycle_error(self, action: str) -> RuntimeError:
+        """Describe why the current lifecycle state forbids ``action``."""
+        if self._stopped:
+            return RuntimeError(f"LSP process has been stopped: cannot {action}")
+        return RuntimeError(f"LSP process has not been started: cannot {action}")
+
+    def _writable_stdin(self, method: str) -> asyncio.StreamWriter:
+        """Return the running process's stdin, or explain why it is unusable."""
+        process = self._process
+        if process is None or process.stdin is None:
+            raise self._lifecycle_error(f"send {method}")
+        return process.stdin
+
     async def start(self) -> None:
         """Start the LSP server process and initialize communication."""
         async with self._lifecycle_lock:
             if self._stopped:
-                raise RuntimeError(
-                    "LSP process cannot be restarted after it is stopped"
-                )
+                raise self._lifecycle_error("restart")
             if self._process:
-                raise RuntimeError("LSP process already started")
+                raise RuntimeError("LSP process is already running: cannot start")
 
             child_proc_env = (
                 self._process_launch_info.resolved_environment()
@@ -371,8 +382,7 @@ class LSPProcess:
 
     async def _send_request(self, method: str, params: types.LSPAny = None) -> t.Any:
         """Send a request to the server and await the response."""
-        if not self._process or not self._process.stdin:
-            raise RuntimeError("LSP process not available")
+        stdin = self._writable_stdin(method)
 
         request_id = next(self._request_id_gen)
 
@@ -380,7 +390,7 @@ class LSPProcess:
         self._pending_requests[request_id] = future
 
         payload = _make_request(method, request_id, params)
-        await self._send_payload(self._process.stdin, payload)
+        await self._send_payload(stdin, payload)
 
         try:
             result = await future
@@ -394,14 +404,10 @@ class LSPProcess:
         self, method: str, params: types.LSPAny = None
     ) -> asyncio.Task[None]:
         """Send a notification to the server."""
-        if not self._process or not self._process.stdin:
-            logger.warning("LSP process not available: [%s]", method)
-            return asyncio.create_task(asyncio.sleep(0))
+        stdin = self._writable_stdin(method)
 
         payload = _make_notification(method, params)
-        return self._track_task(
-            asyncio.create_task(self._send_payload(self._process.stdin, payload))
-        )
+        return self._track_task(asyncio.create_task(self._send_payload(stdin, payload)))
 
     def _on_notification(
         self, method: str, timeout: float | None = None
