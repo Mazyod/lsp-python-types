@@ -6,24 +6,13 @@ This document captures frictions and enhancement opportunities discovered while 
 
 ### Frictions Encountered
 
-#### 1. Virtual Document Support
+#### 1. Virtual Document Support (Resolved)
 
-**Issue**: ty requires files to exist on disk before it can provide diagnostics, completion, and other features. Pyright and Pyrefly work with "virtual documents" opened via `didOpen` without requiring the file to exist on disk.
+**Issue**: ty (as integrated at 0.0.11) required files to exist on disk before it could provide diagnostics, completion, and other features. Pyright and Pyrefly work with "virtual documents" opened via `didOpen` without requiring the file to exist on disk.
 
-**Impact**: Tests that don't write files to disk fail for ty. The following parametrized tests required `xfail` markers for ty:
-- `test_session_diagnostics`
-- `test_session_rename`
-- `test_session_completion`
-- `test_session_recycling_with_diagnostics`
-- `test_session_warmup_on_recycle` (in test_pool.py)
+**Original workaround**: The `requires_file_on_disk()` flag was added to the `LSPBackend` protocol so `Session.create()`/`update_code()` could mirror the session code to disk for ty.
 
-**Workaround**: ty-specific tests must write files to disk using `tmp_path`:
-```python
-(tmp_path / "new.py").write_text(code)
-session = await Session.create(backend, base_path=tmp_path, initial_code=code)
-```
-
-**Potential Enhancement**: Consider adding a `requires_file_on_disk` property to the `LSPBackend` protocol, allowing the Session class to automatically write files when needed.
+**Resolution (August 2026)**: Bisecting PyPI releases showed ty supports virtual documents from 0.0.16 onward (diagnostics, completion, and rename all verified with no file on disk). `TyBackend.requires_file_on_disk()` now returns `False` and the package floor is `ty>=0.0.16`. The protocol flag remains for any future backend that needs it.
 
 #### 2. `workspace/didChangeConfiguration` Not Supported
 

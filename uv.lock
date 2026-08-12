@@ -348,7 +348,7 @@ dev = [
 requires-dist = [
     { name = "pyrefly", marker = "extra == 'pyrefly'", specifier = ">=0.32.0" },
     { name = "tomli-w", specifier = ">=1.0.0" },
-    { name = "ty", marker = "extra == 'ty'", specifier = ">=0.0.15" },
+    { name = "ty", marker = "extra == 'ty'", specifier = ">=0.0.16" },
     { name = "zuban", marker = "extra == 'zuban'", specifier = ">=0.7.0" },
 ]
 provides-extras = ["pyrefly", "ty", "zuban"]

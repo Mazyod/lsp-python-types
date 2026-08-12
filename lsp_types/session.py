@@ -56,9 +56,10 @@ class LSPBackend[TConfig: t.Mapping](t.Protocol):
     def requires_file_on_disk(self) -> bool:
         """Return True if this backend requires files to exist on disk.
 
-        Some LSP backends (like ty) cannot analyze virtual documents opened via
-        didOpen without a corresponding file on disk. For these backends, the
-        session will write the initial code to disk before opening the document.
+        Some LSP backends cannot analyze virtual documents opened via didOpen
+        without a corresponding file on disk (e.g., ty before 0.0.16). For these
+        backends, the session will write the initial code to disk before opening
+        the document.
         """
         ...
 
@@ -296,7 +297,7 @@ class Session:
                     workspace_settings
                 )
 
-            # Write file to disk if backend requires it (e.g., ty)
+            # Write file to disk if backend requires it
             if backend.requires_file_on_disk():
                 session._file_path.write_text(initial_code)
                 session._file_on_disk = True

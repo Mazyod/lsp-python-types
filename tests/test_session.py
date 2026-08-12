@@ -46,13 +46,11 @@ def _diagnostic_text(diagnostic: lsp_types.Diagnostic) -> str:
 
 def test_requires_file_on_disk_protocol():
     """Test that requires_file_on_disk returns correct values for each backend"""
-    # Pyright, Pyrefly, and Zuban support virtual documents
+    # All backends support virtual documents (ty since 0.0.16)
     assert PyrightBackend().requires_file_on_disk() is False
     assert PyreflyBackend().requires_file_on_disk() is False
     assert ZubanBackend().requires_file_on_disk() is False
-
-    # ty requires files to exist on disk
-    assert TyBackend().requires_file_on_disk() is True
+    assert TyBackend().requires_file_on_disk() is False
 
 
 @pytest.mark.parametrize(
@@ -97,26 +95,31 @@ def test_consumes_did_change_configuration_protocol():
     assert ZubanBackend().consumes_did_change_configuration() is False
 
 
-async def test_ty_file_written_to_disk(tmp_path: Path):
-    """Test that ty backend automatically writes file to disk"""
+async def test_ty_no_file_written(tmp_path: Path):
+    """Test that ty backend does NOT write file to disk (virtual docs work)"""
     backend = TyBackend()
-    code = "x: int = 42"
+    code = "x: int = 'not an int'"
 
     file_path = tmp_path / "new.py"
-    assert not file_path.exists(), "File should not exist before session creation"
+    assert not file_path.exists()
 
     session = await lsp_types.Session.create(
         backend, base_path=tmp_path, initial_code=code
     )
 
-    # File should now exist on disk
-    assert file_path.exists(), "File should be written to disk for ty backend"
-    assert file_path.read_text() == code
+    # File should NOT exist - ty supports virtual documents since 0.0.16
+    assert not file_path.exists(), "ty should not write file to disk"
 
-    # Update code and verify file is updated
+    # The virtual document must still be fully analyzed
+    diagnostics = await session.get_diagnostics()
+    assert diagnostics, "virtual document should still produce diagnostics"
+
+    # Updates flow through didChange without touching the disk
     new_code = "y: str = 'hello'"
     await session.update_code(new_code)
-    assert file_path.read_text() == new_code, "File should be updated on code change"
+    diagnostics = await session.get_diagnostics()
+    assert not diagnostics, "updated virtual document should be clean"
+    assert not file_path.exists(), "ty should not write file on code change"
 
     await session.shutdown()
 
@@ -1233,9 +1236,6 @@ def test_function(x: int) -> int:
 
 result = test_function(5)
 """
-    # ty requires files to exist on disk for diagnostics
-    (tmp_path / "new.py").write_text(code)
-
     session = await lsp_types.Session.create(
         backend, base_path=tmp_path, initial_code=code, options=options
     )
@@ -1317,9 +1317,6 @@ from my_utils import helper_function
 result = helper_function(42)
 print(result)
 """
-    # ty requires files to exist on disk for diagnostics
-    (tmp_path / "new.py").write_text(code)
-
     # Configure with extra_paths pointing to lib directory
     options: TyConfig = {
         "environment": {

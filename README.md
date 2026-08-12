@@ -109,12 +109,12 @@ Run `pyrefly <command> --help` for details, or see the [Pyrefly docs](https://py
 
 | Feature | Pyright | Pyrefly | ty | Zuban | Notes |
 |---------|:-------:|:-------:|:--:|:-----:|-------|
-| Diagnostics | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty requires files on disk |
+| Diagnostics | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | Hover | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | ty shows type only, not variable name |
-| Completion | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty requires files on disk |
+| Completion | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | Completion Resolution | :white_check_mark: | :x: | :x: | :white_check_mark: | Pyrefly: no-op (returns item unchanged); ty: not supported (`-32601`) |
 | Signature Help | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| Rename | :white_check_mark: | :white_check_mark: | :warning: | :white_check_mark: | ty: requires files on disk |
+| Rename | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | Semantic Tokens | :white_check_mark:\* | :white_check_mark:\*\* | :white_check_mark: | :white_check_mark: | \*basedpyright recommended; \*\*Pyrefly: legend not advertised (see docs) |
 | Go to Definition | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
 | Find References | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |

@@ -97,7 +97,7 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 - `config_schema.py`: ty configuration types with nested sections (environment, src, rules, etc.)
 - **Key Design**: Uses consolidated `Session` class with `TyBackend` for specialization
 - **Config Format**: TOML (`ty.toml`) with nested sections and kebab-case keys
-- **Known Limitation**: ty requires files to exist on disk (virtual documents not fully supported)
+- **Virtual Documents**: Supported since ty 0.0.16 — no on-disk mirroring needed
 - **Documentation**: See `KNOWN_LIMITATIONS.md` in the ty package for details
 
 **Zuban Integration (`lsp_types/zuban/`)**

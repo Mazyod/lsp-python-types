@@ -111,8 +111,8 @@ class TyBackend(LSPBackend):
         return None
 
     def requires_file_on_disk(self) -> bool:
-        """ty requires files to exist on disk for analysis."""
-        return True
+        """ty supports virtual documents since 0.0.16; no on-disk mirror needed."""
+        return False
 
     def consumes_did_change_configuration(self) -> bool:
         """ty reads ``ty.toml`` from disk; it logs the notification as unhandled."""

@@ -17,12 +17,12 @@ Tests are parametrized across all backends (Pyright, Pyrefly, ty, Zuban). Key in
 
 ### Step 2: Review xfail Markers
 
-In `tests/test_session.py`, search for `xfail` to find documented limitations:
+In `tests/`, search for `xfail` to find documented limitations:
 
 ```python
-# Example from test_session_diagnostics:
+# Example from test_pool.py::test_session_warmup_on_recycle:
 if backend_name == "ty":
-    pytest.xfail("ty requires files on disk for diagnostics")
+    pytest.xfail("ty hover doesn't include variable names in output")
 ```
 
 Each xfail message explains why the feature is limited.
@@ -75,16 +75,16 @@ zuban --version
 ### Adding Notes
 
 - Keep notes concise (under 50 characters)
-- Reference the specific limitation (e.g., "requires files on disk")
+- Reference the specific limitation (e.g., "shows type only, not variable name")
 - Use semicolons to separate multiple backend notes
 
 ## Evidence Mapping
 
 | Feature | Test Function | What to Check |
 |---------|---------------|---------------|
-| Diagnostics | `test_session_diagnostics` | All backends pass; ty relies on the on-disk write from `requires_file_on_disk()` |
+| Diagnostics | `test_session_diagnostics` | All backends pass; virtual documents work everywhere (ty since 0.0.16) |
 | Hover | `test_session_hover` | All backends pass; `if backend_name != "ty"` guards the variable-name assertion (ty shows type only) |
-| Completion | `test_session_completion` | All backends pass; ty relies on the on-disk write |
+| Completion | `test_session_completion` | All backends pass |
 | Completion Resolution | `test_session_completion` | `if backend_name not in ("pyrefly", "ty")` skips resolution (ty errors `-32601`; Pyrefly is a no-op) |
 | Signature Help | `test_session_signature_help` | No xfails expected |
 | Rename | `test_session_rename` | All backends pass; Pyrefly rename was fixed in 1.1.1 (the former xfail is removed) |

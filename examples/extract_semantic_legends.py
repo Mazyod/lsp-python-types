@@ -148,9 +148,6 @@ async def main() -> None:
     with TemporaryDirectory(prefix="lsp-legend-") as tmp:
         base_path = Path(tmp)
 
-        # Create a minimal file for ty (which requires files on disk)
-        (base_path / "new.py").write_text("# placeholder\n")
-
         backends = [
             ("Pyright (basedpyright)", PyrightBackend()),
             ("Pyrefly", PyreflyBackend()),

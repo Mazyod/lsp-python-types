@@ -2,20 +2,7 @@
 
 This document describes known limitations and behavioral differences when using the ty backend compared to other LSP backends (Pyright, Pyrefly).
 
-## 1. Files Must Exist on Disk (Handled Automatically)
-
-**Limitation**: ty requires Python files to exist on disk before it can provide diagnostics, completion, rename, and other analysis features.
-
-**Behavior**: Opening a "virtual document" via `didOpen` without a corresponding file on disk results in:
-- Empty diagnostics (no errors reported even for invalid code)
-- Empty or limited completion results
-- Rename operations may fail
-
-**Resolution**: The `TyBackend` implements `requires_file_on_disk() -> True`, which tells `Session.create()` to automatically write the initial code to disk before opening the document. The `update_code()` method also keeps the file in sync with code changes.
-
-This is handled transparently - no user action required.
-
-## 2. `workspace/didChangeConfiguration` Not Supported
+## 1. `workspace/didChangeConfiguration` Not Supported
 
 **Limitation**: ty does not handle the `workspace/didChangeConfiguration` notification.
 
@@ -28,7 +15,7 @@ WARN Received notification workspace/didChangeConfiguration which does not have 
 
 **Resolution**: `TyBackend` implements `consumes_did_change_configuration() -> False`, so `Session.create()` skips the notification entirely — the warning above no longer appears in stderr. All configuration must still be set in `ty.toml` via the `options` parameter when creating a session; to change configuration at runtime, create a new session.
 
-## 3. Hover Format Differs
+## 2. Hover Format Differs
 
 **Limitation**: ty's hover information shows only the type, not the variable name.
 
@@ -38,7 +25,7 @@ WARN Received notification workspace/didChangeConfiguration which does not have 
 
 **Impact**: Code that parses hover text expecting variable names will not find them with ty.
 
-## 4. No CLI Configuration Flags
+## 3. No CLI Configuration Flags
 
 **Limitation**: The `ty server` command accepts no configuration flags.
 
@@ -46,7 +33,7 @@ WARN Received notification workspace/didChangeConfiguration which does not have 
 
 **Impact**: No impact on functionality - all configuration works via the config file.
 
-## 5. Workspace Folders Warning
+## 4. Workspace Folders Warning
 
 **Limitation**: ty expects `workspaceFolders` in the initialization parameters.
 
@@ -57,7 +44,7 @@ WARN No workspace(s) were provided during initialization. Using the current work
 
 **Impact**: ty falls back to using the working directory. This typically works correctly but may affect multi-root workspace scenarios.
 
-## 6. File Watching Not Supported by Client
+## 5. File Watching Not Supported by Client
 
 **Limitation**: The current LSP client implementation doesn't support file watching.
 
@@ -68,7 +55,7 @@ WARN Your LSP client doesn't support file watching: You may see stale results wh
 
 **Impact**: If files are modified outside the LSP session (e.g., by external tools), ty may not detect the changes until the session is recreated.
 
-## 7. Completion Item Resolution Not Supported
+## 6. Completion Item Resolution Not Supported
 
 **Limitation**: ty does not support the `completionItem/resolve` LSP request.
 
@@ -78,6 +65,12 @@ Unknown request: completionItem/resolve (-32601)
 ```
 
 **Impact**: Completion items won't have extended documentation or additional metadata that resolution typically provides. Basic completion works fine.
+
+---
+
+## Previously Documented, Now Resolved
+
+- **Files must exist on disk** (documented for ty 0.0.11): Early ty versions returned empty diagnostics, limited completions, and failing renames for "virtual documents" opened via `didOpen` without a corresponding file on disk, so `TyBackend` mirrored the session code to disk (`requires_file_on_disk() -> True`). Bisecting PyPI releases shows virtual documents work from ty 0.0.16 onward (diagnostics on `didOpen` and `didChange`, completion, and rename all verified with no `.py` file on disk). The backend no longer writes files to disk, and the package floor is now `ty>=0.0.16`.
 
 ---
 
