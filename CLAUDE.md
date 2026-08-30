@@ -117,8 +117,15 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 
 **Generation Process:**
 1. `download_schemas.py`: Fetches latest schemas from upstream
-2. `datamodel-codegen`: Converts JSON schema to TypedDict definitions
+2. `datamodel-codegen`: Converts JSON schema to TypedDict definitions, pinned to
+   `--formatters black isort`, then ruff-formats its own output
 3. `generate.py`: Orchestrates final type file generation with utilities in `assets/scripts/utils/`
+4. Every file in the Makefile's `GENERATED_FILES` is ruff-formatted and `--fix`ed so
+   regenerating produces no spurious diff
+
+The generation targets need `make`. If it is unavailable, run the recipes from the
+Makefile directly — they are plain `uv run` / `uvx` commands with no make-specific
+logic beyond the `GENERATED_FILES` list.
 
 ### Testing Strategy
 
@@ -145,23 +152,25 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 - `tomli-w>=1.0.0` - TOML writing support for Pyrefly, ty, and Zuban configuration serialization
 
 **Development:** uv-managed dependencies in `pyproject.toml`
-- `pytest` with async support for testing
+- `pytest`, `pytest-asyncio`, `pytest-cov` for testing
 - `datamodel-code-generator` for type generation
 - `httpx` for schema downloading
+- `rich` for the example scripts' console output
 
 **Note:** Previously a zero-dependency library. Added `tomli-w` to support TOML configuration for the Pyrefly, ty, and Zuban backends.
 
 ### Examples
 
 The `examples/` directory contains demo scripts showing library usage:
-- `pyrefly_diagnostics_completion.py`: Demonstrates diagnostics and code completion with Pyrefly
-- `pyrefly_circular_imports.py`: Example of detecting circular import issues
+- `pyrefly_diagnostics_completion.py`: Diagnostics + completion walkthrough, run against Pyrefly then Pyright
+- `pyrefly_circular_imports.py`: Cross-package circular-import hover behavior, run against Pyrefly then Pyright
+- `extract_semantic_legends.py`: Dumps each backend's semantic-token legend as markdown for `docs/SEMANTIC_TOKENS.md`
 
 ### Important Notes
 
 - Always prefix test commands with `uv run`
 - **Before committing**: Run tests (`uv run pytest`), type checking (`uvx pyright`), and linting (`uvx ruff check .`) - CI will fail if any have errors
-- Pool tests require `pyright-langserver`, `pyrefly`, `ty`, and/or `zuban` binaries available in PATH
+- `pyrefly`, `ty`, and `zuban` install into `.venv` via the matching extras, so `uv run pytest` finds them; `pyright-langserver` must be installed separately (needs Node)
 - Type generation requires Python 3.12+ for modern TypedDict features
 - Generated types should not be manually edited - regenerate from schemas
 - Pyrefly, ty, and Zuban each ship a `KNOWN_LIMITATIONS.md` documenting backend-specific behaviors (Pyright has none)
