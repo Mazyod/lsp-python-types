@@ -11,6 +11,14 @@ SHELL := /bin/bash
 # Suppress echoing of commands
 .SILENT:
 
+# All generated files (formatted after generation to keep the tree reproducible)
+GENERATED_FILES := \
+	lsp_types/types.py \
+	lsp_types/requests.py \
+	lsp_types/methods.py \
+	assets/scripts/lsp_schema.py \
+	lsp_types/pyright/config_schema.py
+
 # Colors for help text
 BLUE := \033[36m
 NC := \033[0m
@@ -34,7 +42,9 @@ generate-lsp-schema:
 		--input-file-type "jsonschema" \
 		--use-field-description \
 		--use-schema-description \
-		--use-double-quotes
+		--use-double-quotes \
+		--formatters black isort
+	uvx ruff format assets/scripts/lsp_schema.py
 
 generate-pyright-schema:
 	uv run datamodel-codegen \
@@ -45,14 +55,16 @@ generate-pyright-schema:
 		--input-file-type "jsonschema" \
 		--use-field-description \
 		--use-schema-description \
-		--use-double-quotes
+		--use-double-quotes \
+		--formatters black isort
+	uvx ruff format lsp_types/pyright/config_schema.py
 
 generate-types: ## Generate LSP type definitions
 	echo "Generating LSP type definitions..."
 	uv run python -m assets.scripts.generate
 	echo "Formatting generated files..."
-	uvx ruff format lsp_types/types.py lsp_types/requests.py lsp_types/methods.py
-	uvx ruff check lsp_types/types.py lsp_types/requests.py lsp_types/methods.py --fix --silent || true
+	uvx ruff format $(GENERATED_FILES)
+	uvx ruff check $(GENERATED_FILES) --fix --silent || true
 	echo "Done."
 
 generate-latest-types: download-schemas generate-lsp-schema generate-pyright-schema generate-types ## Download latest LSP schemas and generate type definitions
