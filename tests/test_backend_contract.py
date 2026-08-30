@@ -15,15 +15,6 @@ from pathlib import Path
 import pytest
 
 import lsp_types
-from lsp_types.pyrefly.backend import PyreflyBackend
-from lsp_types.pyright.backend import PyrightBackend
-from lsp_types.ty.backend import TyBackend
-from lsp_types.zuban.backend import ZubanBackend
-
-
-@pytest.fixture(params=[PyrightBackend, PyreflyBackend, TyBackend, ZubanBackend])
-def lsp_backend(request):
-    return request.param()
 
 
 async def test_contract_completion_returns_completion_list(lsp_backend, tmp_path: Path):

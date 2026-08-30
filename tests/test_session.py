@@ -19,18 +19,6 @@ from lsp_types.ty.config_schema import Model as TyConfig
 from lsp_types.zuban.backend import ZubanBackend
 
 
-@pytest.fixture(params=[PyrightBackend, PyreflyBackend, TyBackend, ZubanBackend])
-def lsp_backend(request):
-    """Parametrized fixture providing Pyright, Pyrefly, ty, and Zuban backends"""
-    return request.param()
-
-
-@pytest.fixture
-def backend_name(lsp_backend):
-    """Helper fixture to get the backend name for test identification"""
-    return lsp_backend.__class__.__name__.replace("Backend", "").lower()
-
-
 def _diagnostic_text(diagnostic: lsp_types.Diagnostic) -> str:
     """Normalize a diagnostic message to text.
 
@@ -586,10 +574,12 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
         await pool.cleanup()
 
 
-async def test_shutdown_session_cannot_mutate_reused_process(tmp_path: Path):
+async def test_shutdown_session_cannot_mutate_reused_process(
+    lsp_backend, tmp_path: Path
+):
     """A closed session cannot act through a process leased to its successor."""
     pool = LSPProcessPool(max_size=1)
-    backend = PyrightBackend()
+    backend = lsp_backend
     initial_code = "value: int = 1"
 
     try:

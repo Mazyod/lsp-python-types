@@ -24,19 +24,6 @@ from lsp_types.session import (
     _freeze_for_compatibility,
 )
 from lsp_types.ty.backend import TyBackend
-from lsp_types.zuban.backend import ZubanBackend
-
-
-@pytest.fixture(params=[PyrightBackend, PyreflyBackend, TyBackend, ZubanBackend])
-def lsp_backend(request):
-    """Parametrized fixture providing Pyright, Pyrefly, ty, and Zuban backends"""
-    return request.param()
-
-
-@pytest.fixture
-def backend_name(lsp_backend):
-    """Helper fixture to get the backend name for test identification"""
-    return lsp_backend.__class__.__name__.replace("Backend", "").lower()
 
 
 class _StubLSPProcess(LSPProcess):
@@ -869,13 +856,13 @@ class TestLSPProcessPool:
         self, session_pool, base_path
     ):
         """A process initialized as one backend cannot serve another backend."""
-        pyright_session = await lsp_types.Session.create(
-            PyrightBackend(),
+        ty_session = await lsp_types.Session.create(
+            TyBackend(),
             base_path=base_path,
             initial_code="x = 1",
             pool=session_pool,
         )
-        await pyright_session.shutdown()
+        await ty_session.shutdown()
 
         pyrefly_session = await lsp_types.Session.create(
             PyreflyBackend(),
@@ -1004,7 +991,7 @@ class TestLSPProcessPool:
         await session2.shutdown()
 
     async def test_sessions_with_different_initialize_params_do_not_share_processes(
-        self, session_pool, base_path
+        self, session_pool, lsp_backend, base_path
     ):
         """Initialization inputs are part of process compatibility."""
 
@@ -1017,7 +1004,7 @@ class TestLSPProcessPool:
             }
 
         first = await lsp_types.Session.create(
-            PyrightBackend(),
+            lsp_backend,
             base_path=base_path,
             initial_code="x = 1",
             initialize_params=initialize_params("first-client"),
@@ -1026,7 +1013,7 @@ class TestLSPProcessPool:
         await first.shutdown()
 
         second = await lsp_types.Session.create(
-            PyrightBackend(),
+            lsp_backend,
             base_path=base_path,
             initial_code="x = 1",
             initialize_params=initialize_params("second-client"),
