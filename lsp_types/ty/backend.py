@@ -67,7 +67,8 @@ class TyBackend(LSPBackend):
     ) -> ProcessLaunchInfo:
         """Create process launch info for ty LSP server"""
         # ty server command is simple: just "ty server"
-        # Unlike Pyrefly, ty server accepts no CLI flags - all config via ty.toml
+        # Unlike Pyrefly, ty server accepts no CLI flags. Config comes from
+        # ty.toml or from initializationOptions sent at LSP initialization.
         cmd = ["ty", "server"]
 
         # NOTE: requires ty to be installed and accessible

@@ -39,7 +39,8 @@ class ZubanBackend(LSPBackend):
     def create_process_launch_info(
         self, base_path: Path, options: ZubanConfig
     ) -> ProcessLaunchInfo:
-        # `zuban server` takes no CLI flags; all configuration is file-based.
+        # `zuban server` takes no CLI flags. Config comes from pyproject.toml's
+        # [tool.zuban] table, or from initializationOptions at LSP initialization.
         return ProcessLaunchInfo(cmd=["zuban", "server"], cwd=base_path)
 
     def get_lsp_capabilities(self) -> types.ClientCapabilities:

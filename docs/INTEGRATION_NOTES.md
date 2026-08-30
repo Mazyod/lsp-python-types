@@ -16,13 +16,11 @@ This document captures frictions and enhancement opportunities discovered while 
 
 #### 2. `workspace/didChangeConfiguration` Not Supported
 
-**Issue**: ty logs `Received notification workspace/didChangeConfiguration which does not have a handler.` The Session class sends this notification after initialization to apply workspace settings.
+**Issue**: ty logs `Received notification workspace/didChangeConfiguration which does not have a handler.` The Session class sends this notification after initialization to apply workspace settings, unless the backend opts out.
 
 **Impact**: Runtime configuration changes via `didChangeConfiguration` don't work with ty. However, configuration written to `ty.toml` is respected.
 
-**Current Behavior**: The notification is sent but ignored by ty. No functional impact since config file is written first.
-
-**Potential Enhancement**: Add an optional `supports_did_change_configuration` flag to backends so the Session can skip sending this notification when unsupported.
+**Resolution**: The `LSPBackend` protocol gained `consumes_did_change_configuration()` (default `True`). `TyBackend` and `ZubanBackend` return `False`, so `Session.create()` skips the notification entirely for them. No functional loss — both read their config from disk.
 
 #### 3. Nested Configuration Structure
 
@@ -66,7 +64,8 @@ assert "str" in hover_text
 
 **Issue**: Unlike Pyrefly which accepts `--verbose`, `--threads`, and `--indexing-mode` CLI flags, ty's `server` command accepts no configuration flags.
 
-**Impact**: All configuration must be done via `ty.toml`. This is actually simpler than Pyrefly's hybrid approach.
+**Impact**: Configuration reaches ty via `ty.toml` or via `initializationOptions` at
+LSP initialization, not via the command line. See ty's KNOWN_LIMITATIONS entries 1 and 3.
 
 **Solution**: `create_process_launch_info()` simply returns `["ty", "server"]` without any conditional flag building.
 
@@ -87,13 +86,13 @@ def snake_to_kebab_recursive(obj: Mapping[str, Any]) -> dict[str, Any]:
 
 Then refactor both backends to use this shared utility.
 
-### 2. Backend Capability Flags
+### 2. Backend Capability Flags (implemented)
 
-Add optional flags to the `LSPBackend` protocol for:
-- `requires_file_on_disk: bool` - Whether backend needs files to exist on disk
-- `supports_did_change_configuration: bool` - Whether backend handles `workspace/didChangeConfiguration`
+The `LSPBackend` protocol carries both as methods:
+- `requires_file_on_disk() -> bool` — all four backends return `False`
+- `consumes_did_change_configuration() -> bool` — `False` for ty and Zuban
 
-This would allow the Session class to adapt its behavior automatically.
+`Session.create()` branches on both.
 
 ### 3. Common LSP Capabilities Base
 

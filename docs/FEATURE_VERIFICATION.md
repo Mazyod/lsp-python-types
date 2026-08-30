@@ -85,7 +85,7 @@ zuban --version
 | Diagnostics | `test_session_diagnostics` | All backends pass; virtual documents work everywhere (ty since 0.0.16) |
 | Hover | `test_session_hover` | All backends pass; `if backend_name != "ty"` guards the variable-name assertion (ty shows type only) |
 | Completion | `test_session_completion` | All backends pass |
-| Completion Resolution | `test_session_completion` | `if backend_name not in ("pyrefly", "ty")` skips resolution (ty errors `-32601`; Pyrefly is a no-op) |
+| Completion Resolution | `test_session_completion` | `if backend_name != "ty"` skips resolution for ty only (it errors `-32601`). Pyrefly is invoked but only its echo is asserted, which is why the README still marks it unsupported |
 | Signature Help | `test_session_signature_help` | No xfails expected |
 | Rename | `test_session_rename` | All backends pass; Pyrefly rename was fixed in 1.1.1 (the former xfail is removed) |
 | Semantic Tokens | `test_session_semantic_tokens` | No xfails expected |
@@ -93,8 +93,8 @@ zuban --version
 ## Untested Features
 
 Features declared in backend capabilities but not exposed in Session API:
-- Go to Definition (Pyrefly, ty declare it)
-- Find References (Pyrefly, ty declare it)
+- Go to Definition (Pyrefly, ty, Zuban declare it)
+- Find References (Pyrefly, ty, Zuban declare it)
 - Code Actions
 - Formatting
 

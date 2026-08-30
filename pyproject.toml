@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 readme = "README.md"
 license = "MIT"
 dependencies = [
-    "tomli-w>=1.0.0",  # TOML writing support for Pyrefly and ty config
+    "tomli-w>=1.0.0",  # TOML writing support for Pyrefly, ty, and Zuban config
 ]
 keywords = [
     "lsp",

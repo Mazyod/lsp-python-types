@@ -403,9 +403,10 @@ obj.
     ]
     assert len(method_items) > 0, "my_method not found in completion items"
 
-    # Resolve a completion item for more details
-    # Pyrefly and ty don't support completion resolution
-    if backend_name not in ("pyrefly", "ty"):
+    # Resolve a completion item for more details.
+    # ty is the only backend that cannot: it answers completionItem/resolve with
+    # -32601. Pyrefly answers, but as a pure echo (see its KNOWN_LIMITATIONS).
+    if backend_name != "ty":
         method_completion = method_items[0]
         resolved = await session.resolve_completion(method_completion)
         assert resolved is not None

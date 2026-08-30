@@ -91,7 +91,7 @@ See `examples/extract_semantic_legends.py` for a complete working example.
 
 ### Pyrefly
 
-> Last verified: Pyrefly 0.59.1
+> Last verified: Pyrefly 1.2.0 (2026-08-30)
 > Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/main/pyrefly/lib/state/semantic_tokens.rs)
 
 Pyrefly does not advertise its legend via LSP initialization, but the token mappings are defined in source code.
@@ -138,12 +138,13 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 | 7 | `modification` |
 | 8 | `documentation` |
 | 9 | `defaultLibrary` |
+| 10 | `selfParameter` |
 
 ---
 
 ### ty
 
-> Last verified: ty 0.0.28
+> Last verified: ty 0.0.75 (2026-08-30)
 
 #### Token Types
 
@@ -178,7 +179,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ### Zuban
 
-> Last verified: Zuban 0.7.0
+> Last verified: Zuban 0.9.2 (2026-08-30)
 
 Zuban advertises its legend via LSP initialization (follows LSP 3.17 standard ordering for the 23 token types it emits).
 
@@ -307,9 +308,10 @@ The canonical legend follows LSP standard ordering, with backend-specific tokens
 - 23: label (LSP standard)
 - 24-26: Backend-specific (selfParameter, clsParameter, builtinConstant)
 
-**Token Modifiers (bit 0-12):**
+**Token Modifiers (bit 0-13):**
 - 0-9: LSP standard modifiers (declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation, defaultLibrary)
-- 10-12: Backend-specific (builtin, classMember, parameter)
+- 10-12: Backend-specific from Pyright (builtin, classMember, parameter)
+- 13: Backend-specific from Pyrefly (selfParameter)
 
 ---
 

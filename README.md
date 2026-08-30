@@ -105,7 +105,7 @@ Run `pyrefly <command> --help` for details, or see the [Pyrefly docs](https://py
 
 ### Features by Backend
 
-> Last verified: basedpyright 1.39.9, Pyrefly 1.2.0, ty 0.0.70, Zuban 0.9.1
+> Last verified: Pyrefly 1.2.0, ty 0.0.75, Zuban 0.9.2 (basedpyright: CI only, unpinned `npm install -g basedpyright`)
 
 | Feature | Pyright | Pyrefly | ty | Zuban | Notes |
 |---------|:-------:|:-------:|:--:|:-----:|-------|

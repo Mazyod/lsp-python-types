@@ -67,7 +67,7 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 
 **Generic Process Pooling (`lsp_types/pool.py`)**
 - `LSPProcessPool`: Language-server agnostic process pooling for performance optimization
-- `PooledLSPProcess`: Wrapper for `LSPProcess` with recycling state management
+- `ProcessMetadata`: TypedDict of per-process pool bookkeeping (`base_path`, `compatibility_key`, `idle_since`)
 - Reusable across different LSP implementations (not just Pyright)
 - Handles process lifecycle: creation, reuse, idle cleanup, and shutdown
 
@@ -142,14 +142,14 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 ### Dependencies
 
 **Runtime:**
-- `tomli-w>=1.0.0` - TOML writing support for Pyrefly and ty configuration serialization
+- `tomli-w>=1.0.0` - TOML writing support for Pyrefly, ty, and Zuban configuration serialization
 
 **Development:** uv-managed dependencies in `pyproject.toml`
 - `pytest` with async support for testing
 - `datamodel-code-generator` for type generation
 - `httpx` for schema downloading
 
-**Note:** Previously a zero-dependency library. Added `tomli-w` to support TOML configuration for Pyrefly and ty backends.
+**Note:** Previously a zero-dependency library. Added `tomli-w` to support TOML configuration for the Pyrefly, ty, and Zuban backends.
 
 ### Examples
 
@@ -164,7 +164,7 @@ The `examples/` directory contains demo scripts showing library usage:
 - Pool tests require `pyright-langserver`, `pyrefly`, `ty`, and/or `zuban` binaries available in PATH
 - Type generation requires Python 3.12+ for modern TypedDict features
 - Generated types should not be manually edited - regenerate from schemas
-- Each backend has a `KNOWN_LIMITATIONS.md` file documenting backend-specific behaviors
+- Pyrefly, ty, and Zuban each ship a `KNOWN_LIMITATIONS.md` documenting backend-specific behaviors (Pyright has none)
 
 ### Architecture Design Patterns
 
