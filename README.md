@@ -12,7 +12,7 @@ _Publish the excellent work of [Sublime LSP](https://github.com/sublimelsp/lsp-p
 
 __LSP Types__ is a Python package that aims to provide a fully typed interface to Language Server Protocol (LSP) interactions. It can be used to simply utilize the types, or to interact with an LSP server over stdio.
 
-The library has minimal dependencies (`tomli-w` for TOML config serialization).
+The library has minimal dependencies (`tomlkit` for TOML config serialization).
 
 ## Installation
 

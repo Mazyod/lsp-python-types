@@ -13,14 +13,21 @@ This document describes known limitations and behavioral differences when using 
 **Impact**: Re-invoking `write_config` replaces the previous `[tool.zuban]` table
 in place; every other parsed value and section is preserved.
 
-**Caveat — formatting is not preserved**: `write_config` is a full `tomllib` ->
-`tomli_w` round-trip, so it preserves *values* but not *formatting*. Comments are
-stripped, inline tables expand into sections, and arrays reflow. Because
-`Session.create()` defaults to `base_path=Path(".")`, calling it from a real
-project root will rewrite that project's `pyproject.toml` and drop its comments.
-Pass an explicit `base_path` (a temporary directory, say) when that matters.
-Pyrefly and ty are unaffected: they write dedicated `pyrefly.toml`/`ty.toml` files
-that the library owns outright, rather than a file shared with the user's project.
+**Formatting is preserved**: `write_config` is a format-preserving `tomlkit`
+edit. Only the `[tool.zuban]` table is added or replaced; comments, inline
+tables, arrays-of-tables, key ordering, whitespace and line endings elsewhere in
+the file survive. Comments that `tomlkit` associates with an existing
+`[tool.zuban]` go with it, since that table is replaced wholesale. This matters because `Session.create()` defaults to
+`base_path=Path(".")`, so the naive call operates on the caller's real
+`pyproject.toml`. (Until v0.22.1 this was a `tomllib` -> `tomli_w` round-trip
+that preserved values but stripped every comment.)
+
+**The table is written even when `options` is empty**, and must be: its
+*presence* is what selects Zuban's `default` mode. A project carrying
+`[tool.mypy]` but no `[tool.zuban]` runs in the weaker Mypy-compatible mode, so
+skipping the write would silently downgrade it. Note this is observable only
+through `zuban server` — the `zuban check` subcommand pins `default` mode
+regardless of configuration, which makes the caveat easy to mis-verify.
 
 ## 2. Unused `# type: ignore` Comments Not Reported
 
@@ -100,10 +107,9 @@ reporting `serverInfo {"name": "zuban", "version": "0.9.2"}`:
 - **1** — a pre-existing `pyproject.toml` containing `[project]`,
   `[project.scripts]`, `[build-system]`, `[tool.ruff]`, and `[tool.foo]` (with an
   inline table and a `[[tool.foo.item]]` array-of-tables) survived a `write_config`
-  call with every parsed value intact; only `[tool.zuban]` was replaced. The merge
-  preserves *values*, not *formatting*: the file is a full `tomllib` -> `tomli_w`
-  round-trip, so comments are stripped, inline tables expand into sections, and
-  arrays are reflowed.
+  call with every parsed value intact; only `[tool.zuban]` was replaced. Since
+  v0.22.1 the edit is format-preserving (`tomlkit`), so comments, inline tables,
+  arrays-of-tables and whitespace elsewhere in the file also survive.
 - **2** — a file containing two unnecessary `# type: ignore` comments produced zero
   diagnostics, while a plain type error in a control file was reported.
 - **3** — a type error inside a value-constrained `TypeVar("T", str, bytes)` body

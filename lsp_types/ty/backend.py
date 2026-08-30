@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing as t
 from pathlib import Path
 
-import tomli_w
+import tomlkit
 
 import lsp_types
 from lsp_types import types
@@ -59,7 +59,7 @@ class TyBackend(LSPBackend):
         kebab_options = _convert_keys_to_kebab(dict(options))
 
         config_path = base_path / "ty.toml"
-        toml_content = tomli_w.dumps(kebab_options)
+        toml_content = tomlkit.dumps(kebab_options)
         config_path.write_text(toml_content)
 
     def create_process_launch_info(

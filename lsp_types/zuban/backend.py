@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
 
-import tomli_w
+import tomlkit
 
 import lsp_types
 from lsp_types import types
@@ -22,19 +21,34 @@ class ZubanBackend(LSPBackend):
         Zuban's native-mode config lives under `[tool.zuban]` in `pyproject.toml`
         — it has no dedicated config file. Because `Session.create()` defaults
         `base_path=Path(".")`, this method must not destroy a caller's existing
-        `pyproject.toml`: any `[project]` metadata and other `[tool.*]` sections
-        are preserved; only `[tool.zuban]` is added or replaced.
+        `pyproject.toml`. It is a format-preserving edit via `tomlkit`: only the
+        `[tool.zuban]` table is added or replaced. Comments, inline tables,
+        arrays-of-tables, key ordering, whitespace and line endings elsewhere in
+        the file survive. Comments tomlkit associates with an existing
+        `[tool.zuban]` go with it, since that table is replaced wholesale.
 
         Keys stay snake_case — Zuban's native TOML format uses snake_case directly
         (unlike Pyrefly/ty which use kebab-case). Presence of `[tool.zuban]` puts
         Zuban into its recommended `default` mode.
         """
         config_path = base_path / "pyproject.toml"
-        existing: dict = {}
         if config_path.exists():
-            existing = tomllib.loads(config_path.read_text())
-        existing.setdefault("tool", {})["zuban"] = dict(options)
-        config_path.write_text(tomli_w.dumps(existing))
+            # newline="" keeps the file's own line endings intact; Path.read_text
+            # would normalise CRLF to LF and rewrite every line.
+            with config_path.open("r", newline="") as handle:
+                document = tomlkit.parse(handle.read())
+        else:
+            document = tomlkit.document()
+
+        if "tool" not in document:
+            document["tool"] = tomlkit.table(is_super_table=True)
+        # Assign the plain dict rather than a pre-built tomlkit item: tomlkit
+        # then converts it to match the parent, so an inline `tool = { ... }`
+        # table gets an inline child instead of raising.
+        document["tool"]["zuban"] = dict(options)  # type: ignore[index]
+
+        with config_path.open("w", newline="") as handle:
+            handle.write(tomlkit.dumps(document))
 
     def create_process_launch_info(
         self, base_path: Path, options: ZubanConfig

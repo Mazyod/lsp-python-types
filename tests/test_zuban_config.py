@@ -212,3 +212,131 @@ def test_zuban_backend_workspace_settings_passthrough():
     options: ZubanConfig = {"mode": "default", "untyped_strict_optional": True}
     settings = ZubanBackend().get_workspace_settings(options)
     assert settings == {"settings": options}
+
+
+def test_zuban_backend_write_config_preserves_surrounding_formatting(tmp_path: Path):
+    """write_config edits only [tool.zuban]; every other byte survives.
+
+    `Session.create()` defaults to `base_path=Path(".")`, so this runs against a
+    caller's real `pyproject.toml`. A tomllib -> tomli_w round-trip preserved
+    values but destroyed comments, inline tables, arrays-of-tables and layout;
+    tomlkit preserves them.
+    """
+    from lsp_types.zuban.backend import ZubanBackend
+
+    original = (
+        "# Top comment, load-bearing.\n"
+        "[project]\n"
+        'name = "acme"\n'
+        'dependencies = ["httpx>=0.27"]  # trailing comment\n'
+        "\n"
+        "[tool.acme]\n"
+        'release = { channel = "stable", signed = true }\n'
+        'notes = """\n'
+        "A line that looks like [tool.zuban] but is not.\n"
+        '"""\n'
+        "\n"
+        "[[tool.acme.item]]\n"
+        'name = "alpha"\n'
+        "\n"
+        "[tool.ruff]\n"
+        "line-length = 88  # matches black\n"
+    )
+    config_path = tmp_path / "pyproject.toml"
+    config_path.write_text(original)
+
+    ZubanBackend().write_config(tmp_path, {"mode": "default"})
+    result = config_path.read_text()
+
+    # Everything the caller wrote is still there, verbatim.
+    assert "# Top comment, load-bearing." in result
+    assert 'dependencies = ["httpx>=0.27"]  # trailing comment' in result
+    assert 'release = { channel = "stable", signed = true }' in result
+    assert "[[tool.acme.item]]" in result
+    assert "line-length = 88  # matches black" in result
+    assert "A line that looks like [tool.zuban] but is not." in result
+    assert result.startswith(original)
+
+    parsed = tomllib.loads(result)
+    assert parsed["tool"]["zuban"] == {"mode": "default"}
+    assert parsed["tool"]["acme"]["release"] == {"channel": "stable", "signed": True}
+    assert parsed["tool"]["acme"]["item"] == [{"name": "alpha"}]
+
+
+def test_zuban_backend_write_config_replaces_existing_table(tmp_path: Path):
+    """An existing [tool.zuban] is replaced wholesale, not merged into."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    config_path = tmp_path / "pyproject.toml"
+    config_path.write_text(
+        "# keep me\n"
+        "[tool.zuban]\n"
+        'mode = "mypy"\n'
+        "stale_key = 1\n"
+        "\n"
+        "[tool.other]\n"
+        "value = 2\n"
+    )
+
+    ZubanBackend().write_config(tmp_path, {"mode": "default"})
+
+    result = config_path.read_text()
+    assert "# keep me" in result
+    parsed = tomllib.loads(result)
+    assert parsed["tool"]["zuban"] == {"mode": "default"}, "stale keys must be dropped"
+    assert parsed["tool"]["other"]["value"] == 2
+
+
+def test_zuban_backend_write_config_empty_options_still_writes_table(tmp_path: Path):
+    """An empty [tool.zuban] must still be written -- it selects Zuban's mode.
+
+    The table's *presence* puts Zuban in its `default` (PyRight-like) mode. A
+    project carrying [tool.mypy] but no [tool.zuban] is driven into the weaker
+    Mypy-compatible mode, so skipping the write when `options` is empty would
+    silently downgrade those projects. See KNOWN_LIMITATIONS.md entry 1.
+    """
+    from lsp_types.zuban.backend import ZubanBackend
+
+    config_path = tmp_path / "pyproject.toml"
+    config_path.write_text("[tool.mypy]\nstrict = true\n")
+
+    ZubanBackend().write_config(tmp_path, {})
+
+    parsed = tomllib.loads(config_path.read_text())
+    assert "zuban" in parsed["tool"], "empty options must still emit [tool.zuban]"
+    assert parsed["tool"]["zuban"] == {}
+    assert parsed["tool"]["mypy"]["strict"] is True
+
+
+def test_zuban_backend_write_config_handles_inline_tool_table(tmp_path: Path):
+    """An inline root `tool = { ... }` table must not break the write.
+
+    Assigning a pre-built `tomlkit` table into an inline parent raises
+    "Inline tables cannot contain a table"; assigning a plain dict lets tomlkit
+    convert it to match the parent instead.
+    """
+    from lsp_types.zuban.backend import ZubanBackend
+
+    config_path = tmp_path / "pyproject.toml"
+    config_path.write_text("tool = { other = { x = 1 } }\n")
+
+    ZubanBackend().write_config(tmp_path, {"mode": "default"})
+
+    parsed = tomllib.loads(config_path.read_text())
+    assert parsed["tool"]["zuban"] == {"mode": "default"}
+    assert parsed["tool"]["other"] == {"x": 1}
+
+
+def test_zuban_backend_write_config_preserves_crlf(tmp_path: Path):
+    """CRLF line endings survive; Path.read_text would normalise them to LF."""
+    from lsp_types.zuban.backend import ZubanBackend
+
+    config_path = tmp_path / "pyproject.toml"
+    original = b'# c\r\n[project]\r\nname = "a"\r\n'
+    config_path.write_bytes(original)
+
+    ZubanBackend().write_config(tmp_path, {})
+
+    after = config_path.read_bytes()
+    assert after.startswith(original), "existing lines must be untouched"
+    assert after.count(b"\r\n") == original.count(b"\r\n")

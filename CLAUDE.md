@@ -90,7 +90,7 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 - `backend.py`: `PyreflyBackend` implementation for Pyrefly LSP server (Facebook's Rust-based type checker)
 - `config_schema.py`: Pyrefly configuration types (TypedDict with known fields)
 - **Key Design**: Uses consolidated `Session` class with `PyreflyBackend` for specialization
-- **Config Flexibility**: Supports arbitrary configuration fields via TOML serialization (using `tomli-w`)
+- **Config Flexibility**: Supports arbitrary configuration fields via TOML serialization (using `tomlkit`)
 
 **ty Integration (`lsp_types/ty/`)**
 - `backend.py`: `TyBackend` implementation for ty LSP server (Astral's Rust-based type checker)
@@ -149,7 +149,7 @@ logic beyond the `GENERATED_FILES` list.
 ### Dependencies
 
 **Runtime:**
-- `tomli-w>=1.0.0` - TOML writing support for Pyrefly, ty, and Zuban configuration serialization
+- `tomlkit>=0.13.3` - format-preserving TOML for Pyrefly, ty, and Zuban configuration serialization (Zuban edits the user's own `pyproject.toml`, so comments and layout must survive)
 
 **Development:** uv-managed dependencies in `pyproject.toml`
 - `pytest`, `pytest-asyncio`, `pytest-cov` for testing
@@ -157,7 +157,7 @@ logic beyond the `GENERATED_FILES` list.
 - `httpx` for schema downloading
 - `rich` for the example scripts' console output
 
-**Note:** Previously a zero-dependency library. Added `tomli-w` to support TOML configuration for the Pyrefly, ty, and Zuban backends.
+**Note:** Previously a zero-dependency library. Added a single TOML dependency for the Pyrefly, ty, and Zuban backends — `tomli-w` originally, replaced by `tomlkit` in v0.22.1 so Zuban's edit of `pyproject.toml` preserves the rest of the file.
 
 ### Examples
 

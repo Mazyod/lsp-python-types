@@ -1347,3 +1347,48 @@ print(result)
     )
 
     await session.shutdown()
+
+
+async def test_zuban_empty_table_selects_default_mode(tmp_path: Path):
+    """An empty [tool.zuban] overrides [tool.mypy] and selects `default` mode.
+
+    This pins why `write_config` must write the table even when `options` is
+    empty. Zuban picks its mode from the config file: [tool.mypy] alone forces
+    the weaker Mypy-compatible mode, in which the bodies of untyped functions
+    are not checked. Adding an empty [tool.zuban] flips it back to `default`.
+
+    Note the discriminator is only observable through `zuban server` -- the
+    `zuban check` subcommand pins `default` mode regardless of configuration,
+    which is what made this caveat easy to mis-verify.
+    """
+    from lsp_types.zuban.backend import ZubanBackend
+
+    class _NoWriteZubanBackend(ZubanBackend):
+        """Lets the test own pyproject.toml instead of Session.create."""
+
+        def write_config(self, base_path: Path, options) -> None:  # type: ignore[override]
+            return None
+
+    # An error in the body of an *untyped* function: reported in `default` mode,
+    # not reported in Mypy-compatible mode.
+    code = "def untyped(x):\n    y: int = 'nope'\n    return y\n"
+
+    async def codes_for(config: str) -> set[str]:
+        (tmp_path / "pyproject.toml").write_text(config)
+        session = await lsp_types.Session.create(
+            _NoWriteZubanBackend(), base_path=tmp_path, initial_code=code
+        )
+        try:
+            return {str(d.get("code")) for d in await session.get_diagnostics()}
+        finally:
+            await session.shutdown()
+
+    mypy_only = await codes_for("[tool.mypy]\n")
+    with_empty_zuban = await codes_for("[tool.mypy]\n\n[tool.zuban]\n")
+
+    assert "assignment" not in mypy_only, (
+        f"[tool.mypy] alone should not check untyped bodies, got {mypy_only}"
+    )
+    assert "assignment" in with_empty_zuban, (
+        f"empty [tool.zuban] should restore default mode, got {with_empty_zuban}"
+    )
