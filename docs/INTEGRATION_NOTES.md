@@ -136,13 +136,50 @@ new monaco.lsp.MonacoLspClient(transport);
 - Per-backend implementations (~200 lines each)
 - Dependencies: `vscode-languageserver-protocol`, `vscode-jsonrpc`
 
-**Blockers / caveats (as of v0.55.0):**
-- **API not stable** — the author (hediet, Microsoft) explicitly warned the API may change
-- **No custom initialization params** — sends `rootUri: null`, `processId: null` with no way to customize. The playground backends need specific `initializationOptions`
-- **Global registration** — providers register for all models, not per-language
-- **No reconnection** — WebSocket drops require page refresh
+**Blockers / caveats (re-verified against v0.56.0 — 2026-08-30):**
 
-**Recommendation:** Monitor the API stability across v0.56.0+. The lack of custom `initializationOptions` is the main blocker for adoption. Once that is addressed, migrating the playground would eliminate significant boilerplate and gain features (completion, semantic tokens, rename, etc.) for free.
+Verification was documentary only: there is no npm on the machine, so nothing was
+installed or executed. Evidence came from the published npm artifacts (`monaco.d.ts`
+and the shipped `esm/external/monaco-lsp-client/out/index.js` for 0.55.1 and 0.56.0,
+fetched via CDN), the `monaco-lsp-client/` source at `main`, and the issue trackers.
+The decisive check: diffing the shipped LSP bundle 0.55.1 -> 0.56.0 yields 50 lines —
+untrusted markdown, a stray `debugger;` removal, one import rename. The client is
+functionally unchanged, so every blocker below still stands.
+
+- **API still unstable** — `monaco-lsp-client/README.md` (current): "This package is
+  in alpha stage and might contain many bugs." 0.56.0 added typings (0.55.1 shipped
+  no `.d.ts` at all) but made no stability declaration.
+- **No custom initialization params — still the main blocker.**
+  `constructor(transport: IMessageTransport)` is the entire public API; the client
+  hardcodes `{ processId: null, capabilities, rootUri: null }` and never sends
+  `initializationOptions`. Identical in 0.55.1, 0.56.0 and `main`.
+- **Registration is global in practice for our backends** (the original wording was
+  too broad). Providers register against
+  `toMonacoLanguageSelector(capability.documentSelector)`, which falls back to
+  `{ language: "*" }` only when that selector is missing or empty — so capabilities
+  registered dynamically via `client/registerCapability` *are* scoped per-language.
+  But options derived from static server capabilities carry no document selector,
+  and Pyright, Pyrefly, ty and Zuban all advertise statically.
+- **No reconnection** — `WebSocketTransport`'s `socket.onclose` only flips transport
+  state to `closed`; nothing subscribes to that state, and `reconnect` appears zero
+  times in the shipped bundle.
+- **No `dispose()`** (microsoft/monaco-editor#5340, open) — new since this note was
+  written, and disqualifying on its own here. `createFeatures()` builds a
+  `DisposableStore` that the constructor discards, and `MonacoLspClient` exposes no
+  `dispose()`, so provider registrations outlive the transport for the page lifetime.
+  `playground/src/main.ts` disposes the adapter on every backend switch, so each
+  switch would leak a full set of providers.
+- **Other open bugs to watch** — microsoft/monaco-editor#5224 and #5239 (document
+  URIs are case-mangled during text-document synchronisation) and #5342
+  (`textDocument/codeAction` drops the diagnostic `data`, `code` and `source` fields
+  servers need for quickfixes).
+
+**Recommendation:** Do not migrate on monaco-editor 0.56.0. Re-evaluate only once
+both a `MonacoLspClient` constructor accepting initialization options and a proper
+`dispose()` have landed; #5340 is a required lifecycle fix, not merely something to
+monitor. Treat 0.57+ as a release horizon to re-check, not an expectation that it
+will be usable. If both land, migrating the playground would eliminate significant
+boilerplate and gain features (completion, semantic tokens, rename, etc.) for free.
 
 ### 5. Backend Registry Pattern
 
@@ -166,10 +203,9 @@ class TyBackend(LSPBackend):
 
 ## Summary
 
-The ty backend integration revealed that different LSP servers have varying requirements around file handling and configuration. The current abstraction works but could benefit from:
+The ty backend integration revealed that different LSP servers have varying requirements around file handling and configuration. Optional capability flags on backends have since shipped (`requires_file_on_disk()`, `consumes_did_change_configuration()`). The current abstraction works but could still benefit from:
 
-1. Optional capability flags on backends
-2. Shared utilities for common patterns (TOML conversion, base capabilities)
-3. Better documentation of backend-specific behaviors
+1. Shared utilities for common patterns (TOML conversion, base capabilities)
+2. Better documentation of backend-specific behaviors
 
 The core `LSPBackend` protocol and `Session` class work well across all four backends (Pyright, Pyrefly, ty, Zuban) with minimal backend-specific handling needed in tests.
