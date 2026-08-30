@@ -447,6 +447,62 @@ class LSPProcess:
             stream.writelines([part.encode(ENCODING) for part in message] + [body])
             await stream.drain()
 
+    def _server_request_result(self, method: str, params: t.Any) -> types.LSPObject:
+        """Return the result for a server request, or raise ``Error``.
+
+        This client implements no server-to-client requests, so the honest
+        answer to almost everything is ``MethodNotFound``. Two exceptions earn
+        a real reply because servers block on them: ty stops answering
+        entirely — diagnostics, hover and completion all hang indefinitely —
+        until its ``workspace/configuration`` request is answered, and an
+        error response does not unblock it.
+
+        These are not claims of support. ``[null, ...]`` means "no
+        configuration for those scopes" and ``null`` acknowledges a
+        registration this client will not act on. Both are only ever reached
+        when the caller advertised the corresponding capability.
+        """
+        match method:
+            case "workspace/configuration":
+                items = (params or {}).get("items")
+                if not isinstance(items, list):
+                    raise Error(
+                        types.ErrorCodes.InvalidParams,
+                        "workspace/configuration requires an 'items' array",
+                    )
+                # One result per requested item; the lengths must match.
+                return t.cast(types.LSPObject, [None] * len(items))
+            case "client/registerCapability" | "client/unregisterCapability":
+                return t.cast(types.LSPObject, None)
+            case _:
+                raise Error(
+                    types.ErrorCodes.MethodNotFound,
+                    f"Unhandled server request: {method}",
+                )
+
+    async def _answer_server_request(self, payload: types.LSPObject) -> None:
+        """Reply to a server-initiated request.
+
+        JSON-RPC 2.0 requires a response to every request, and a server may
+        wait forever without one. Runs as its own task: replying inline would
+        take ``_write_lock`` and ``drain()`` from inside the reader, which
+        would stop draining stdout.
+        """
+        method = t.cast(str, payload["method"])
+        response: types.LSPObject = {"jsonrpc": "2.0", "id": payload["id"]}
+        try:
+            response["result"] = self._server_request_result(
+                method, payload.get("params")
+            )
+        except Error as error:
+            response["error"] = error.to_lsp()
+
+        try:
+            await self._send_payload(self._writable_stdin(method), response)
+        except (RuntimeError, ConnectionError, BrokenPipeError):
+            # The process stopped between the request arriving and our reply.
+            logger.debug("Could not answer server request %s", method)
+
     async def _read_stdout(self) -> None:
         """Read and process messages from the server's stdout."""
         try:
@@ -476,8 +532,14 @@ class LSPProcess:
 
                 logger.debug("Server -> Client: %s", payload)
 
-                # Handle message based on type
-                if "method" in payload:
+                # Handle message based on type. A server-initiated *request*
+                # carries both "method" and "id", so it must be classified
+                # before notifications or it would be silently swallowed.
+                if "method" in payload and "id" in payload:
+                    self._track_task(
+                        asyncio.create_task(self._answer_server_request(payload))
+                    )
+                elif "method" in payload:
                     # Server notification
                     [q.put_nowait(payload) for q in self._notification_listeners]
                 elif "id" in payload:

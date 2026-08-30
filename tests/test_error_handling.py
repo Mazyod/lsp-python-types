@@ -873,3 +873,50 @@ async def test_is_alive_is_false_after_the_server_crashes():
         assert not process.is_alive
     finally:
         await process.stop()
+
+
+async def test_server_request_gets_configuration_reply():
+    """A server's workspace/configuration request is answered, not swallowed.
+
+    A server->client request carries both "method" and "id". Classifying on
+    "method" first routed it to the notification listeners and never replied,
+    which hangs any server that waits — ty stops answering entirely until its
+    workspace/configuration request is answered.
+    """
+    launch_info = ProcessLaunchInfo(
+        cmd=get_mock_server_cmd(
+            "--server-request", "workspace/configuration", "--server-request-items", "3"
+        ),
+    )
+
+    async with LSPProcess(launch_info) as process:
+        # The mock blocks inside initialize until we answer its request, so
+        # this call itself only returns if the reply was sent.
+        await asyncio.wait_for(process._send_request("initialize", {}), timeout=10.0)
+
+        reply = await asyncio.wait_for(
+            process._send_request("$/serverRequestReply"), timeout=10.0
+        )
+
+    assert reply is not None, "the mock never captured a reply"
+    assert reply.get("result") == [None, None, None], (
+        f"expected one null per requested item, got {reply!r}"
+    )
+    assert "error" not in reply
+
+
+async def test_unknown_server_request_gets_method_not_found():
+    """Server requests we do not implement get a MethodNotFound error."""
+    launch_info = ProcessLaunchInfo(
+        cmd=get_mock_server_cmd("--server-request", "window/showMessageRequest"),
+    )
+
+    async with LSPProcess(launch_info) as process:
+        await asyncio.wait_for(process._send_request("initialize", {}), timeout=10.0)
+        reply = await asyncio.wait_for(
+            process._send_request("$/serverRequestReply"), timeout=10.0
+        )
+
+    assert reply is not None
+    assert "result" not in reply
+    assert reply["error"]["code"] == types.ErrorCodes.MethodNotFound

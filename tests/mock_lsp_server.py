@@ -20,6 +20,10 @@ Usage:
 
     # Exit without responding (simulates a server dying mid-request)
     python mock_lsp_server.py --exit-on shutdown
+
+    # Send a server->client request during initialize and block until answered,
+    # the way ty blocks on workspace/configuration
+    python mock_lsp_server.py --server-request workspace/configuration
 """
 
 from __future__ import annotations
@@ -42,6 +46,8 @@ class MockLSPServer:
         error_message: str = "Mock error",
         malformed_on: str | None = None,
         exit_on: str | None = None,
+        server_request: str | None = None,
+        server_request_items: int = 2,
     ):
         self.hang_on = hang_on
         self.error_on = error_on
@@ -49,7 +55,10 @@ class MockLSPServer:
         self.error_message = error_message
         self.malformed_on = malformed_on
         self.exit_on = exit_on
+        self.server_request = server_request
+        self.server_request_items = server_request_items
         self._initialized = False
+        self._server_request_reply: dict[str, Any] | None = None
 
     def read_message(self) -> dict[str, Any] | None:
         """Read a JSON-RPC message from stdin with Content-Length header."""
@@ -122,7 +131,18 @@ class MockLSPServer:
 
         # Handle standard LSP methods
         if method == "initialize" and request_id is not None:
+            if self.server_request:
+                self._do_server_request()
             self._handle_initialize(request_id)
+        elif method == "$/serverRequestReply" and request_id is not None:
+            # Test hook: hand back whatever the client answered our request with.
+            self.write_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": self._server_request_reply,
+                }
+            )
         elif method == "initialized":
             self._initialized = True
             # No response for notifications
@@ -133,6 +153,40 @@ class MockLSPServer:
         elif not is_notification and request_id is not None:
             # Default response for unknown requests
             self._handle_default(request_id, method)
+
+    def _do_server_request(self) -> None:
+        """Send a server->client request and block until the client answers.
+
+        This is what ty does with `workspace/configuration`: it sends the
+        request and then answers nothing at all until it gets a reply. A client
+        that misroutes server requests to its notification handlers deadlocks
+        here, which is the point of the mode.
+        """
+        request_id = "mock-server-request-1"
+        params: dict[str, Any] = {}
+        if self.server_request == "workspace/configuration":
+            params = {
+                "items": [
+                    {"section": f"s{i}"} for i in range(self.server_request_items)
+                ]
+            }
+        self.write_message(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": self.server_request,
+                "params": params,
+            }
+        )
+
+        # Block until the client replies, exactly as a real server would.
+        while True:
+            message = self.read_message()
+            if message is None:
+                return
+            if message.get("id") == request_id and "method" not in message:
+                self._server_request_reply = message
+                return
 
     def _handle_initialize(self, request_id: int | str) -> None:
         """Handle the initialize request."""
@@ -206,6 +260,18 @@ def main():
         help="Method to exit on without responding",
     )
     parser.add_argument(
+        "--server-request",
+        type=str,
+        default=None,
+        help="Send this server->client request during initialize and block for a reply",
+    )
+    parser.add_argument(
+        "--server-request-items",
+        type=int,
+        default=2,
+        help="Number of items in a workspace/configuration server request",
+    )
+    parser.add_argument(
         "--ignore-sigterm",
         action="store_true",
         help="Ignore SIGTERM to test forced process cleanup",
@@ -223,6 +289,8 @@ def main():
         error_message=args.error_message,
         malformed_on=args.malformed_on,
         exit_on=args.exit_on,
+        server_request=args.server_request,
+        server_request_items=args.server_request_items,
     )
     server.run()
 
