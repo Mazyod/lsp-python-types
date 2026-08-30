@@ -920,3 +920,21 @@ async def test_unknown_server_request_gets_method_not_found():
     assert reply is not None
     assert "result" not in reply
     assert reply["error"]["code"] == types.ErrorCodes.MethodNotFound
+
+
+async def test_malformed_server_request_params_still_get_a_reply():
+    """A server request with unusable params still gets a response.
+
+    `_answer_server_request` exists to guarantee a reply. An exception leaking
+    out of it would be swallowed by the task-done handler, leaving the server
+    waiting forever -- the exact failure this path was written to fix. Params
+    may legally be by-position (a list), which is not an object.
+    """
+    process = LSPProcess(ProcessLaunchInfo(cmd=["true"]))
+
+    for params in (["by-position"], None, {}, {"items": "not-a-list"}, 42):
+        with pytest.raises(Error) as excinfo:
+            process._server_request_result("workspace/configuration", params)
+        assert excinfo.value.code == types.ErrorCodes.InvalidParams, (
+            f"params={params!r} should yield InvalidParams, not a leaked exception"
+        )

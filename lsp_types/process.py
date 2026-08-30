@@ -464,7 +464,7 @@ class LSPProcess:
         """
         match method:
             case "workspace/configuration":
-                items = (params or {}).get("items")
+                items = params.get("items") if isinstance(params, dict) else None
                 if not isinstance(items, list):
                     raise Error(
                         types.ErrorCodes.InvalidParams,
@@ -496,6 +496,15 @@ class LSPProcess:
             )
         except Error as error:
             response["error"] = error.to_lsp()
+        except Exception:
+            # This function exists to guarantee a reply. A leaked exception
+            # would be swallowed by the task-done handler and leave the server
+            # waiting forever, which is the bug this whole path fixes.
+            logger.exception("Failed to build a reply to server request %s", method)
+            response["error"] = Error(
+                types.ErrorCodes.InternalError,
+                f"Failed to handle server request: {method}",
+            ).to_lsp()
 
         try:
             await self._send_payload(self._writable_stdin(method), response)
