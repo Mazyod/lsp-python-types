@@ -1,46 +1,28 @@
-# Pyrefly backend: known limitations
+# 🪽 Pyrefly: behavior & limitations
 
-Verified with **Pyrefly 1.3.0 on 2026-09-11** using this library's LSP client.
-Release notes are dated September 10; PyPI and GitHub publication occurred
-September 11 UTC. [Release](https://github.com/facebook/pyrefly/releases/tag/1.3.0)
+## Completion resolution adds no details
 
-## Completion resolution is an echo
+`resolve_completion()` returns the submitted item unchanged. Use the type
+details and documentation included in the initial completion response.
 
-`completionItem/resolve` returns the submitted item unchanged, despite
-advertising `completionProvider.resolveProvider: true`. A live probe resolved
-a method completion both normally and with `detail`/`documentation` removed;
-both responses exactly matched their respective inputs.
+## Semantic-token legend uses a built-in fallback
 
-Initial completions already include type details and documentation, so ordinary
-completion remains useful. Calling `resolve_completion()` succeeds but does
-not retrieve additional metadata.
+Pyrefly returns semantic tokens without advertising a legend during
+initialization. `PyreflyBackend` supplies `PYREFLY_LEGEND` automatically.
 
-## Semantic-token legend is not advertised
+Normalization preserves Pyrefly's string modifiers: `byteString`,
+`formatString`, `rawString`, `stringPrefix`, and `templateString`. See the
+[semantic-token guide](../../docs/SEMANTIC_TOKENS.md).
 
-The initialize response omits `semanticTokensProvider` entirely, while
-`textDocument/semanticTokens/full` still returns tokens. The backend therefore
-supplies `PYREFLY_LEGEND` instead of discovering a legend from the server.
+## Configuration keys
 
-Pyrefly 1.3.0 adds five string modifiers: `byteString`, `formatString`,
-`rawString`, `stringPrefix`, and `templateString` (bits 11–15). This maintenance
-updates both the fallback legend and canonical modifiers so normalization
-preserves those bits. Token types are unchanged. See
-[semantic-token documentation](../../docs/SEMANTIC_TOKENS.md).
+Top-level snake_case Python keys become kebab-case TOML keys. Nested keys keep
+their spelling: use upstream error-code names such as `bad-assignment`.
+The typed schema covers common options; `Session.create(options=...)` also
+accepts a plain dictionary with other upstream settings.
 
-## Configuration and API boundaries
+## API scope
 
-The backend writes kebab-case TOML keys from top-level snake_case Python keys.
-Nested error-code keys should use the upstream names (`bad-assignment`, etc.).
-The typed schema covers common options; a plain `Session.create(options=...)`
-dictionary can carry other upstream settings.
-
-Upstream CLI tools, TSP, and editor refactorings extend beyond the high-level
-`Session` API. Their availability upstream does not imply a matching Session
-method. Tensor-shape and DataFrame schema extensions remain experimental.
-
-## Previously resolved
-
-Rename previously failed for session files classified as external. It has
-worked since 1.1.1 and remains covered by the regular rename integration test;
-the former expected failure is gone. Virtual documents work without on-disk
-mirroring.
+Virtual documents and rename work without on-disk mirroring. The high-level
+`Session` API exposes the methods documented by this library; upstream CLI,
+TSP, and editor-only features do not automatically become session methods.

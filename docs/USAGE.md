@@ -1,50 +1,68 @@
-# Usage details
+# 🔌 Low-level API & lifecycle
+
+`Session` handles initialization and document management. Use `LSPProcess` for
+direct access to typed LSP requests and notifications.
 
 ## Low-level stdio
 
-> [!TIP]
-> Recommend using [basedpyright](https://github.com/DetachHead/basedpyright) for extended features.
+This example requires `pyright-langserver` on your `PATH`.
 
 ```python
+import asyncio
+from pathlib import Path
+
 from lsp_types.process import LSPProcess, ProcessLaunchInfo
 
-process_info = ProcessLaunchInfo(cmd=[
-    "pyright-langserver", "--stdio"
-])
 
-async with LSPProcess(process_info) as process:
-    # Initialize the process
-    ...
+async def main():
+    root = Path.cwd()
+    process_info = ProcessLaunchInfo(cmd=["pyright-langserver", "--stdio"])
 
-    # Grab a typed listener
-    diagnostics_listener = process.notify.on_publish_diagnostics(timeout=1.0)
+    async with LSPProcess(process_info) as process:
+        await process.send.initialize({
+            "processId": None,
+            "rootUri": root.as_uri(),
+            "capabilities": {},
+        })
+        await process.notify.initialized({})
 
-    # Send a notification (`await` is optional. It ensures messages have been drained)
-    await process.notify.did_open_text_document(...)
+        # Register before opening the document so the response is captured.
+        listener = process.notify.on_publish_diagnostics(timeout=10.0)
+        await process.notify.did_open_text_document({
+            "textDocument": {
+                "uri": (root / "example.py").as_uri(),
+                "languageId": "python",
+                "version": 1,
+                "text": "value: int = 'hello'\n",
+            }
+        })
+        print(await listener)
 
-    # Wait for diagnostics to come in
-    diagnostics = await diagnostics_listener
+
+asyncio.run(main())
 ```
 
-`LSPProcess.stop()` is terminal — including the implicit stop() when the `async with`
-block exits. Calling `start()` on a stopped process raises `RuntimeError` instead
-of relaunching the server, and requests and notifications sent through it raise
-`RuntimeError` too (notifications are no longer dropped with a warning). The
-messages name the state they came from (`LSP process has been stopped` vs. `LSP
-process has not been started`). Construct a new `LSPProcess` when you need to
-restart a server.
+Requests require `await`. Notifications queue immediately; awaiting one also
+waits for its bytes to drain to the server.
 
+## Process lifecycle
+
+`LSPProcess.stop()` permanently closes the process. Exiting its `async with`
+block calls `stop()` automatically. Starting a stopped process, or sending
+requests or notifications through it, raises `RuntimeError`. Create a new
+`LSPProcess` to restart a server.
 
 ## Session lifecycle
 
-After `shutdown()`, a session's operational methods raise `RuntimeError`; its
-captured server and semantic-token metadata remain readable. Calling
-`shutdown()` while other operations are in flight is safe: it waits up to five
-seconds for them to finish, and if any are still running it stops the language
-server process instead of returning it to the pool, keeping stale operations
-out of the next session's protocol stream. (One narrow exception: cancelling
-an operation ends its in-flight accounting even if a notification write it
-already queued is still being flushed.)
+Always call `await session.shutdown()` in a `finally` block. Shutdown rejects
+new operations immediately and gives active operations up to five seconds to
+finish. If any remain, it stops the server process. Otherwise, it releases the
+process to the pool, or stops it when no reusable pool was supplied.
 
+After shutdown, operational methods raise `RuntimeError`. Captured server
+information and semantic-token legends remain readable.
 
-Internal generated types whose names start with `__` are not public API.
+Await document updates before shutting down. Cancelling an operation can leave
+an already-queued notification flushing after the operation ends.
+
+Generated types whose names start with `__` are internal and outside the public API.

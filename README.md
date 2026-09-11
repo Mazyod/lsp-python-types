@@ -10,31 +10,21 @@ and process pooling for Python language servers. Built on
 [Sublime LSP’s generated types](https://github.com/sublimelsp/lsp-python-types).
 Python 3.12+; one runtime dependency, `tomlkit`.
 
-## Meet your party
+## 🧙 Meet your party
 
-<img src="assets/images/lsp-party.png" width="800" alt="Pixel-art party: Pyright the blue sentinel, Pyrefly the coral artificer, ty the green scout, and Zuban the purple diplomat." />
+<img src="https://raw.githubusercontent.com/Mazyod/lsp-python-types/main/assets/images/lsp-party.png" width="800" alt="Pixel-art party: Pyright the blue sentinel, Pyrefly the coral artificer, ty the green scout, and Zuban the purple diplomat." />
 
-- **[Pyright — the sentinel](docs/research/landscape.md#pyright--the-veteran).**
-  Broad typing support and configurable execution environments. Equip the
-  **basedpyright** fork for extra diagnostics, baselines and semantic highlighting;
-  those extras are not part of Microsoft Pyright.
-- **[Pyrefly — the artificer](docs/research/pyrefly.md).**
-  A growing toolbelt: configurable regex and `mock.patch` checks, framework knowledge,
-  and experimental tensor/DataFrame analysis. Some tools need explicit settings;
-  experimental APIs can change.
-- **[ty — the scout](docs/research/landscape.md#ty--the-swift-scout).**
-  Built for quick incremental feedback, explanatory diagnostics and precise type
-  narrowing. In this adapter, hover favors the type alone and completion resolution
-  is unavailable.
-- **[Zuban — the diplomat](docs/research/landscape.md#zuban--the-bridge-builder).**
-  Bridges Mypy workflows and editor inference for untyped code. Compatibility modes
-  are its specialty; value-constrained generic bodies and unused ignores remain
-  checking blind spots.
+- 🛡️ **[Pyright — the sentinel](https://github.com/Mazyod/lsp-python-types/blob/main/docs/research/landscape.md#pyright--the-sentinel).**
+  Broad typing support and configurable execution environments.
+  Choose **basedpyright** for extra diagnostics, baselines and semantic highlighting.
+- 🔧 **[Pyrefly — the artificer](https://github.com/Mazyod/lsp-python-types/blob/main/docs/research/pyrefly.md).**
+  Framework-aware analysis with opt-in regex and `mock.patch` checks.
+- 🏹 **[ty — the scout](https://github.com/Mazyod/lsp-python-types/blob/main/docs/research/landscape.md#ty--the-scout).**
+  Incremental analysis, explanatory diagnostics and precise type narrowing.
+- 🤝 **[Zuban — the diplomat](https://github.com/Mazyod/lsp-python-types/blob/main/docs/research/landscape.md#zuban--the-diplomat).**
+  Mypy-compatible configuration and editor inference for untyped code.
 
-These are personalities, not speed rankings. The linked field notes separate
-upstream features from what this library actually tests.
-
-## Start a session
+## 🚀 Start a session
 
 ```sh
 pip install "lsp-types[pyrefly]"  # Or [ty] / [zuban]
@@ -70,31 +60,30 @@ Node.js and `npm install -g pyright` (or `basedpyright`) separately.
 Sessions write backend configuration into `base_path`; use a dedicated workspace
 as above. For types alone, `import lsp_types`; no server is needed.
 
-## What works here
+## ✨ Features
 
-Diagnostics, hover, completion, signature help and rename pass across all four
-backends. Semantic tokens work with **basedpyright**, Pyrefly, ty and Zuban;
-Microsoft Pyright does not provide them. Completion resolution enriches results
-with Pyright/basedpyright and Zuban; Pyrefly echoes the item, while ty rejects it.
+All four backends support diagnostics, hover, completion, signature help and rename.
 
-Verified **2026-09-11**: Pyright **1.1.414**, basedpyright **1.40.1**,
-Pyrefly **1.3.0**, ty **0.0.80**, Zuban **0.9.3**.
+| Feature | Pyright | basedpyright | Pyrefly | ty | Zuban |
+|---|---|---|---|---|---|
+| Semantic highlighting | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Completion documentation via resolve | ✅ | ✅ | ❌ | ❌ | ✅ |
 
-[Feature evidence & maintenance runbook](docs/FEATURE_VERIFICATION.md) ·
-[Semantic tokens](docs/SEMANTIC_TOKENS.md) ·
-[Low-level API & lifecycle](docs/USAGE.md) ·
-[Maintenance results](docs/MAINTENANCE_2026-09-11.md)
+Pyrefly returns completion items unchanged on resolve; ty does not support the
+request. ty hover returns the type without the symbol name.
 
-## Development
+📖 [API & lifecycle](https://github.com/Mazyod/lsp-python-types/blob/main/docs/USAGE.md) ·
+🎨 [Semantic tokens](https://github.com/Mazyod/lsp-python-types/blob/main/docs/SEMANTIC_TOKENS.md) ·
+🧭 [Backend guide](https://github.com/Mazyod/lsp-python-types/blob/main/docs/research/landscape.md) ·
+🎮 [Browser playground](https://mazyod.com/lsp-python-types/)
+
+## 🛠️ Development
 
 ```sh
 uv sync --all-extras --locked
 npm install -g basedpyright
-uv run pytest
+uv run pytest tests
 uvx pyright --pythonpath .venv/bin/python
 uvx ruff check .
 make generate-latest-types
 ```
-
-The [runbook](docs/FEATURE_VERIFICATION.md) covers testing Microsoft Pyright
-separately, regenerating schemas and updating the browser playground.

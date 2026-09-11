@@ -36,7 +36,7 @@ Release sources and comparisons: [field guide](research/landscape.md),
   its fallback legend and the canonical legend, preserving existing indices.
   A wire-bit regression check and live server test cover all five. ty now
   advertises `operator` and `regexp` token types; the canonical legend already
-  handles both. Updated the [token reference](SEMANTIC_TOKENS.md).
+  handles both. Updated the [token reference](../SEMANTIC_TOKENS.md).
 - **Configuration:** updated Pyrefly severities, presets, inference, multi-platform
   settings and baselines; ty import-analysis controls, strictness, per-file
   overrides, script exclusion and output formats; Zuban `auto` mode. Refreshed
@@ -54,7 +54,7 @@ Release sources and comparisons: [field guide](research/landscape.md),
   CI now fetches/builds and smoke-tests pinned WASM before producing the site.
 - **Presentation:** replaced the long README with a ~425-word overview and one
   pixel-art party banner. Usage details and the feature matrix moved into docs.
-  [Artwork and generation prompt](../assets/images/README.md) are in the repo.
+  [Artwork and generation prompt](../../assets/images/README.md) are in the repo.
 
 Pyrefly's configured regex/mock-target checks caught two errors that strict
 Pyright did not in the same CLI probe. This is evidence for specific extra
@@ -106,7 +106,7 @@ The existing Monaco dynamic-import bundler warning remains harmless. The
 code generator also emits a formatter deprecation warning even with the extras
 explicitly declared; generated output and validation succeed. Monaco's native
 LSP client still lacks configurable initialization and disposal in the installed
-0.56.0 artifact, so migration remains deferred (see [integration notes](INTEGRATION_NOTES.md)).
+0.56.0 artifact, so migration remains deferred (see [archived integration notes](REFERENCE_HISTORY_2026-09-11.md)).
 
 These checks establish the tested integration behaviors, not full conformance or
 an independent speed leaderboard. CLI, LSP, TSP and browser WASM features remain

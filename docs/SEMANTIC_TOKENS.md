@@ -1,10 +1,69 @@
-# Semantic Tokens Reference
+# 🎨 Semantic tokens
 
-This document provides a reference for semantic token types and modifiers returned by each LSP backend. This is particularly useful when integrating with editors like Monaco that need to map token IDs to theme colors.
+Semantic tokens give editors type-aware syntax highlighting. basedpyright,
+Pyrefly, ty, and Zuban support them; Microsoft Pyright does not.
 
-## Overview
+## Normalized Semantic Tokens API
 
-Semantic tokens provide richer syntax highlighting than traditional TextMate grammars by leveraging the language server's understanding of the code. The LSP protocol encodes tokens as a compact integer array where each token is represented by 5 values.
+Use `normalize=True` with `CANONICAL_LEGEND` to keep editor colors consistent
+when switching backends. Raw indexes differ:
+
+| Token | basedpyright Index | Pyrefly Index | ty Index | Zuban Index |
+|-------|---------------|---------------|----------|-------------|
+| `namespace` | 0 | 0 | 0 | 0 |
+| `class` | 2 | 2 | 1 | 2 |
+| `variable` | 6 | 8 | 5 | 8 |
+| `function` | 9 | 12 | 7 | 12 |
+
+Request normalized tokens and send `CANONICAL_LEGEND` to the editor:
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from lsp_types import CANONICAL_LEGEND, Session
+from lsp_types.ty import TyBackend
+
+with TemporaryDirectory() as workspace:
+    session = await Session.create(
+        TyBackend(), base_path=Path(workspace), initial_code="x = 1"
+    )
+    try:
+        tokens = await session.get_semantic_tokens(normalize=True)
+        legend = CANONICAL_LEGEND
+    finally:
+        await session.shutdown()
+```
+
+Run this code inside an async function. It requires the ty extra
+(`uv add "lsp-types[ty]"`).
+
+Normalization requires a backend legend. If no legend is available, the method
+returns raw tokens unchanged; unsupported servers still reject the request.
+
+### Available Properties
+
+```python
+session.canonical_legend   # The canonical legend (fixed, same for all backends)
+session.backend_legend     # The original legend from the server/backend
+```
+
+### Canonical Legend Order
+
+The canonical legend follows LSP standard ordering, with backend-specific tokens appended:
+
+**Token Types (index 0-26):**
+
+- 0-22: LSP standard types (namespace, type, class, enum, interface, struct, typeParameter, parameter, variable, property, enumMember, event, function, method, macro, keyword, modifier, comment, string, number, regexp, operator, decorator)
+- 23: label (LSP standard)
+- 24-26: Backend-specific (selfParameter, clsParameter, builtinConstant)
+
+**Token Modifiers (bit 0-18):**
+
+- 0-9: LSP standard modifiers (declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation, defaultLibrary)
+- 10-12: Backend-specific from basedpyright (builtin, classMember, parameter)
+- 13: Backend-specific from Pyrefly (selfParameter)
+- 14-18: Pyrefly string modifiers (byteString, formatString, rawString, stringPrefix, templateString)
 
 ## Token Encoding Format
 
@@ -12,9 +71,9 @@ Each token in the `data` array consists of 5 consecutive integers:
 
 | Position | Field | Description |
 |----------|-------|-------------|
-| 0 | `deltaLine` | Line offset from previous token (or 0 for first token) |
+| 0 | `deltaLine` | Line offset from previous token (from line 0 for the first token) |
 | 1 | `deltaStart` | Column offset from previous token on same line (or from 0 if new line) |
-| 2 | `length` | Token length in characters |
+| 2 | `length` | Token length in the negotiated position encoding |
 | 3 | `tokenType` | Index into the legend's `tokenTypes` array |
 | 4 | `tokenModifiers` | Bitmask of modifiers from the legend's `tokenModifiers` array |
 
@@ -29,33 +88,21 @@ def has_modifier(token_modifiers: int, modifier_index: int) -> bool:
 
 For example, if `tokenModifiers = 5` (binary `101`), modifiers at index 0 and 2 are active.
 
-## How to Get the Legend
+## Backend legend
 
-The legend is provided by the server during initialization in `InitializeResult.capabilities.semanticTokensProvider.legend`. You can extract it using:
-
-```python
-from lsp_types.process import LSPProcess
-
-async with LSPProcess(process_info) as process:
-    init_result = await process.send.initialize({...})
-    legend = init_result["capabilities"]["semanticTokensProvider"]["legend"]
-    token_types = legend["tokenTypes"]      # List of type names
-    token_modifiers = legend["tokenModifiers"]  # List of modifier names
-```
-
-See `examples/extract_semantic_legends.py` for a complete working example.
-
----
+`session.backend_legend` contains the server's legend or the backend's fallback.
+For low-level clients, read
+`InitializeResult.capabilities.semanticTokensProvider.legend` when present.
+Pyrefly omits this capability; use `PYREFLY_LEGEND` from
+`lsp_types.semantic_tokens` for its raw tokens.
 
 ## Token Legends by Backend
 
-Microsoft Pyright 1.1.414 does **not** provide semantic tokens. The Pyright-family
-legend below belongs to the separate basedpyright fork, which uses the same backend.
-These are LSP legends, independent of the playground’s WASM APIs.
+The tables below describe each server’s raw LSP indexes. Read
+`session.backend_legend` for the running server’s ordering. These legends apply
+to LSP sessions; browser WASM APIs have their own feature sets.
 
-### basedpyright (through PyrightBackend)
-
-> Last verified: basedpyright 1.40.1 (2026-09-11)
+### basedpyright 1.40.1 (through PyrightBackend)
 
 #### Token Types
 
@@ -93,10 +140,9 @@ These are LSP legends, independent of the playground’s WASM APIs.
 
 ---
 
-### Pyrefly
+### Pyrefly 1.3.0
 
-> Last verified: Pyrefly 1.3.0 (2026-09-11)
-> Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/1.3.0/pyrefly/lib/state/semantic_tokens.rs)
+Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/1.3.0/pyrefly/lib/state/semantic_tokens.rs)
 
 Pyrefly does not advertise its legend via LSP initialization, but the token mappings are defined in source code.
 
@@ -151,9 +197,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ---
 
-### ty
-
-> Last verified: ty 0.0.80 (2026-09-11)
+### ty 0.0.80
 
 #### Token Types
 
@@ -188,9 +232,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ---
 
-### Zuban
-
-> Last verified: Zuban 0.9.3 (2026-09-11)
+### Zuban 0.9.3
 
 Zuban advertises its legend via LSP initialization (follows LSP 3.17 standard ordering for the 23 token types it emits).
 
@@ -239,20 +281,18 @@ Zuban advertises its legend via LSP initialization (follows LSP 3.17 standard or
 
 ## Monaco Editor Integration
 
-When integrating with Monaco, register a `DocumentSemanticTokensProvider` that:
-
-1. Requests tokens via `session.get_semantic_tokens()`
-2. Returns the token data along with the legend
+Register a `DocumentSemanticTokensProvider` with the legend paired to your
+Python response. In this example, `canonicalLegend` is the JSON representation
+of `CANONICAL_LEGEND`, and `requestSemanticTokens` calls
+`session.get_semantic_tokens(normalize=True)` through your application’s transport.
 
 ```typescript
 // TypeScript example for Monaco
 monaco.languages.registerDocumentSemanticTokensProvider('python', {
-    getLegend: () => ({
-        tokenTypes: ['namespace', 'type', 'class', ...],  // From backend legend
-        tokenModifiers: ['declaration', 'definition', ...]
-    }),
+    getLegend: () => canonicalLegend,
     provideDocumentSemanticTokens: async (model) => {
         const tokens = await requestSemanticTokens(model.uri);
+        if (!tokens) return null;
         return {
             data: new Uint32Array(tokens.data),
             resultId: tokens.resultId
@@ -262,77 +302,5 @@ monaco.languages.registerDocumentSemanticTokensProvider('python', {
 });
 ```
 
-The token types and modifiers must be registered in the **exact same order** as the backend's legend for the indices to map correctly.
-
----
-
-## Normalized Semantic Tokens API
-
-The library provides a **normalized tokens API** that remaps token indices to a canonical legend. This allows Monaco/editors to use a single fixed legend regardless of which backend is active.
-
-### The Problem
-
-Each backend has different legend ordering:
-
-| Token | Pyright Index | Pyrefly Index | ty Index | Zuban Index |
-|-------|---------------|---------------|----------|-------------|
-| `namespace` | 0 | 0 | 0 | 0 |
-| `class` | 2 | 2 | 1 | 2 |
-| `variable` | 6 | 8 | 5 | 8 |
-| `function` | 9 | 12 | 7 | 12 |
-
-A Monaco client configured with one legend breaks when switching backends.
-
-### The Solution
-
-Use the `normalize=True` parameter to get tokens with indices remapped to the canonical legend:
-
-```python
-from lsp_types import Session, CANONICAL_LEGEND
-from lsp_types.pyright.backend import PyrightBackend
-
-session = await Session.create(PyrightBackend(), initial_code="x = 1")
-
-# Original tokens (backend-specific indices)
-raw = await session.get_semantic_tokens()
-
-# Normalized tokens (canonical indices matching CANONICAL_LEGEND)
-normalized = await session.get_semantic_tokens(normalize=True)
-
-# Monaco uses one fixed legend for all backends
-monaco_legend = CANONICAL_LEGEND
-```
-
-### Available Properties
-
-```python
-session.canonical_legend   # The canonical legend (fixed, same for all backends)
-session.backend_legend     # The original legend from the server/backend
-```
-
-### Canonical Legend Order
-
-The canonical legend follows LSP standard ordering, with backend-specific tokens appended:
-
-**Token Types (index 0-26):**
-- 0-22: LSP standard types (namespace, type, class, enum, interface, struct, typeParameter, parameter, variable, property, enumMember, event, function, method, macro, keyword, modifier, comment, string, number, regexp, operator, decorator)
-- 23: label (LSP standard)
-- 24-26: Backend-specific (selfParameter, clsParameter, builtinConstant)
-
-**Token Modifiers (bit 0-18):**
-- 0-9: LSP standard modifiers (declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation, defaultLibrary)
-- 10-12: Backend-specific from Pyright (builtin, classMember, parameter)
-- 13: Backend-specific from Pyrefly (selfParameter)
-- 14-18: Pyrefly 1.3 string modifiers (byteString, formatString, rawString, stringPrefix, templateString); appended so existing indices stay stable
-
----
-
-## Updating This Document
-
-Run the extraction script to get the latest legends:
-
-```bash
-uv run python examples/extract_semantic_legends.py
-```
-
-Update the tables above with the script output when backend versions change.
+Match the legend to the data: use `CANONICAL_LEGEND` for normalized tokens and
+`session.backend_legend` for raw tokens. Preserve the legend’s exact ordering.
