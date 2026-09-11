@@ -42,3 +42,21 @@ public guides carry the conclusions and user actions.
   normalized ty example returned token data and shut down successfully.
 
 No library behavior, dependency versions or playground code changed.
+
+## Publication — 2026-09-11
+
+[PR #52](https://github.com/Mazyod/lsp-python-types/pull/52) merged after lint,
+type checking and all six Python 3.12/3.13/3.14 × Pyright/basedpyright CI jobs
+passed. The same checks passed on the merged commit.
+
+The existing [publication workflow](https://github.com/Mazyod/lsp-python-types/actions/runs/34593333505)
+released [0.24.1](https://pypi.org/project/lsp-types/0.24.1/), with a wheel, source
+distribution and [GitHub release](https://github.com/Mazyod/lsp-python-types/releases/tag/v0.24.1).
+PyPI's published description matches the revised README exactly; the public
+banner URL serves a valid PNG.
+
+The [playground deployment](https://github.com/Mazyod/lsp-python-types/actions/runs/34593335649)
+passed its pinned WASM checks and production build, then deployed successfully
+to [GitHub Pages](https://mazyod.com/lsp-python-types/). The live site returned
+HTTP 200 with the configured asset base path. Playground code was unchanged;
+this documentation release did not rerun the separate interactive browser suite.
