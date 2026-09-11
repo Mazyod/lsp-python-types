@@ -1,5 +1,18 @@
 # Maintenance — September 11, 2026
 
+## Release close-out
+
+[PR #49](https://github.com/Mazyod/lsp-python-types/pull/49) merged into `main` after
+lint and all six Python 3.12/3.13/3.14 × Pyright/basedpyright jobs passed.
+[CI run](https://github.com/Mazyod/lsp-python-types/actions/runs/34591505276).
+
+Published **0.24.0** to [PyPI](https://pypi.org/project/lsp-types/0.24.0/) using the
+existing release workflow, with wheel/sdist and attestations on the
+[GitHub release](https://github.com/Mazyod/lsp-python-types/releases/tag/v0.24.0).
+A fresh isolated installation from PyPI passed the semantic-modifier smoke check.
+The merge also triggered the [playground deployment](https://github.com/Mazyod/lsp-python-types/actions/runs/34591652483)
+for [the live site](https://mazyod.com/lsp-python-types/).
+
 ## Release snapshot
 
 Checked live registries and tagged releases, rather than cached search results.
@@ -59,7 +72,8 @@ in separate temporary prefixes, with the intended binary first in `PATH`.
 - Microsoft Pyright separately: **35 passed** (`PYRIGHT_PACKAGE=pyright`, `-k Pyright`).
 - `uvx pyright --pythonpath .venv/bin/python .`: **0 errors, warnings or information**.
 - Ruff lint and formatting checks: **passed**; `git diff --check`: **passed**.
-- `uv build`: wheel and sdist built successfully; no package version bump or publication.
+- `uv build`: wheel and sdist built successfully during local validation;
+  the subsequent release workflow published 0.24.0 as recorded above.
 - Schema generation: all five generated files reproduced **byte-for-byte**.
   `make` was unavailable, so the Makefile's recipes were run directly.
 - Backend probes confirmed completion-documentation enrichment with Pyright,
@@ -81,9 +95,9 @@ the optional browser regression script without a new project dependency.
 
 ## Limits and follow-up
 
-Local Python testing used 3.12; the revised CI covers 3.12, 3.13 and 3.14, but a
-remote CI run was not triggered. The artwork and browser assets were inspected
-locally; no deployment was performed. basedpyright's browser worker still loads
+Local Python testing used 3.12; the subsequent PR CI passed on 3.12, 3.13 and
+3.14 with both Pyright distributions. The artwork and browser assets were inspected
+locally before release. basedpyright's browser worker still loads
 from pinned jsDelivr URLs. ty WASM requires Rust and a native compiler; this run
 built it in an isolated Node 24 container. Its optimized WASM is about 18 MB,
 and Pyrefly's about 14 MB; generated modules stay ignored and CI rebuilds them.
