@@ -4,9 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Maintenance
 
-Follow `docs/FEATURE_VERIFICATION.md` for release updates, including separate
-Microsoft Pyright/basedpyright checks and browser WASM verification. Keep the README
-concise; dated evidence and detailed comparisons belong in `docs/`.
+Follow `docs/internal/FEATURE_VERIFICATION.md` for release updates, including
+separate Microsoft Pyright/basedpyright checks and browser WASM verification.
+
+## Documentation voice and audience
+
+- Keep the README and every guide it links concise, direct and confident. State
+  what each backend does and give actionable instructions and concrete limits.
+- Preserve the character banner, backend personalities and tasteful emojis.
+- Keep run dates, tested-version inventories, commands/results, investigation
+  history and editorial feedback in `docs/internal/`. Public docs must not link
+  to those records or narrate internal verification and decision-making.
+- Confidence must follow evidence: keep real limitations and experimental labels;
+  remove hedging, repetitive caveats and unsupported rankings.
+- Write public guides for users, internal records for maintainers. Apply this
+  distinction to the full README link path, not just the README itself.
+
+The durable feedback record is `docs/internal/DOCUMENTATION.md`.
 
 ## Essential Commands
 

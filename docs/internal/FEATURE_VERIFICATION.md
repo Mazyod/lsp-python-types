@@ -1,7 +1,8 @@
 # Feature verification and maintenance runbook
 
 Run this after backend releases, dependency updates or changes to `Session`.
-Keep the README to a short overview; put the evidence and qualifications here.
+Follow [the documentation policy](DOCUMENTATION.md). Keep evidence here and in
+dated internal records; publish concise capabilities and practical limits in user guides.
 
 ## 1. Update and record versions
 
@@ -94,7 +95,7 @@ PATH=/tmp/lsp-basedpyright/node_modules/.bin:$PATH \
 rg -n 'xfail|skip' tests
 ```
 
-Compare legends with [the token reference](SEMANTIC_TOKENS.md) and tagged source.
+Compare legends with [the token reference](../SEMANTIC_TOKENS.md) and tagged source.
 Pyrefly 1.3 still omits its provider from initialization; it needs the fallback
 legend. `tests/test_semantic_tokens.py` checks that its five new string modifiers
 survive normalization, including a live server fixture. Append canonical entries
@@ -102,9 +103,9 @@ so existing editor indices stay stable. ty 0.0.80 appends `operator` and `regexp
 token types, already covered by the canonical legend.
 
 Reprobe versioned limitations with positive controls before advancing their dates:
-[Pyrefly](../lsp_types/pyrefly/KNOWN_LIMITATIONS.md),
-[ty](../lsp_types/ty/KNOWN_LIMITATIONS.md),
-[Zuban](../lsp_types/zuban/KNOWN_LIMITATIONS.md).
+[Pyrefly](../../lsp_types/pyrefly/KNOWN_LIMITATIONS.md),
+[ty](../../lsp_types/ty/KNOWN_LIMITATIONS.md),
+[Zuban](../../lsp_types/zuban/KNOWN_LIMITATIONS.md).
 Check manual config schemas against tagged source/docs, including severity values,
 nested sections and renamed/deprecated settings. Keep historical evidence labeled.
 
@@ -149,11 +150,27 @@ PLAYWRIGHT_MODULE=/tmp/lsp-browser-check/node_modules/playwright/index.mjs \
   node concurrency.test.mjs
 ```
 
-## 5. Publish the evidence in the docs
+## 5. Update public guidance and internal evidence
 
-Update the README versions and short profiles, this feature snapshot, semantic
-legends and limitation dates. Save a dated maintenance report with commands,
-results, unresolved issues and environment details. Keep broader capabilities,
-release sources and benchmark caveats in the [field guide](research/landscape.md)
-and [Pyrefly notes](research/pyrefly.md). Do not turn upstream marketing benchmarks
-or test-suite elapsed time into a speed leaderboard.
+Update the public feature descriptions, semantic legends and actionable
+limitations when behavior changes. Use direct statements, preserve the character
+banner and use emojis sparingly. Keep compatibility versions that affect usage;
+keep verification dates and tested-version inventories here.
+
+Save commands, results, release sources, unresolved issues and environment details
+in a dated maintenance record under `docs/internal/`. Keep detailed research in
+`docs/internal/research/`. Public pages must not link to these records or this
+runbook. Do not turn upstream benchmarks or test elapsed time into a speed ranking.
+
+Before publishing, follow the README links and read each destination as a user.
+Remove investigation narrative, indecisive language and repeated qualifications;
+retain real limitations, experimental status and useful upstream references.
+Check local links and anchors after moving documents. Use absolute GitHub links
+and a raw image URL in the README so the PyPI description renders correctly.
+
+For documentation releases, run the required tests, type check and lint; merge
+only after CI passes. Use the existing `publish.yml` workflow with a patch bump
+when the PyPI README needs updating. Deploy the playground through its existing
+workflow when requested or when its assets change; no dependency or schema refresh
+is needed for prose-only changes. Record publication and deployment results in the
+internal ledger, never in the README.
