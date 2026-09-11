@@ -43,7 +43,6 @@ type TyPositionClass = TyPosition;
 
 interface TyWasmModule {
   default(): Promise<void>;
-  initLogging(level: number): void;
   Workspace: new (
     root: string,
     encoding: number,
@@ -51,7 +50,6 @@ interface TyWasmModule {
   ) => TyWorkspace;
   Position: new (line: number, column: number) => TyPositionClass;
   PositionEncoding: { Utf16: number };
-  LogLevel: { Info: number };
 }
 
 let MarkerSeverity: typeof import("monaco-editor").MarkerSeverity;
@@ -73,7 +71,7 @@ export class TyBackend implements BackendAdapter {
     this.workspace = new this.tyModule.Workspace(
       "/",
       this.tyModule.PositionEncoding.Utf16,
-      {},
+      { environment: { "python-version": "3.12" } },
     );
     this.fileHandle = this.workspace.openFile(FILENAME, "");
   }
@@ -87,8 +85,7 @@ export class TyBackend implements BackendAdapter {
     return diagnostics.map((d) => {
       const range = d.toRange(this.workspace!);
       return {
-        // ty uses 0-based positions; Monaco uses 1-based — but ty's playground
-        // shows range.start.line is already 1-based from toRange()
+        // ty's WASM Position is 1-based, like Monaco (unlike LSP positions).
         startLineNumber: range?.start.line ?? 1,
         startColumn: range?.start.column ?? 1,
         endLineNumber: range?.end.line ?? 1,
@@ -153,16 +150,14 @@ function mapTySeverity(severity: number): monaco.MarkerSeverity {
 
 async function loadTyWasm(): Promise<TyWasmModule> {
   try {
-    const baseUrl = new URL(/* @vite-ignore */ "../../wasm/ty/", import.meta.url).href;
-    const jsUrl = `${baseUrl}ty_wasm.js`;
+    // Absolute URLs keep Vite's dev server from transforming public WASM glue.
+    const jsUrl = new URL(
+      `${import.meta.env.BASE_URL}ty/ty_wasm.js`,
+      window.location.origin,
+    ).href;
 
     const mod = (await import(/* @vite-ignore */ jsUrl)) as TyWasmModule;
     await mod.default();
-    try {
-      mod.initLogging(mod.LogLevel.Info);
-    } catch {
-      // initLogging may fail if already initialized
-    }
     return mod;
   } catch (e) {
     throw new Error(

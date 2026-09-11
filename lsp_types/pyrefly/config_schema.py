@@ -1,6 +1,7 @@
 # Pyrefly configuration schema
 # Based on official Pyrefly documentation: https://pyrefly.org/en/docs/configuration/
 # CLI reference: https://github.com/facebook/pyrefly
+# Reviewed against Pyrefly 1.3.0 (2026-09-11).
 #
 # Note: Field names use snake_case (Python convention) but are automatically
 # converted to kebab-case when written to pyrefly.toml (official format).
@@ -19,22 +20,21 @@ UntypedDefBehavior = Literal[
     "skip-and-infer-return-any",
 ]
 
-# Error severity configuration (error-code -> enabled/disabled)
-ErrorConfig = dict[str, bool]
+ErrorSeverity = Literal["error", "warn", "info", "ignore"]
+# Boolean values remain accepted by Pyrefly for compatibility.
+ErrorConfig = dict[str, bool | ErrorSeverity]
 
 
 class Model(TypedDict):
     """
     Pyrefly Configuration Schema
 
-    Comprehensive type definitions for all Pyrefly configuration options.
-    Field names use snake_case following Python conventions. Pyrefly accepts
-    both snake_case and kebab-case in TOML configuration files.
+    Common Pyrefly configuration options and backend launch settings.
+    Field names use snake_case; the backend writes kebab-case TOML keys.
 
     All fields are NotRequired for maximum flexibility. For arbitrary fields
     not yet in this schema:
-    - Use cast(dict, config) to add extra keys
-    - Or pass plain dict to write_config (accepts Mapping[str, Any])
+    pass a plain dictionary to Session.create(options=...).
 
     Official Documentation: https://pyrefly.org/en/docs/configuration/
     """
@@ -94,8 +94,8 @@ class Model(TypedDict):
     python_version: NotRequired[str]
     """Python version for sys.version checks, e.g. "3.13.0" (USER REQUESTED)"""
 
-    python_platform: NotRequired[str]
-    """Platform for sys.platform checks, e.g. "linux", "darwin", "win32" """
+    python_platform: NotRequired[str | list[str]]
+    """One platform, multiple platforms, or "all" for sys.platform checks."""
 
     conda_environment: NotRequired[str]
     """Conda environment name for querying Python configuration"""
@@ -116,8 +116,23 @@ class Model(TypedDict):
     typeshed_path: NotRequired[str]
     """Override bundled typeshed with custom path"""
 
+    preset: NotRequired[Literal["off", "basic", "legacy", "default", "strict", "all"]]
+    """Select the starting set of diagnostics and checking behavior."""
+
     untyped_def_behavior: NotRequired[UntypedDefBehavior]
-    """How to handle untyped function definitions (default: check-and-infer-return-type)"""
+    """Deprecated upstream; use check_unannotated_defs and infer_return_types."""
+
+    check_unannotated_defs: NotRequired[bool]
+    """Check unannotated function bodies (default: true with the default preset)."""
+
+    infer_return_types: NotRequired[Literal["never", "annotated", "checked"]]
+    """Infer returns for no functions, annotated functions, or all checked functions."""
+
+    treat_all_caps_as_final: NotRequired[bool]
+    """Reject reassignment of ALL_CAPS names (opt-in)."""
+
+    required_version: NotRequired[str]
+    """PEP 440 constraint on the Pyrefly version, e.g. ">=1.3,<1.4"."""
 
     infer_with_first_use: NotRequired[bool]
     """Infer container types from first usage patterns (default: true)"""
@@ -138,6 +153,9 @@ class Model(TypedDict):
     replace_imports_with_any: NotRequired[list[str]]
     """Module globs to unconditionally replace with typing.Any"""
 
+    replace_untyped_imports_with_any: NotRequired[list[str]]
+    """Replace matching installed packages lacking stubs or py.typed with Any."""
+
     ignore_missing_imports: NotRequired[list[str]]
     """Module globs to replace with typing.Any when not found"""
 
@@ -149,4 +167,16 @@ class Model(TypedDict):
     # ========================================================================
 
     errors: NotRequired[ErrorConfig]
-    """Error severity configuration: {"error-code": bool, ...}"""
+    """Error code to severity (or legacy enabled/disabled boolean)."""
+
+    baseline: NotRequired[str]
+    """Path to a baseline file of existing diagnostics."""
+
+    baseline_error_level: NotRequired[ErrorSeverity]
+    """Severity for diagnostics matching the baseline (default: ignore)."""
+
+    baseline_matching_mode: NotRequired[Literal["column", "concise-description"]]
+    """Match baseline entries by source column or concise diagnostic description."""
+
+    baseline_format: NotRequired[Literal["full", "minimal"]]
+    """Amount of metadata written to baseline entries."""

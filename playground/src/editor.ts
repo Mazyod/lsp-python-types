@@ -49,6 +49,7 @@ export function createEditor(): monaco.editor.IStandaloneCodeEditor {
 
   // Listen for content changes (debounced 500ms) — registered once
   editor.onDidChangeModelContent(() => {
+    currentVersion++;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => runDiagnostics(), 500);
   });
@@ -56,7 +57,9 @@ export function createEditor(): monaco.editor.IStandaloneCodeEditor {
   return editor;
 }
 
-export function setAdapter(adapter: BackendAdapter): void {
+export function setAdapter(adapter: BackendAdapter | null): void {
+  currentVersion++;
+  if (debounceTimer) clearTimeout(debounceTimer);
   // Clear old markers and hover provider
   if (currentAdapter) {
     monaco.editor.setModelMarkers(
@@ -71,17 +74,17 @@ export function setAdapter(adapter: BackendAdapter): void {
   }
 
   currentAdapter = adapter;
-  currentVersion = 0;
+  if (!adapter) return;
 
   // Register hover provider
   hoverDisposable = monaco.languages.registerHoverProvider("python", {
     provideHover: async (_model, position) => {
-      if (!currentAdapter) return null;
-      const info = await currentAdapter.getHover(
+      const version = currentVersion;
+      const info = await adapter.getHover(
         position.lineNumber,
         position.column,
       );
-      if (!info) return null;
+      if (!info || adapter !== currentAdapter || version !== currentVersion) return null;
       return {
         range: info.range,
         contents: [{ value: info.contents }],
@@ -94,17 +97,18 @@ export function setAdapter(adapter: BackendAdapter): void {
 }
 
 async function runDiagnostics(): Promise<void> {
-  if (!currentAdapter) return;
+  const adapter = currentAdapter;
+  if (!adapter) return;
 
   const version = ++currentVersion;
   const code = editor.getValue();
 
-  const diagnostics = await currentAdapter.updateCode(code);
+  const diagnostics = await adapter.updateCode(code);
 
   // Stale check — a newer version was triggered
-  if (version !== currentVersion) return;
+  if (version !== currentVersion || adapter !== currentAdapter) return;
 
-  setMarkers(currentAdapter.name, diagnostics);
+  setMarkers(adapter.name, diagnostics);
 }
 
 function setMarkers(owner: string, diagnostics: DiagnosticInfo[]): void {

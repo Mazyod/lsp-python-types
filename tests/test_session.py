@@ -9,7 +9,7 @@ import pytest
 import lsp_types
 from lsp_types import session as session_module
 from lsp_types.pool import LSPProcessPool
-from lsp_types.process import LSPProcess, ProcessLaunchInfo
+from lsp_types.process import Error, LSPProcess, ProcessLaunchInfo
 from lsp_types.pyrefly.backend import PyreflyBackend
 from lsp_types.pyrefly.config_schema import Model as PyreflyConfig
 from lsp_types.pyright.backend import PyrightBackend
@@ -370,7 +370,7 @@ async def test_session_completion(lsp_backend, backend_name, tmp_path: Path):
     code = """\
 class MyClass:
     def my_method(self) -> None:
-        pass
+        'Method documentation.'
 
 obj = MyClass()
 obj.
@@ -399,11 +399,21 @@ obj.
         resolved = await session.resolve_completion(method_completion)
         assert resolved is not None
         assert resolved.get("label") == "my_method"
+        if backend_name == "pyrefly":
+            assert resolved == method_completion
+        else:
+            assert "Method documentation." in str(resolved.get("documentation"))
+            assert resolved.get("documentation") != method_completion.get(
+                "documentation"
+            )
+    else:
+        with pytest.raises(Error, match="-32601"):
+            await session.resolve_completion(method_items[0])
 
     await session.shutdown()
 
 
-async def test_session_semantic_tokens(lsp_backend, tmp_path: Path):
+async def test_session_semantic_tokens(lsp_backend, microsoft_pyright, tmp_path: Path):
     """Test semantic token retrieval"""
     code = """\
 def greet(name: str) -> str:
@@ -416,6 +426,13 @@ result = greet("world")
     )
 
     # Get semantic tokens
+    if microsoft_pyright:
+        try:
+            with pytest.raises(Error, match="-32601"):
+                await session.get_semantic_tokens()
+        finally:
+            await session.shutdown()
+        return
     tokens = await session.get_semantic_tokens()
     assert tokens is not None
     token_data = tokens.get("data", [])
@@ -426,7 +443,9 @@ result = greet("world")
     await session.shutdown()
 
 
-async def test_session_semantic_tokens_normalized(lsp_backend, tmp_path: Path):
+async def test_session_semantic_tokens_normalized(
+    lsp_backend, microsoft_pyright, tmp_path: Path
+):
     """Test normalized semantic token retrieval with canonical legend"""
     code = """\
 def greet(name: str) -> str:
@@ -446,6 +465,14 @@ result = greet("world")
 
     # Check that backend_legend is captured (Pyrefly uses hardcoded, others use server)
     backend_legend = session.backend_legend
+    if microsoft_pyright:
+        try:
+            assert backend_legend is None
+            with pytest.raises(Error, match="-32601"):
+                await session.get_semantic_tokens(normalize=True)
+        finally:
+            await session.shutdown()
+        return
     assert backend_legend is not None
 
     # Get raw tokens
@@ -498,13 +525,21 @@ async def test_session_semantic_tokens_canonical_legend_consistency(
     await session.shutdown()
 
 
-async def test_session_server_info(lsp_backend, backend_name, tmp_path: Path):
+async def test_session_server_info(
+    lsp_backend, backend_name, microsoft_pyright, tmp_path: Path
+):
     """Test that serverInfo from the initialize response is exposed on the session"""
     session = await lsp_types.Session.create(
         lsp_backend, base_path=tmp_path, initial_code="x = 1"
     )
 
     server_info = session.server_info
+    if microsoft_pyright:
+        try:
+            assert server_info is None  # Optional in LSP; Microsoft omits it.
+        finally:
+            await session.shutdown()
+        return
     assert server_info is not None, (
         f"{backend_name} should report serverInfo in initialize response"
     )
@@ -518,7 +553,7 @@ async def test_session_server_info(lsp_backend, backend_name, tmp_path: Path):
     await session.shutdown()
 
 
-async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
+async def test_session_recycling_basic(lsp_backend, microsoft_pyright, tmp_path: Path):
     """Test basic session recycling functionality"""
     pool = LSPProcessPool(max_size=2)
 
@@ -532,8 +567,12 @@ async def test_session_recycling_basic(lsp_backend, tmp_path: Path):
         )
         first_server_info = session1.server_info
         first_backend_legend = session1.backend_legend
-        assert first_server_info is not None
-        assert first_backend_legend is not None
+        if microsoft_pyright:
+            assert first_server_info is None
+            assert first_backend_legend is None
+        else:
+            assert first_server_info is not None
+            assert first_backend_legend is not None
 
         # Verify it works
         hover_info = await session1.get_hover_info(

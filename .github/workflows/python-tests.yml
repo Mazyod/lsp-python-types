@@ -17,6 +17,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13", "3.14"]
+        pyright-package: ["basedpyright", "pyright"]
+    env:
+      PYRIGHT_PACKAGE: ${{ matrix.pyright-package }}
+      UV_PYTHON: ${{ matrix.python-version }}
 
     steps:
     - uses: actions/checkout@v7
@@ -27,12 +31,12 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
     - name: Install dependencies
-      run: uv sync --all-extras
+      run: uv sync --all-extras --locked
     - name: Setup Node.js environment
       uses: actions/setup-node@v7.0.0
 
-    - name: Install basedpyright globally
-      run: npm install -g basedpyright
+    - name: Install Pyright distribution
+      run: npm install -g "$PYRIGHT_PACKAGE"
       env:
         NPM_CONFIG_PREFIX: ~/.npm-global
 

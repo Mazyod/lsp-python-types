@@ -136,10 +136,18 @@ new monaco.lsp.MonacoLspClient(transport);
 - Per-backend implementations (~200 lines each)
 - Dependencies: `vscode-languageserver-protocol`, `vscode-jsonrpc`
 
+**Current artifact check (2026-09-11):** installed `monaco-editor` is still
+0.56.0. The public declaration still exposes only `constructor(transport)` and
+no `dispose()`; the shipped LSP client hardcodes `rootUri: null`, omits
+`initializationOptions`, and discards the feature disposable store. The two
+migration blockers below remain. The playground's existing adapters were built
+and smoke-tested in Chromium; the other issue statuses below are historical,
+not freshly verified.
+
 **Blockers / caveats (re-verified against v0.56.0 — 2026-08-30):**
 
-Verification was documentary only: there is no npm on the machine, so nothing was
-installed or executed. Evidence came from the published npm artifacts (`monaco.d.ts`
+The August 30 verification was documentary only: npm was unavailable on that
+machine, so nothing was installed or executed in that earlier run. Evidence came from the published npm artifacts (`monaco.d.ts`
 and the shipped `esm/external/monaco-lsp-client/out/index.js` for 0.55.1 and 0.56.0,
 fetched via CDN), the `monaco-lsp-client/` source at `main`, and the issue trackers.
 The decisive check: diffing the shipped LSP bundle 0.55.1 -> 0.56.0 yields 50 lines —

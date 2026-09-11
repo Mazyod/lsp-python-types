@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 
-# Zuban's two operating modes. `default` is PyRight-like and recommended.
-ZubanMode = Literal["default", "mypy"]
+# `auto` selects native or Mypy-compatible behavior from project configuration.
+ZubanMode = Literal["default", "mypy", "auto"]
 
 # Controls how Zuban infers untyped function return types.
 # - `any`: behave like Mypy (return type is `Any`).
@@ -36,7 +36,7 @@ class Model(TypedDict, total=False):
     """
 
     mode: NotRequired[ZubanMode]
-    """Selects `default` (PyRight-like, recommended) or `mypy` (Mypy-compatible)."""
+    """Selects native `default`, Mypy-compatible `mypy`, or config-based `auto`."""
 
     mypy_path: NotRequired[list[str]]
     """Additional import search paths (equivalent to Mypy's `mypy_path` / `MYPYPATH`)."""

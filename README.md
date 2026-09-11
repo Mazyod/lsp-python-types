@@ -5,192 +5,96 @@
 [![Tests](https://github.com/Mazyod/lsp-python-types/actions/workflows/python-tests.yml/badge.svg)](https://github.com/Mazyod/lsp-python-types/actions/workflows/python-tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-_Publish the excellent work of [Sublime LSP](https://github.com/sublimelsp/lsp-python-types) as a PyPI package._
+Typed Python interfaces for the Language Server Protocol, with async sessions
+and process pooling for Python language servers. Built on
+[Sublime LSP’s generated types](https://github.com/sublimelsp/lsp-python-types).
+Python 3.12+; one runtime dependency, `tomlkit`.
 
-<img width="1423" height="551" alt="lsp-types-splash" src="https://github.com/user-attachments/assets/9d70eb52-cbd7-4d51-8c69-6dba19359880" />
+## Meet your party
 
+<img src="assets/images/lsp-party.png" width="800" alt="Pixel-art party: Pyright the blue sentinel, Pyrefly the coral artificer, ty the green scout, and Zuban the purple diplomat." />
 
-__LSP Types__ is a Python package that aims to provide a fully typed interface to Language Server Protocol (LSP) interactions. It can be used to simply utilize the types, or to interact with an LSP server over stdio.
+- **[Pyright — the sentinel](docs/research/landscape.md#pyright--the-veteran).**
+  Broad typing support and configurable execution environments. Equip the
+  **basedpyright** fork for extra diagnostics, baselines and semantic highlighting;
+  those extras are not part of Microsoft Pyright.
+- **[Pyrefly — the artificer](docs/research/pyrefly.md).**
+  A growing toolbelt: configurable regex and `mock.patch` checks, framework knowledge,
+  and experimental tensor/DataFrame analysis. Some tools need explicit settings;
+  experimental APIs can change.
+- **[ty — the scout](docs/research/landscape.md#ty--the-swift-scout).**
+  Built for quick incremental feedback, explanatory diagnostics and precise type
+  narrowing. In this adapter, hover favors the type alone and completion resolution
+  is unavailable.
+- **[Zuban — the diplomat](docs/research/landscape.md#zuban--the-bridge-builder).**
+  Bridges Mypy workflows and editor inference for untyped code. Compatibility modes
+  are its specialty; value-constrained generic bodies and unused ignores remain
+  checking blind spots.
 
-The library has minimal dependencies (`tomlkit` for TOML config serialization).
+These are personalities, not speed rankings. The linked field notes separate
+upstream features from what this library actually tests.
 
-## Installation
+## Start a session
 
 ```sh
-pip install lsp-types
+pip install "lsp-types[pyrefly]"  # Or [ty] / [zuban]
 ```
 
-## Usage
-
-Using the LSP types:
-
 ```python
-import lsp_types
+import asyncio
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-# Use the types
-```
-
-Using an LSP process through stdio:
-
-> [!TIP]
-> Recommend using [basedpyright](https://github.com/DetachHead/basedpyright) for extended features.
-
-```python
-from lsp_types.process import LSPProcess, ProcessLaunchInfo
-
-process_info = ProcessLaunchInfo(cmd=[
-    "pyright-langserver", "--stdio"
-])
-
-async with LSPProcess(process_info) as process:
-    # Initialize the process
-    ...
-
-    # Grab a typed listener
-    diagnostics_listener = process.notify.on_publish_diagnostics(timeout=1.0)
-
-    # Send a notification (`await` is optional. It ensures messages have been drained)
-    await process.notify.did_open_text_document(...)
-
-    # Wait for diagnostics to come in
-    diagnostics = await diagnostics_listener
-```
-
-`LSPProcess.stop()` is terminal — including the implicit stop() when the `async with`
-block exits. Calling `start()` on a stopped process raises `RuntimeError` instead
-of relaunching the server, and requests and notifications sent through it raise
-`RuntimeError` too (notifications are no longer dropped with a warning). The
-messages name the state they came from (`LSP process has been stopped` vs. `LSP
-process has not been started`). Construct a new `LSPProcess` when you need to
-restart a server.
-
-## LSPs
-
-The following LSPs are available out of the box:
-
-- [Pyright](https://github.com/microsoft/pyright)
-- [Pyrefly](https://github.com/facebook/pyrefly)
-- [ty](https://github.com/astral-sh/ty) - Astral's fast Python type checker
-- [Zuban](https://github.com/zubanls/zuban) - Rust-based type checker + LSP by the author of Jedi
-
-### Pyrefly CLI tools
-
-This library drives Pyrefly's LSP server (`pyrefly lsp`), but Pyrefly also ships a broader
-standalone CLI worth knowing about (verified with Pyrefly 1.2.0):
-
-| Command | What it does |
-|---------|--------------|
-| `pyrefly init` | Scaffold a `pyrefly.toml` (or `[tool.pyrefly]` in `pyproject.toml`), or **migrate an existing mypy/pyright config** to Pyrefly |
-| `pyrefly check` | Full type check of a file or project |
-| `pyrefly snippet <CODE>` | Type-check an inline code snippet |
-| `pyrefly infer` | Automatically add inferred type annotations to a file or directory |
-| `pyrefly coverage` | Type-coverage reporting commands |
-| `pyrefly suppress` | Add ignore comments for existing errors, or remove unused ignores |
-| `pyrefly stubgen` | Generate `.pyi` stub files from Python source |
-| `pyrefly dump-config` | Print Pyrefly's resolved configuration |
-| `pyrefly tsp` | Start a TSP (Type Server Protocol) server (new in 1.2.x) |
-
-Run `pyrefly <command> --help` for details, or see the [Pyrefly docs](https://pyrefly.org/).
-
-## Feature Support Matrix
-
-### Legend
-
-| Symbol | Meaning |
-|--------|---------|
-| :white_check_mark: | Fully supported |
-| :warning: | Partial support (see notes) |
-| :x: | Not supported |
-| :grey_question: | Not tested / Not exposed in API |
-
-### Features by Backend
-
-> Last verified: Pyrefly 1.2.0, ty 0.0.75, Zuban 0.9.2 (basedpyright: CI only, unpinned `npm install -g basedpyright`)
-
-| Feature | Pyright | Pyrefly | ty | Zuban | Notes |
-|---------|:-------:|:-------:|:--:|:-----:|-------|
-| Diagnostics | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| Hover | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | ty shows type only, not variable name |
-| Completion | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| Completion Resolution | :white_check_mark: | :x: | :x: | :white_check_mark: | Pyrefly: no-op (returns item unchanged); ty: not supported (`-32601`) |
-| Signature Help | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| Rename | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| Semantic Tokens | :white_check_mark:\* | :white_check_mark:\*\* | :white_check_mark: | :white_check_mark: | \*basedpyright recommended; \*\*Pyrefly: legend not advertised (see docs) |
-| Go to Definition | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
-| Find References | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
-| Code Actions | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
-| Formatting | :grey_question: | :grey_question: | :grey_question: | :grey_question: | Not exposed in Session API |
-
-> See [Feature Verification Guide](docs/FEATURE_VERIFICATION.md) for methodology on maintaining this table.
-
-For detailed documentation:
-- [Semantic Tokens Reference](docs/SEMANTIC_TOKENS.md) - Token types and modifiers for Monaco/editor integration
-- [Pyrefly Known Limitations](lsp_types/pyrefly/KNOWN_LIMITATIONS.md)
-- [ty Known Limitations](lsp_types/ty/KNOWN_LIMITATIONS.md)
-- [Zuban Known Limitations](lsp_types/zuban/KNOWN_LIMITATIONS.md)
-
-### Pyright Example
-
-```python
 from lsp_types import Session
-from lsp_types.pyright.backend import PyrightBackend
+from lsp_types.pyrefly.backend import PyreflyBackend
 
-async def test_pyright_session():
-    code = """\
-def greet(name: str) -> str:
-    return 123
-"""
+async def main():
+    with TemporaryDirectory() as workspace:
+        session = await Session.create(
+            PyreflyBackend(),
+            base_path=Path(workspace),
+            initial_code='answer: int = "oops"',
+        )
+        try:
+            print(await session.get_diagnostics())
+            await session.update_code("answer: int = 42")
+            print(await session.get_diagnostics())  # []
+        finally:
+            await session.shutdown()
 
-    session = await Session.create(PyrightBackend(), initial_code=code)
-    diagnostics = await session.get_diagnostics()
-
-    assert diagnostics != []
-
-    code = """\
-def greet(name: str) -> str:
-    return f"Hello, {name}"
-"""
-
-    await session.update_code(code)
-    diagnostics = await session.get_diagnostics()
-    assert diagnostics == []
-
-    await session.shutdown()
+asyncio.run(main())
 ```
 
-After `shutdown()`, a session's operational methods raise `RuntimeError`; its
-captured server and semantic-token metadata remain readable. Calling
-`shutdown()` while other operations are in flight is safe: it waits up to five
-seconds for them to finish, and if any are still running it stops the language
-server process instead of returning it to the pool, keeping stale operations
-out of the next session's protocol stream. (One narrow exception: cancelling
-an operation ends its in-flight accounting even if a notification write it
-already queued is still being flushed.)
+Swap in `TyBackend`, `ZubanBackend`, or `PyrightBackend`. For Pyright, install
+Node.js and `npm install -g pyright` (or `basedpyright`) separately.
+Sessions write backend configuration into `base_path`; use a dedicated workspace
+as above. For types alone, `import lsp_types`; no server is needed.
+
+## What works here
+
+Diagnostics, hover, completion, signature help and rename pass across all four
+backends. Semantic tokens work with **basedpyright**, Pyrefly, ty and Zuban;
+Microsoft Pyright does not provide them. Completion resolution enriches results
+with Pyright/basedpyright and Zuban; Pyrefly echoes the item, while ty rejects it.
+
+Verified **2026-09-11**: Pyright **1.1.414**, basedpyright **1.40.1**,
+Pyrefly **1.3.0**, ty **0.0.80**, Zuban **0.9.3**.
+
+[Feature evidence & maintenance runbook](docs/FEATURE_VERIFICATION.md) ·
+[Semantic tokens](docs/SEMANTIC_TOKENS.md) ·
+[Low-level API & lifecycle](docs/USAGE.md) ·
+[Maintenance results](docs/MAINTENANCE_2026-09-11.md)
 
 ## Development
 
-- Requires Python 3.12+.
-- Requires `uv` for dev dependencies.
-
-Generate latest types in one go:
 ```sh
+uv sync --all-extras --locked
+npm install -g basedpyright
+uv run pytest
+uvx pyright --pythonpath .venv/bin/python
+uvx ruff check .
 make generate-latest-types
 ```
 
-Download the latest json schema:
-```sh
-make download-schemas
-```
-
-Generate the types:
-```sh
-make generate-types
-```
-
-Copy the `lsp_types/types.py` file to your project.
-
-NOTE: Do not import types that begin with `__`. These types are internal types and are not meant to be used.
-
-### TODOs
-
-- Support server request handlers.
+The [runbook](docs/FEATURE_VERIFICATION.md) covers testing Microsoft Pyright
+separately, regenerating schemas and updating the browser playground.

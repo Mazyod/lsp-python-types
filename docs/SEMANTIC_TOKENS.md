@@ -49,9 +49,13 @@ See `examples/extract_semantic_legends.py` for a complete working example.
 
 ## Token Legends by Backend
 
-### Pyright (basedpyright)
+Microsoft Pyright 1.1.414 does **not** provide semantic tokens. The Pyright-family
+legend below belongs to the separate basedpyright fork, which uses the same backend.
+These are LSP legends, independent of the playground’s WASM APIs.
 
-> Last verified: basedpyright 1.36.2
+### basedpyright (through PyrightBackend)
+
+> Last verified: basedpyright 1.40.1 (2026-09-11)
 
 #### Token Types
 
@@ -91,8 +95,8 @@ See `examples/extract_semantic_legends.py` for a complete working example.
 
 ### Pyrefly
 
-> Last verified: Pyrefly 1.2.0 (2026-08-30)
-> Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/main/pyrefly/lib/state/semantic_tokens.rs)
+> Last verified: Pyrefly 1.3.0 (2026-09-11)
+> Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/1.3.0/pyrefly/lib/state/semantic_tokens.rs)
 
 Pyrefly does not advertise its legend via LSP initialization, but the token mappings are defined in source code.
 
@@ -139,12 +143,17 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 | 8 | `documentation` |
 | 9 | `defaultLibrary` |
 | 10 | `selfParameter` |
+| 11 | `byteString` |
+| 12 | `formatString` |
+| 13 | `rawString` |
+| 14 | `stringPrefix` |
+| 15 | `templateString` |
 
 ---
 
 ### ty
 
-> Last verified: ty 0.0.75 (2026-08-30)
+> Last verified: ty 0.0.80 (2026-09-11)
 
 #### Token Types
 
@@ -165,6 +174,8 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 | 12 | `decorator` |
 | 13 | `builtinConstant` |
 | 14 | `typeParameter` |
+| 15 | `operator` |
+| 16 | `regexp` |
 
 #### Token Modifiers
 
@@ -179,7 +190,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ### Zuban
 
-> Last verified: Zuban 0.9.2 (2026-08-30)
+> Last verified: Zuban 0.9.3 (2026-09-11)
 
 Zuban advertises its legend via LSP initialization (follows LSP 3.17 standard ordering for the 23 token types it emits).
 
@@ -308,10 +319,11 @@ The canonical legend follows LSP standard ordering, with backend-specific tokens
 - 23: label (LSP standard)
 - 24-26: Backend-specific (selfParameter, clsParameter, builtinConstant)
 
-**Token Modifiers (bit 0-13):**
+**Token Modifiers (bit 0-18):**
 - 0-9: LSP standard modifiers (declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation, defaultLibrary)
 - 10-12: Backend-specific from Pyright (builtin, classMember, parameter)
 - 13: Backend-specific from Pyrefly (selfParameter)
+- 14-18: Pyrefly 1.3 string modifiers (byteString, formatString, rawString, stringPrefix, templateString); appended so existing indices stay stable
 
 ---
 
