@@ -43,6 +43,7 @@ generate-lsp-schema:
 		--use-field-description \
 		--use-schema-description \
 		--use-double-quotes \
+		--disable-timestamp \
 		--formatters black isort
 	uvx ruff format assets/scripts/lsp_schema.py
 
@@ -56,6 +57,7 @@ generate-pyright-schema:
 		--use-field-description \
 		--use-schema-description \
 		--use-double-quotes \
+		--disable-timestamp \
 		--formatters black isort
 	uvx ruff format lsp_types/pyright/config_schema.py
 

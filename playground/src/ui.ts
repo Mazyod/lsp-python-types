@@ -1,12 +1,12 @@
-export type BackendName = "Pyright" | "Pyrefly" | "ty";
+export type BackendName = "basedpyright" | "Pyrefly" | "ty";
 
-const ALL_BACKENDS: BackendName[] = ["Pyright", "Pyrefly", "ty"];
+const ALL_BACKENDS: BackendName[] = ["basedpyright", "Pyrefly", "ty"];
 
 export interface UICallbacks {
   onBackendSelect: (name: BackendName) => void;
 }
 
-let currentBackend: BackendName = "Pyright";
+let currentBackend: BackendName = "basedpyright";
 
 export function initUI(callbacks: UICallbacks): void {
   const selector = document.getElementById("backend-selector")!;

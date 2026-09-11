@@ -1615,6 +1615,9 @@ class InlineValueParams(TypedDict):
     requested."""
     workDoneToken: NotRequired["ProgressToken"]
     """An optional token that a server can use to report work done progress."""
+    partialResultToken: NotRequired["ProgressToken"]
+    """An optional token that a server can use to report partial results (e.g. streaming) to
+    the client."""
 
 
 class InlineValueRegistrationOptions(TypedDict):
@@ -1641,6 +1644,9 @@ class InlayHintParams(TypedDict):
     """The document range for which inlay hints should be computed."""
     workDoneToken: NotRequired["ProgressToken"]
     """An optional token that a server can use to report work done progress."""
+    partialResultToken: NotRequired["ProgressToken"]
+    """An optional token that a server can use to report partial results (e.g. streaming) to
+    the client."""
 
 
 class InlayHint(TypedDict):
@@ -1874,6 +1880,9 @@ class InlineCompletionParams(TypedDict):
     """The position inside the text document."""
     workDoneToken: NotRequired["ProgressToken"]
     """An optional token that a server can use to report work done progress."""
+    partialResultToken: NotRequired["ProgressToken"]
+    """An optional token that a server can use to report partial results (e.g. streaming) to
+    the client."""
 
 
 class InlineCompletionList(TypedDict):

@@ -1,49 +1,46 @@
-# Pyrefly Backend - Known Limitations
+# Pyrefly backend: known limitations
 
-This document describes known limitations and behavioral differences when using the Pyrefly backend compared to other LSP backends (Pyright, ty).
+Verified with **Pyrefly 1.3.0 on 2026-09-11** using this library's LSP client.
+Release notes are dated September 10; PyPI and GitHub publication occurred
+September 11 UTC. [Release](https://github.com/facebook/pyrefly/releases/tag/1.3.0)
 
-## 1. Completion Item Resolution Is a No-op
+## Completion resolution is an echo
 
-**Limitation**: Pyrefly accepts the `completionItem/resolve` LSP request but returns the item unchanged.
+`completionItem/resolve` returns the submitted item unchanged, despite
+advertising `completionProvider.resolveProvider: true`. A live probe resolved
+a method completion both normally and with `detail`/`documentation` removed;
+both responses exactly matched their respective inputs.
 
-**Behavior**: Calling `resolve_completion()` does not raise (unlike ty), but the resolved item carries no additional `detail`, `documentation`, or other metadata beyond what the initial completion already provided.
+Initial completions already include type details and documentation, so ordinary
+completion remains useful. Calling `resolve_completion()` succeeds but does
+not retrieve additional metadata.
 
-**Impact**: Completion items won't gain extended documentation from resolution. Basic completion works fine.
+## Semantic-token legend is not advertised
 
-## 2. Configuration Key Format
+The initialize response omits `semanticTokensProvider` entirely, while
+`textDocument/semanticTokens/full` still returns tokens. The backend therefore
+supplies `PYREFLY_LEGEND` instead of discovering a legend from the server.
 
-**Note**: Pyrefly uses TOML configuration (`pyrefly.toml`) with kebab-case keys (e.g., `python-version`, `search-path`). The backend automatically converts snake_case Python keys to kebab-case when writing the config file.
+Pyrefly 1.3.0 adds five string modifiers: `byteString`, `formatString`,
+`rawString`, `stringPrefix`, and `templateString` (bits 11–15). This maintenance
+updates both the fallback legend and canonical modifiers so normalization
+preserves those bits. Token types are unchanged. See
+[semantic-token documentation](../../docs/SEMANTIC_TOKENS.md).
 
----
+## Configuration and API boundaries
 
-## Previously Documented, Now Resolved
+The backend writes kebab-case TOML keys from top-level snake_case Python keys.
+Nested error-code keys should use the upstream names (`bad-assignment`, etc.).
+The typed schema covers common options; a plain `Session.create(options=...)`
+dictionary can carry other upstream settings.
 
-- **Rename operations disabled for external files** (documented for Pyrefly 0.32.0): Earlier Pyrefly versions treated session files as "external" and returned no rename edits, so `get_rename_edits()` was marked `xfail`. As of Pyrefly 1.1.1 rename returns proper edits and the test is now a regular passing case.
+Upstream CLI tools, TSP, and editor refactorings extend beyond the high-level
+`Session` API. Their availability upstream does not imply a matching Session
+method. Tensor-shape and DataFrame schema extensions remain experimental.
 
----
+## Previously resolved
 
-## Version Information
-
-These limitations were last verified with Pyrefly 1.2.0 (verified 2026-08-30;
-1.2.0 is the newest stable release on PyPI, released 2026-08-01):
-
-- `completionItem/resolve` remains a no-op. The resolved item comes back
-  byte-identical, and an item with `detail`/`documentation` stripped before the
-  request comes back still stripped — a pure echo, not an already-complete
-  result. Pyrefly nonetheless advertises `completionProvider.resolveProvider:
-  true`. Little is lost in practice: Pyrefly front-loads `detail` and
-  `documentation` into the initial completion items.
-- The semantic-tokens legend is still not advertised: `semanticTokensProvider`
-  is absent from the initialize result entirely (not merely missing its
-  `legend`), even though the server answers `textDocument/semanticTokens/full`.
-  The hardcoded `PYREFLY_LEGEND` therefore remains required. ty and Zuban both
-  advertise a legend.
-- Rename returns proper edits for the virtual session document and spans
-  on-disk sibling modules; the fix has not regressed.
-
-**Forward-looking:** Pyrefly `main` (heading to 1.3.0) appends five token
-modifiers after `selfParameter` — `byteString`, `formatString`, `rawString`,
-`stringPrefix`, `templateString` (bits 11-15). Verified against 1.3.0.dev3:
-those bits are emitted and silently dropped by `normalize_tokens()` because
-they are absent from both `PYREFLY_LEGEND` and `CANONICAL_TOKEN_MODIFIERS`.
-Both lists must be extended when 1.3.0 ships. Token *types* are unchanged.
+Rename previously failed for session files classified as external. It has
+worked since 1.1.1 and remains covered by the regular rename integration test;
+the former expected failure is gone. Virtual documents work without on-disk
+mirroring.

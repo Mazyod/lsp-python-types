@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from lsp_types.pyrefly.backend import PyreflyBackend
@@ -30,3 +32,9 @@ def lsp_backend(request: pytest.FixtureRequest) -> LSPBackend:
 def backend_name(lsp_backend: LSPBackend) -> str:
     """Helper fixture to get the backend name for test identification."""
     return lsp_backend.__class__.__name__.replace("Backend", "").lower()
+
+
+@pytest.fixture
+def microsoft_pyright(backend_name: str) -> bool:
+    """CI runs the shared adapter against both npm distributions explicitly."""
+    return backend_name == "pyright" and os.environ.get("PYRIGHT_PACKAGE") == "pyright"

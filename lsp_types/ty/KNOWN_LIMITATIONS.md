@@ -21,13 +21,14 @@ unhandled, so sending it produces a warning and no effect.
 Configuration does not have to live in `ty.toml`, however. ty also reads
 `initializationOptions.configuration` at initialization, which accepts inline ty
 config using kebab-case keys (`{"configuration": {"rules": {"unresolved-import":
-"ignore"}}}` was verified to suppress that diagnostic with no `ty.toml` present;
+"ignore"}}}` was verified to suppress that diagnostic with an empty `ty.toml`;
 the snake_case spelling is silently ignored). Pass it through the public
 `Session.create(..., initialize_params={"initializationOptions": {...}})`
 parameter. This mirrors Zuban, which honors its own `initializationOptions` —
 several backends in this repo accept LSP-time configuration, so "file-based only"
-is the wrong mental model. What remains true for ty is that configuration cannot
-be changed *after* the session starts: to change it, create a new session.
+is the wrong mental model. This integration applies configuration when creating
+the session. Recreate the session to change it reliably; its default null
+configuration replies and lack of file watching do not provide settings updates.
 
 ## 2. Hover Format Differs
 
@@ -48,13 +49,15 @@ be changed *after* the session starts: to change it, create a new session.
 
 **Impact**: None on functionality. Configuration reaches ty through two channels
 rather than the command line: `ty.toml` (what `TyBackend.write_config()` writes),
-and `initializationOptions` at LSP initialization — see limitation 1. Two keys
-were verified to have a real effect there: `logLevel` (changes server log
+and `initializationOptions` at LSP initialization — see limitation 1. The August
+30 probe verified two keys with a real effect: `logLevel` (changes server log
 verbosity) and `configuration` (applies inline ty config). Others are accepted
 without a warning, but their effect was not confirmed and should not be assumed:
-`diagnosticMode`, `disableLanguageServices`, `configuration-file`, `inlayHints`,
+`diagnosticMode`, `disableLanguageServices`, `inlayHints`,
 `completions`, `pythonExtension`, `workspaceTrust`, `experimental`,
-`showSyntaxErrors`.
+`showSyntaxErrors`. The current documented setting for an explicit TOML path is
+`configurationFile`; the older probe used `configuration-file` and did not
+establish its behavior. See the [editor settings reference](https://docs.astral.sh/ty/reference/editor-settings/).
 
 ty warns loudly on unrecognized *top-level* initialization-option keys, so a typo
 there is visible. That does not extend to nested keys: a misspelled rule name
@@ -81,21 +84,17 @@ adjusts its warning to how much watching the client claims to support.
 ```
 WARN Your LSP client doesn't support file watching: You may see stale results when files change outside the editor
 ```
-Advertising `workspace.didChangeWatchedFiles.dynamicRegistration` narrows this to
-"...doesn't support file watching **outside of project**: You may see stale results
-when **dependencies change**". Additionally advertising `relativePatternSupport`
-removes the warning entirely. This tiering is not new — it behaves identically at
-ty 0.0.70.
+**Historical probe (0.0.70 and 0.0.75, August 30):** Advertising
+`workspace.didChangeWatchedFiles.dynamicRegistration` narrowed the warning to
+watching outside the project; also advertising `relativePatternSupport` removed
+it. These capability variants were not rerun in the September maintenance.
 
-**Why the warning is left in place**: silencing it by advertising those
-capabilities would be dishonest, not a fix. When `dynamicRegistration` is
-advertised, ty replies with a `client/registerCapability` *request*, and this
-client cannot answer it: the read loop tests `if "method" in payload` before
-`elif "id" in payload` (`lsp_types/process.py:480`), so a server-initiated
-request — which carries both — is routed to the notification listeners and never
-answered. Advertising a capability we do not implement and then leaving ty's
-request hanging is worse than the warning. A real fix needs server-request
-replies plus actual file watching.
+**Why the warning is left in place:** this library has no file watchers. The
+process now answers server requests: its default handler returns null
+configuration entries, acknowledges registration requests, and replies
+`-32601` for unknown methods. That prevents protocol stalls, but acknowledging a
+registration does not install a watcher. Advertising watching support would
+still promise behavior this client does not provide.
 
 **Impact**: Files modified outside the LSP session (by external tools, a build
 step, or a dependency install) may not be picked up until the session is
@@ -111,7 +110,8 @@ are unaffected.
 Unknown request: completionItem/resolve (-32601)
 ```
 
-**Impact**: Completion items won't have extended documentation or additional metadata that resolution typically provides. Basic completion works fine.
+**Impact**: Clients must use the initial completion response; they cannot fetch
+additional details through a separate resolution request. Basic completion works.
 
 ---
 
@@ -123,31 +123,26 @@ Unknown request: completionItem/resolve (-32601)
 
 ## Version Information
 
-These limitations were documented based on ty version 0.0.11 (January 2026), last
-verified with ty 0.0.75 (August 30, 2026), which is the newest release on PyPI.
+The September 11, 2026 maintenance used **ty 0.0.80**. Fresh temporary
+LSP sessions confirmed:
 
-All six entries were probed directly against 0.0.75, each with a control case
-proving the probe could detect the opposite result. **None of the six was fixed.**
-The identical probe suite was then re-run against a pinned ty 0.0.70 in a throwaway
-virtualenv: behaviour was byte-identical on all six. Nothing regressed and nothing
-was fixed in 0.0.70..0.0.75, and the release notes for 0.0.71-0.0.75 contain no LSP
-change bearing on these entries. The `ty>=0.0.16` floor in `pyproject.toml` remains
-correct.
+- `workspace/didChangeConfiguration` still logs an unhandled-notification
+  warning. An unresolved import remained after sending a suppressing setting
+  and editing the document; inline initialization with the correct kebab-case
+  rule suppressed it, while an unrelated assignment error remained. The
+  snake_case rule spelling did not suppress it.
+- Hover over `result: str = "ok"` returned `Literal["ok"]`, without its name.
+- `ty server --help` lists only `-h/--help`.
+- The default initialization emits both missing-workspace and missing-watcher
+  warnings. Supplying a valid `workspaceFolders` removed the former while
+  retaining correct diagnostics. Session does not currently supply this field.
+- Resolving a real completion item returned `-32601`.
+- All diagnostic and hover probes used virtual documents, with no `.py` file on
+  disk. New analysis configuration serialized and loaded successfully; an
+  `allowed_unresolved_imports` entry suppressed its matching unresolved import
+  without suppressing the assignment control.
 
-Two entries read differently than their original wording suggests:
-
-- Limitation 4 is a gap in *this client*, not in ty. Supplying `workspaceFolders`
-  in the initialize params (URI matching `base_path`) removes the warning with no
-  loss of function: diagnostics stay correct and `ty.toml` is still applied.
-  `Session.create()` does not currently send the field. A folder URI that is not a
-  real directory is worse than sending none — ty falls back to default settings and
-  reports no diagnostics at all.
-- Limitation 5 is tiered by client capability and should be left alone; see that
-  section for why silencing it would be a regression in honesty, not a fix.
-
-Limitation 1 is narrower than originally written: the notification is still
-unhandled, but ty does accept configuration over LSP at initialization via
-`initializationOptions`. Configuration still cannot be changed after a session
-starts.
-
-Future versions may address some of these limitations.
+Historical August 30 probes compared 0.0.70 and 0.0.75 and found identical behavior
+for the six entries. That run also checked log-level changes, invalid workspace
+paths and watcher-capability variants. Those details remain historical evidence,
+not claims that every variant was repeated at 0.0.80.

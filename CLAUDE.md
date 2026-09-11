@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Maintenance
+
+Follow `docs/FEATURE_VERIFICATION.md` for release updates, including separate
+Microsoft Pyright/basedpyright checks and browser WASM verification. Keep the README
+concise; dated evidence and detailed comparisons belong in `docs/`.
+
 ## Essential Commands
 
 Always use `uv` for Python operations:
@@ -118,7 +124,7 @@ This is a minimal-dependency Python library providing typed LSP (Language Server
 **Generation Process:**
 1. `download_schemas.py`: Fetches latest schemas from upstream
 2. `datamodel-codegen`: Converts JSON schema to TypedDict definitions, pinned to
-   `--formatters black isort`, then ruff-formats its own output
+   `--formatters black isort --disable-timestamp`, then ruff-formats its own output
 3. `generate.py`: Orchestrates final type file generation with utilities in `assets/scripts/utils/`
 4. Every file in the Makefile's `GENERATED_FILES` is ruff-formatted and `--fix`ed so
    regenerating produces no spurious diff

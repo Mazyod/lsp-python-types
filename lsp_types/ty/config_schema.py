@@ -15,7 +15,7 @@ RuleSeverity = Literal["ignore", "warn", "error"]
 PythonPlatform = Literal["win32", "darwin", "android", "ios", "linux", "all"]
 
 # Output format options
-OutputFormat = Literal["full", "concise"]
+OutputFormat = Literal["full", "concise", "github", "gitlab", "junit"]
 
 
 class EnvironmentConfig(TypedDict, total=False):
@@ -61,6 +61,9 @@ class SrcConfig(TypedDict, total=False):
     respect_ignore_files: NotRequired[bool]
     """Auto-exclude files listed in .gitignore. Default: true."""
 
+    exclude_scripts: NotRequired[bool]
+    """Exclude PEP 723 scripts unless explicitly passed to the CLI. Default: false."""
+
 
 class AnalysisConfig(TypedDict, total=False):
     """
@@ -72,6 +75,18 @@ class AnalysisConfig(TypedDict, total=False):
     respect_type_ignore_comments: NotRequired[bool]
     """Whether 'type: ignore' comments suppress errors. Default: true."""
 
+    allowed_unresolved_imports: NotRequired[list[str]]
+    """Module glob patterns exempt from unresolved-import diagnostics."""
+
+    replace_imports_with_any: NotRequired[list[str]]
+    """Module glob patterns whose imports become Any, even when resolvable."""
+
+    strict_equality_semantics: NotRequired[bool]
+    """Use strict equality inference and narrowing semantics. Default: false."""
+
+    strict_generic_narrowing: NotRequired[bool]
+    """Use strict narrowing for unspecialized generic classes. Default: false."""
+
 
 class TerminalConfig(TypedDict, total=False):
     """
@@ -81,10 +96,10 @@ class TerminalConfig(TypedDict, total=False):
     """
 
     error_on_warning: NotRequired[bool]
-    """Exit with code 1 when warnings are emitted. Default: false."""
+    """Exit with code 1 when warnings are emitted. Default: true."""
 
     output_format: NotRequired[OutputFormat]
-    """Diagnostic message format: 'full' or 'concise'. Default: full."""
+    """Diagnostic output format for the CLI. Default: full."""
 
 
 class OverrideConfig(TypedDict, total=False):
@@ -103,12 +118,15 @@ class OverrideConfig(TypedDict, total=False):
     rules: NotRequired[dict[str, RuleSeverity]]
     """Rule overrides for matched files."""
 
+    analysis: NotRequired[AnalysisConfig]
+    """Analysis overrides for matched files."""
+
 
 class Model(TypedDict, total=False):
     """
     ty Configuration Schema
 
-    Comprehensive type definitions for all ty configuration options.
+    Type definitions for documented ty configuration options.
     Field names use snake_case following Python conventions but are
     automatically converted to kebab-case when written to ty.toml.
 

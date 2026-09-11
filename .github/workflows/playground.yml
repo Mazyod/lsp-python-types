@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "playground/**"
+      - ".github/workflows/playground.yml"
   workflow_dispatch:
 
 permissions:
@@ -36,6 +37,9 @@ jobs:
         uses: actions/configure-pages@v6
 
       - run: npm ci
+      - name: Build pinned WASM backends
+        run: npm run fetch-wasm
+      - run: npm run test:wasm
       - run: npm run build
 
       - uses: actions/upload-pages-artifact@v5

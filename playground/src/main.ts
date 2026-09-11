@@ -11,11 +11,12 @@ import {
 import type { BackendAdapter } from "./backends/interface";
 
 let currentAdapter: BackendAdapter | null = null;
+let switchVersion = 0;
 const failedBackends = new Set<BackendName>();
 
 function createBackend(name: BackendName): BackendAdapter {
   switch (name) {
-    case "Pyright":
+    case "basedpyright":
       return new PyrightBackend();
     case "Pyrefly":
       return new PyreflyBackend();
@@ -26,6 +27,8 @@ function createBackend(name: BackendName): BackendAdapter {
 
 async function switchBackend(name: BackendName): Promise<void> {
   if (failedBackends.has(name)) return;
+  const version = ++switchVersion;
+  setAdapter(null);
 
   // Dispose current adapter
   if (currentAdapter) {
@@ -35,13 +38,19 @@ async function switchBackend(name: BackendName): Promise<void> {
 
   setStatus(`Loading ${name}...`, "loading");
 
+  const adapter = createBackend(name);
   try {
-    const adapter = createBackend(name);
     await adapter.initialize();
+    if (version !== switchVersion) {
+      adapter.dispose();
+      return;
+    }
     currentAdapter = adapter;
     setAdapter(adapter);
     setStatus(name, "ready");
   } catch (err) {
+    adapter.dispose();
+    if (version !== switchVersion) return;
     console.error(`Failed to initialize ${name}:`, err);
     failedBackends.add(name);
     setBackendDisabled(name, true);
@@ -57,7 +66,7 @@ async function main(): Promise<void> {
   });
 
   // Load default backend
-  await switchBackend("Pyright");
+  await switchBackend("basedpyright");
 }
 
 main();

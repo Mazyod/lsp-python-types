@@ -45,7 +45,7 @@ def test_zuban_backend_write_config_creates_pyproject_toml(tmp_path: Path):
 
     backend = ZubanBackend()
     options: ZubanConfig = {
-        "mode": "default",
+        "mode": "auto",
         "untyped_strict_optional": True,
     }
     backend.write_config(tmp_path, options)
@@ -56,7 +56,7 @@ def test_zuban_backend_write_config_creates_pyproject_toml(tmp_path: Path):
     parsed = tomllib.loads(config_path.read_text())
     assert "tool" in parsed
     assert "zuban" in parsed["tool"]
-    assert parsed["tool"]["zuban"]["mode"] == "default"
+    assert parsed["tool"]["zuban"]["mode"] == "auto"
     assert parsed["tool"]["zuban"]["untyped_strict_optional"] is True
 
 
@@ -291,9 +291,9 @@ def test_zuban_backend_write_config_empty_options_still_writes_table(tmp_path: P
     """An empty [tool.zuban] must still be written -- it selects Zuban's mode.
 
     The table's *presence* puts Zuban in its `default` (PyRight-like) mode. A
-    project carrying [tool.mypy] but no [tool.zuban] is driven into the weaker
-    Mypy-compatible mode, so skipping the write when `options` is empty would
-    silently downgrade those projects. See KNOWN_LIMITATIONS.md entry 1.
+    project carrying [tool.mypy] but no [tool.zuban] uses Mypy-compatible
+    behavior, so skipping the write when `options` is empty would silently
+    change the chosen mode. See KNOWN_LIMITATIONS.md entry 1.
     """
     from lsp_types.zuban.backend import ZubanBackend
 

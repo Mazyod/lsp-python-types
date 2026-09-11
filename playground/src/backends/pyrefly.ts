@@ -134,8 +134,11 @@ function mapPyreflySeverity(
 async function loadPyreflyWasm(): Promise<PyreflyWasmModule> {
   // Try loading from local static assets (built by CI or fetch-wasm.sh)
   try {
-    const baseUrl = new URL(/* @vite-ignore */ "../../wasm/pyrefly/", import.meta.url).href;
-    const jsUrl = `${baseUrl}pyrefly_wasm.js`;
+    // Absolute URLs keep Vite's dev server from transforming public WASM glue.
+    const jsUrl = new URL(
+      `${import.meta.env.BASE_URL}pyrefly/pyrefly_wasm.js`,
+      window.location.origin,
+    ).href;
 
     const mod = (await import(/* @vite-ignore */ jsUrl)) as PyreflyWasmModule;
     await mod.default();

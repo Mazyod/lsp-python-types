@@ -16,7 +16,7 @@ import type { BackendAdapter, DiagnosticInfo, HoverInfo } from "./interface";
 let MarkerSeverity: typeof import("monaco-editor").MarkerSeverity;
 
 const PACKAGE = "browser-basedpyright";
-const VERSION = "1.28.1";
+const VERSION = "1.40.1";
 const WORKER_URL = `https://cdn.jsdelivr.net/npm/${PACKAGE}@${VERSION}/dist/pyright.worker.js`;
 
 const ROOT_PATH = "/src/";
@@ -33,11 +33,11 @@ const DEFAULT_CONFIG = JSON.stringify({
 });
 
 export class PyrightBackend implements BackendAdapter {
-  readonly name = "Pyright";
+  readonly name = "basedpyright";
   private connection: MessageConnection | null = null;
   private workers: Worker[] = [];
   private version = 0;
-  private latestDiagnostics: Diagnostic[] = [];
+  private diagnosticsVersion = 0;
   private diagnosticsResolve: ((diags: Diagnostic[]) => void) | null = null;
 
   async initialize(): Promise<void> {
@@ -84,8 +84,10 @@ export class PyrightBackend implements BackendAdapter {
       "textDocument/publishDiagnostics",
       (params: PublishDiagnosticsParams) => {
         if (params.uri === FILE_URI) {
-          this.latestDiagnostics = params.diagnostics;
-          if (this.diagnosticsResolve) {
+          if (
+            this.diagnosticsResolve &&
+            (params.version === undefined || params.version >= this.diagnosticsVersion)
+          ) {
             this.diagnosticsResolve(params.diagnostics);
             this.diagnosticsResolve = null;
           }
@@ -139,6 +141,8 @@ export class PyrightBackend implements BackendAdapter {
     if (!this.connection) return [];
 
     const version = ++this.version;
+    this.diagnosticsResolve?.([]);
+    this.diagnosticsVersion = version;
 
     // Create a promise that resolves when we get diagnostics back
     const diagnosticsPromise = new Promise<Diagnostic[]>((resolve) => {
@@ -147,7 +151,7 @@ export class PyrightBackend implements BackendAdapter {
       setTimeout(() => {
         if (this.diagnosticsResolve === resolve) {
           this.diagnosticsResolve = null;
-          resolve(this.latestDiagnostics);
+          resolve([]);
         }
       }, 10000);
     });
@@ -200,6 +204,9 @@ export class PyrightBackend implements BackendAdapter {
   }
 
   dispose(): void {
+    this.version++;
+    this.diagnosticsResolve?.([]);
+    this.diagnosticsResolve = null;
     if (this.connection) {
       this.connection.dispose();
       this.connection = null;
