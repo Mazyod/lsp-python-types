@@ -36,6 +36,20 @@ enum and literal completions, and automatic `@override` insertion.
 [Editor features](https://docs.basedpyright.com/latest/benefits-over-pyright/pylance-features/),
 [completion improvements](https://docs.basedpyright.com/latest/benefits-over-pyright/language-server-improvements/).
 
+## Pyrefly — the artificer
+
+🔧 Pyrefly combines framework-aware analysis with specialized checks. It
+understands same-file Django reverse relations, SQLAlchemy updates and PyTorch
+registered attributes. Opt-in diagnostics validate literal regexes and
+`mock.patch` targets. Tensor-shape and DataFrame schema analysis are experimental.
+
+`PyreflyBackend` provides diagnostics, hover, completion, signature help, rename
+and semantic tokens through `Session`. Initial completion items include type
+details and documentation; `resolve_completion()` returns the item unchanged.
+The backend supplies the semantic-token legend automatically.
+
+See the [Pyrefly guide](pyrefly.md) for configuration examples and specialized tools.
+
 ## ty — the scout
 
 ty uses fine-grained incremental analysis to recompute work affected by an edit.
