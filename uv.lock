@@ -323,7 +323,7 @@ wheels = [
 
 [[package]]
 name = "lsp-types"
-version = "0.24.1"
+version = "0.25.0"
 source = { editable = "." }
 dependencies = [
     { name = "tomlkit" },
