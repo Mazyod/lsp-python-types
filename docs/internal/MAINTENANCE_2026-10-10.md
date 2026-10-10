@@ -86,6 +86,12 @@ Updated Monaco **0.56.0 → 0.57.0**, Vite **8.3.0 → 8.3.4**, JSON-RPC
 **3.4.15 → 3.4.16**. TypeScript remains **7.0.2**. The external
 browser-basedpyright worker is pinned to **1.40.2**.
 
+The DOMPurify refresh also fixes the repository's open
+[Dependabot alert #34](https://github.com/Mazyod/lsp-python-types/security/dependabot/34)
+([GHSA-p98j-92pf-mc4p](https://github.com/advisories/GHSA-p98j-92pf-mc4p)).
+Raised the existing override to `^3.4.16` so its floor excludes the affected
+3.4.13–3.4.15 releases; the lock already resolved the patched 3.4.16 artifact.
+
 Pinned WASM: Pyrefly **1.3.2** release archive and ty **0.0.86** source archive,
 with their upstream SHA-256 values verified before extraction/build. ty builds
 in an isolated Node **24.21.0** container with Rust **1.99.0**, a native compiler and
