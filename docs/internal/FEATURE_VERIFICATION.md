@@ -21,7 +21,10 @@ npm view basedpyright version
 
 Commit `uv.lock` with the dependency changes. Minimum supported versions in
 `pyproject.toml` are compatibility floors, not the versions verified in this run;
-raise them only if a change requires it. Generate schemas from upstream with:
+raise them only if a change requires it or an upstream security fix excludes
+vulnerable versions. The ty floor is 0.0.84 for
+[GHSA-vxvm-j4xq-q7m4](https://github.com/astral-sh/ty/security/advisories/GHSA-vxvm-j4xq-q7m4).
+Generate schemas from upstream with:
 
 ```sh
 make generate-latest-types
@@ -38,13 +41,14 @@ select Black/isort before Ruff formatting.
 that executable, so install them in **separate directories**:
 
 ```sh
-npm install --prefix /tmp/lsp-basedpyright basedpyright@1.40.1
+npm install --prefix /tmp/lsp-basedpyright basedpyright@1.40.2
 npm install --prefix /tmp/lsp-pyright pyright@1.1.414
 PATH=/tmp/lsp-basedpyright/node_modules/.bin:$PATH uv run pytest tests -q
 PYRIGHT_PACKAGE=pyright PATH=/tmp/lsp-pyright/node_modules/.bin:$PATH \
   uv run pytest tests -k Pyright -q
 uvx pyright --pythonpath .venv/bin/python .
 uvx ruff check .
+uvx ruff format --check --exclude '*.md' .
 ```
 
 Update those exact npm versions on the next maintenance run. `PYRIGHT_PACKAGE`
@@ -59,8 +63,8 @@ and send a real request with a control case when validating a claim.
 
 ## Verified Session features
 
-Snapshot **2026-09-11**: Pyright 1.1.414, basedpyright 1.40.1, Pyrefly 1.3.0,
-ty 0.0.80, Zuban 0.9.3. “Yes” means the named integration test passes for its
+Snapshot **2026-10-10**: Pyright 1.1.414, basedpyright 1.40.2, Pyrefly 1.3.2,
+ty 0.0.86, Zuban 0.10.0. “Yes” means the named integration test passes for its
 fixture, not comprehensive conformance for every Python program.
 
 | Feature | Pyright | basedpyright | Pyrefly | ty | Zuban |
@@ -96,11 +100,11 @@ rg -n 'xfail|skip' tests
 ```
 
 Compare legends with [the token reference](../SEMANTIC_TOKENS.md) and tagged source.
-Pyrefly 1.3 still omits its provider from initialization; it needs the fallback
+Pyrefly 1.3.2 still omits its provider from initialization; it needs the fallback
 legend. `tests/test_semantic_tokens.py` checks that its five new string modifiers
 survive normalization, including a live server fixture. Append canonical entries
-so existing editor indices stay stable. ty 0.0.80 appends `operator` and `regexp`
-token types, already covered by the canonical legend.
+so existing editor indices stay stable. The current legends match the previous
+maintenance run; ty's `operator` and `regexp` types remain covered.
 
 Reprobe versioned limitations with positive controls before advancing their dates:
 [Pyrefly](../../lsp_types/pyrefly/KNOWN_LIMITATIONS.md),
