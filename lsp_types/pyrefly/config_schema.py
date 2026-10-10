@@ -1,7 +1,7 @@
 # Pyrefly configuration schema
 # Based on official Pyrefly documentation: https://pyrefly.org/en/docs/configuration/
 # CLI reference: https://github.com/facebook/pyrefly
-# Reviewed against Pyrefly 1.3.0 (2026-09-11).
+# Source: https://github.com/facebook/pyrefly/tree/1.3.2/crates/pyrefly_config/src
 #
 # Note: Field names use snake_case (Python convention) but are automatically
 # converted to kebab-case when written to pyrefly.toml (official format).

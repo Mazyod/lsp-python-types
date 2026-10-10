@@ -102,7 +102,7 @@ The tables below describe each server’s raw LSP indexes. Read
 `session.backend_legend` for the running server’s ordering. These legends apply
 to LSP sessions; browser WASM APIs have their own feature sets.
 
-### basedpyright 1.40.1 (through PyrightBackend)
+### basedpyright (through PyrightBackend)
 
 #### Token Types
 
@@ -140,9 +140,9 @@ to LSP sessions; browser WASM APIs have their own feature sets.
 
 ---
 
-### Pyrefly 1.3.0
+### Pyrefly
 
-Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/1.3.0/pyrefly/lib/state/semantic_tokens.rs)
+Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/1.3.2/pyrefly/lib/state/semantic_tokens.rs)
 
 Pyrefly does not advertise its legend via LSP initialization, but the token mappings are defined in source code.
 
@@ -197,7 +197,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ---
 
-### ty 0.0.80
+### ty
 
 #### Token Types
 
@@ -232,7 +232,7 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 
 ---
 
-### Zuban 0.9.3
+### Zuban
 
 Zuban advertises its legend via LSP initialization (follows LSP 3.17 standard ordering for the 23 token types it emits).
 

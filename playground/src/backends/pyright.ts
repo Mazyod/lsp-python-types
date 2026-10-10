@@ -16,7 +16,7 @@ import type { BackendAdapter, DiagnosticInfo, HoverInfo } from "./interface";
 let MarkerSeverity: typeof import("monaco-editor").MarkerSeverity;
 
 const PACKAGE = "browser-basedpyright";
-const VERSION = "1.40.1";
+const VERSION = "1.40.2";
 const WORKER_URL = `https://cdn.jsdelivr.net/npm/${PACKAGE}@${VERSION}/dist/pyright.worker.js`;
 
 const ROOT_PATH = "/src/";

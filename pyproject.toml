@@ -39,7 +39,7 @@ pyrefly = [
   "pyrefly>=0.32.0",
 ]
 ty = [
-  "ty>=0.0.16",  # 0.0.16 added virtual document support (no on-disk files needed)
+  "ty>=0.0.84",  # fixes GHSA-vxvm-j4xq-q7m4 in incremental type checking
 ]
 zuban = [
   "zuban>=0.7.0",

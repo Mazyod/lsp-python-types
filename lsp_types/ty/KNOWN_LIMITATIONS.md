@@ -56,4 +56,5 @@ Use the initial completion response.
 ## Virtual documents are supported
 
 Supported ty versions analyze documents opened through LSP without a matching
-Python file on disk. The backend requires ty 0.0.16 or newer.
+Python file on disk. The backend requires ty 0.0.84 or newer, which includes the
+[incremental type-checking security fix](https://github.com/astral-sh/ty/security/advisories/GHSA-vxvm-j4xq-q7m4).

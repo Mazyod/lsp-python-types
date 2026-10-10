@@ -36,7 +36,7 @@ class EnvironmentConfig(TypedDict, total=False):
     """Target platform for sys.platform checks (e.g., 'linux', 'darwin', 'win32')."""
 
     python_version: NotRequired[str]
-    """Python version to target (e.g., '3.12'). Default: 3.14."""
+    """Target Python version; inferred from the project/environment, falling back to 3.15."""
 
     root: NotRequired[list[str]]
     """Root paths of the project, used for finding first-party modules."""

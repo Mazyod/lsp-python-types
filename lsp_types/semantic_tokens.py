@@ -77,7 +77,7 @@ _CANONICAL_MODIFIER_INDEX: dict[str, int] = {
 }
 
 # Pyrefly legend (server doesn't advertise it via LSP)
-# Source: https://github.com/facebook/pyrefly/blob/1.3.0/pyrefly/lib/state/semantic_tokens.rs
+# Source: https://github.com/facebook/pyrefly/blob/1.3.2/pyrefly/lib/state/semantic_tokens.rs
 PYREFLY_LEGEND: types.SemanticTokensLegend = {
     "tokenTypes": [
         "namespace",  # 0
