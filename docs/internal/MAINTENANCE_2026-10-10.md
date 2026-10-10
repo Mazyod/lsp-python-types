@@ -4,9 +4,9 @@
 
 Monthly maintenance follows [the feature-verification runbook](FEATURE_VERIFICATION.md)
 and [documentation policy](DOCUMENTATION.md). Work used the isolated
-`codex/maintenance-2026-10-10` worktree. The existing publication workflow will
-apply a minor bump to **0.25.0** after merge and CI; publication and deployment
-receipts belong in the close-out below.
+`codex/maintenance-2026-10-10` worktree. The existing publication workflow applied
+a minor bump to **0.25.0** after merge and CI; publication and deployment receipts
+belong in the close-out below.
 
 ## Version and source checks
 
@@ -145,4 +145,38 @@ git diff --check
 
 ## Release close-out
 
-Publication and deployment results will be recorded after their workflows complete.
+[PR #58](https://github.com/Mazyod/lsp-python-types/pull/58) merged as
+`3390dcac5298735ca520cd9be342141f19ac5d07` after lint/type checking and all six
+Python 3.12/3.13/3.14 × Microsoft Pyright/basedpyright jobs passed
+([PR tests](https://github.com/Mazyod/lsp-python-types/actions/runs/38063468162),
+[PR lint](https://github.com/Mazyod/lsp-python-types/actions/runs/38063468137)).
+The same checks passed on `main`
+([tests](https://github.com/Mazyod/lsp-python-types/actions/runs/38063592732),
+[lint](https://github.com/Mazyod/lsp-python-types/actions/runs/38063592683)).
+GitHub marked Dependabot alert #34 **fixed** after the merge.
+
+The existing [publication workflow](https://github.com/Mazyod/lsp-python-types/actions/runs/38063698023)
+published [lsp-types 0.25.0](https://pypi.org/project/lsp-types/0.25.0/).
+The [GitHub release](https://github.com/Mazyod/lsp-python-types/releases/tag/v0.25.0)
+contains the wheel, source distribution and their publication attestations.
+Tag `v0.25.0` points to the workflow's version-bump commit, `8caa834`.
+
+A fresh isolated PyPI installation with all three Python backend extras passed
+diagnostics, error clearing after edits and normalized semantic tokens across
+basedpyright, Pyrefly, ty and Zuban. The installed artifact contains
+`maxCodeComplexity` and the ty >=0.0.84 requirement. PyPI's version-specific JSON
+lists the wheel and sdist; its description matches the README exactly.
+The wheel and sdist SHA-256 values match the corresponding GitHub assets.
+
+The [playground deployment](https://github.com/Mazyod/lsp-python-types/actions/runs/38063592822)
+passed its pinned WASM build, both WASM tests and production build, then deployed
+to [the live site](https://mazyod.com/lsp-python-types/). Live HTTP checks confirmed
+the Pages asset base path, basedpyright 1.40.2 worker pin, both WASM assets and
+JavaScript glue matching the locally checked release builds. The complete
+Chromium browser regression also passed against the live HTTPS site, including
+diagnostics, hover, clearing errors, repeated backend switches and rapid
+selections, with no console/page errors.
+
+Before committing this close-out, rechecked the tagged source: **251 passed,
+1 existing ty xfail**, zero Pyright errors/warnings/information, Ruff lint and
+Python formatting passed. The original main worktree remains undisturbed.
