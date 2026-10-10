@@ -504,4 +504,5 @@ class Model(TypedDict):
     venvPath: NotRequired[str]
     venv: NotRequired[str]
     verboseOutput: NotRequired[bool]
+    maxCodeComplexity: NotRequired[int]
     executionEnvironments: NotRequired[list[ExecutionEnvironment]]
