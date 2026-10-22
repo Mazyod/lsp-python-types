@@ -13,7 +13,7 @@
   "dependencies": {
     "monaco-editor": "^0.57.0",
     "remote-web-worker": "^0.0.9",
-    "vscode-jsonrpc": "^9.0.2",
+    "vscode-jsonrpc": "^10.0.0",
     "vscode-languageserver-protocol": "^3.18.3"
   },
   "devDependencies": {
