@@ -6,9 +6,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="${SCRIPT_DIR}/wasm"
-PYREFLY_VERSION="1.3.2"
-TY_VERSION="0.0.86"
-WASM_PACK_VERSION="0.15.0"
+PYREFLY_VERSION="1.4.0"
+TY_VERSION="0.0.95"
+WASM_PACK_VERSION="0.15.1"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -22,9 +22,9 @@ fetch_pyrefly() {
 
   echo "Downloading Pyrefly ${PYREFLY_VERSION} WASM..."
   curl --fail --location --retry 3 \
-    "https://github.com/facebook/pyrefly/releases/download/${PYREFLY_VERSION}/pyrefly-wasm.tar.gz" \
+    "https://github.com/meta/pyrefly/releases/download/${PYREFLY_VERSION}/pyrefly-wasm.tar.gz" \
     -o "$TMP_DIR/pyrefly-wasm.tar.gz"
-  (cd "$TMP_DIR" && echo "2210236fbee5e4dc0427ae8a966c401babc5ab69235d80e9a1f989323c71c9ea  pyrefly-wasm.tar.gz" | shasum -a 256 --check)
+  (cd "$TMP_DIR" && echo "a852fa5f33ac5e32dbc1a661545319f80219a3a33bbb3b1146554f14141b0cd7  pyrefly-wasm.tar.gz" | shasum -a 256 --check)
   mkdir -p "$dir"
   tar -xzf "$TMP_DIR/pyrefly-wasm.tar.gz" -C "$dir"
   echo "$PYREFLY_VERSION" > "$dir/.version"
@@ -43,7 +43,7 @@ fetch_ty() {
   curl --fail --location --retry 3 \
     "https://github.com/astral-sh/ty/releases/download/${TY_VERSION}/source.tar.gz" \
     -o "$TMP_DIR/ty-source.tar.gz"
-  (cd "$TMP_DIR" && echo "83346e0a713c319f81d9848798be6bf8f02e49c324ea5206d0028a110cbdd455  ty-source.tar.gz" | shasum -a 256 --check)
+  (cd "$TMP_DIR" && echo "da65aa508bc32416111f43ad3e0865e502f5d11749488795ed61282cd31ecd94  ty-source.tar.gz" | shasum -a 256 --check)
   tar -xzf "$TMP_DIR/ty-source.tar.gz" -C "$TMP_DIR"
   # The source archive contains the exact Ruff workspace used for this ty release.
   (cd "$TMP_DIR/ruff" && npm exec --yes --package="wasm-pack@${WASM_PACK_VERSION}" -- \

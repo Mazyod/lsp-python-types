@@ -101,3 +101,56 @@ git diff --check
 Full suite: **251 passed, 1 existing ty xfail**, no skips. Separate Microsoft
 Pyright suite: **35 passed, 217 deselected**. Pyright: **0 errors, warnings or
 information**. Ruff lint/formatting and wheel/sdist builds passed.
+
+Read the full README user-guide path; all eight public documents passed local
+link/anchor checks and contain no internal-record links. The character banner
+and backend profiles are unchanged. Public changes explain the Pyrefly minimum
+and its actual raw/canonical token ordering.
+
+## Browser refresh and validation
+
+Updated Vite 8.3.4 → 8.3.5, LSP protocol 3.18.4 → 3.18.5 and DOMPurify
+3.4.16 → 3.4.17. Aligned the direct JSON-RPC dependency with protocol 3.18.5's
+JSON-RPC 10.0.0 requirement; npm deduplicates them. Monaco remains 0.57.0,
+TypeScript 7.0.2, and the browser-basedpyright CDN worker remains pinned to 1.40.2.
+
+Raised the DOMPurify override floor to `^3.4.17`, the patched version for all
+three open dependency alerts:
+[35](https://github.com/Mazyod/lsp-python-types/security/dependabot/35),
+[36](https://github.com/Mazyod/lsp-python-types/security/dependabot/36), and
+[37](https://github.com/Mazyod/lsp-python-types/security/dependabot/37).
+`npm audit`: **0 vulnerabilities**. `npm outdated`: **no entries**.
+
+Pinned Pyrefly 1.4.0's WASM archive and ty 0.0.95's source archive to their
+GitHub release SHA-256 digests. The fetch script verified both before extraction;
+a second run reused the matching assets. Updated wasm-pack 0.15.0 → 0.15.1.
+Built ty in an isolated Node 24.21.0 container: rustup installed stable 1.99.1,
+then the release workspace selected its pinned Rust 1.99.0. The generated assets
+remain ignored. Pyrefly WASM is **14,183,814 bytes**; ty is **19,966,393 bytes**.
+
+```sh
+cd playground
+npm update
+npm install
+npm audit
+npm outdated
+npm run fetch-wasm
+npm run test:wasm
+npm run build
+# With dev and production preview servers running in separate terminals:
+PLAYWRIGHT_MODULE=/tmp/lsp-browser-check-2026-11-02/node_modules/playwright/index.mjs \
+  node concurrency.test.mjs
+PLAYWRIGHT_MODULE=/tmp/lsp-browser-check-2026-11-02/node_modules/playwright/index.mjs \
+  node browser.test.mjs
+```
+
+- WASM tests: **2 passed**, covering diagnostics, hover and error clearing.
+- Production build passed with both `dist/pyrefly` and `dist/ty` assets at the
+  configured `/lsp-python-types/` base path. The existing ineffective Monaco
+  dynamic-import warning remains.
+- Playwright 1.64.1 / Chromium 156 passed concurrency checks for edits during
+  debounce, late results, adapter switch/detach, diagnostic versions,
+  superseded requests, timeouts and disposal.
+- Production browser checks passed diagnostics, hover and error clearing through
+  basedpyright → Pyrefly → ty → Pyrefly → ty → basedpyright. Rapid selections
+  preserved the final backend. No console or page errors.
