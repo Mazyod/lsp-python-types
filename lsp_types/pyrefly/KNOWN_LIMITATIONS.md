@@ -7,11 +7,13 @@ details and documentation included in the initial completion response.
 
 ## Semantic-token legend uses a built-in fallback
 
-Pyrefly returns semantic tokens without advertising a legend during
-initialization. `PyreflyBackend` supplies `PYREFLY_LEGEND` automatically.
+`PyreflyBackend` requires Pyrefly 1.4.0 or newer and supplies `PYREFLY_LEGEND`
+for its full token stream. Pyrefly advertises a legend only when the client
+sets `augmentsSyntaxTokens=True`; that mode omits syntax tokens such as strings.
 
 Normalization preserves Pyrefly's string modifiers: `byteString`,
-`formatString`, `rawString`, `stringPrefix`, and `templateString`. See the
+`formatString`, `rawString`, `stringPrefix`, `templateString`, `escapeSequence`,
+`formatPlaceholder`, and `formatSpecifier`. See the
 [semantic-token guide](../../docs/SEMANTIC_TOKENS.md).
 
 ## Configuration keys

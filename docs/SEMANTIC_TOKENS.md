@@ -58,12 +58,13 @@ The canonical legend follows LSP standard ordering, with backend-specific tokens
 - 23: label (LSP standard)
 - 24-26: Backend-specific (selfParameter, clsParameter, builtinConstant)
 
-**Token Modifiers (bit 0-18):**
+**Token Modifiers (bit 0-21):**
 
 - 0-9: LSP standard modifiers (declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation, defaultLibrary)
 - 10-12: Backend-specific from basedpyright (builtin, classMember, parameter)
 - 13: Backend-specific from Pyrefly (selfParameter)
 - 14-18: Pyrefly string modifiers (byteString, formatString, rawString, stringPrefix, templateString)
+- 19-21: Pyrefly string-content modifiers (escapeSequence, formatPlaceholder, formatSpecifier)
 
 ## Token Encoding Format
 
@@ -93,8 +94,9 @@ For example, if `tokenModifiers = 5` (binary `101`), modifiers at index 0 and 2 
 `session.backend_legend` contains the server's legend or the backend's fallback.
 For low-level clients, read
 `InitializeResult.capabilities.semanticTokensProvider.legend` when present.
-Pyrefly omits this capability; use `PYREFLY_LEGEND` from
-`lsp_types.semantic_tokens` for its raw tokens.
+Pyrefly omits this capability for its full token stream; use `PYREFLY_LEGEND`
+from `lsp_types.semantic_tokens` for Pyrefly 1.4+ raw tokens. Older Pyrefly
+releases use a different modifier order and are no longer supported.
 
 ## Token Legends by Backend
 
@@ -142,9 +144,10 @@ to LSP sessions; browser WASM APIs have their own feature sets.
 
 ### Pyrefly
 
-Legend source: [semantic_tokens.rs](https://github.com/facebook/pyrefly/blob/1.3.2/pyrefly/lib/state/semantic_tokens.rs)
+Legend source: [semantic_tokens.rs](https://github.com/meta/pyrefly/blob/1.4.0/pyrefly/lib/state/semantic_tokens.rs)
 
-Pyrefly does not advertise its legend via LSP initialization, but the token mappings are defined in source code.
+The full token stream uses this fallback. Setting `augmentsSyntaxTokens=True`
+advertises the legend but omits syntax tokens such as strings.
 
 #### Token Types
 
@@ -190,10 +193,13 @@ Pyrefly does not advertise its legend via LSP initialization, but the token mapp
 | 9 | `defaultLibrary` |
 | 10 | `selfParameter` |
 | 11 | `byteString` |
-| 12 | `formatString` |
-| 13 | `rawString` |
-| 14 | `stringPrefix` |
-| 15 | `templateString` |
+| 12 | `escapeSequence` |
+| 13 | `formatPlaceholder` |
+| 14 | `formatSpecifier` |
+| 15 | `formatString` |
+| 16 | `rawString` |
+| 17 | `stringPrefix` |
+| 18 | `templateString` |
 
 ---
 

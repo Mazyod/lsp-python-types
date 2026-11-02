@@ -1,7 +1,7 @@
 # Pyrefly configuration schema
 # Based on official Pyrefly documentation: https://pyrefly.org/en/docs/configuration/
 # CLI reference: https://github.com/facebook/pyrefly
-# Source: https://github.com/facebook/pyrefly/tree/1.3.2/crates/pyrefly_config/src
+# Source: https://github.com/meta/pyrefly/tree/1.4.0/crates/pyrefly_config/src
 #
 # Note: Field names use snake_case (Python convention) but are automatically
 # converted to kebab-case when written to pyrefly.toml (official format).
@@ -89,6 +89,9 @@ class Model(TypedDict):
     """Prevent automatic search path detection"""
 
     site_package_path: NotRequired[list[str]]
+    """Compatibility alias for site_packages_path."""
+
+    site_packages_path: NotRequired[list[str]]
     """Third-party package directories for import resolution"""
 
     python_version: NotRequired[str]
@@ -114,7 +117,10 @@ class Model(TypedDict):
     # ========================================================================
 
     typeshed_path: NotRequired[str]
-    """Override bundled typeshed with custom path"""
+    """Replace the bundled typeshed entirely with this directory."""
+
+    extends: NotRequired[str]
+    """Inherit another configuration file, relative to pyrefly.toml."""
 
     preset: NotRequired[Literal["off", "basic", "legacy", "default", "strict", "all"]]
     """Select the starting set of diagnostics and checking behavior."""
@@ -132,7 +138,7 @@ class Model(TypedDict):
     """Reject reassignment of ALL_CAPS names (opt-in)."""
 
     required_version: NotRequired[str]
-    """PEP 440 constraint on the Pyrefly version, e.g. ">=1.3,<1.4"."""
+    """PEP 440 constraint on the Pyrefly version, e.g. ">=1.4,<1.5"."""
 
     infer_with_first_use: NotRequired[bool]
     """Infer container types from first usage patterns (default: true)"""
@@ -175,8 +181,13 @@ class Model(TypedDict):
     baseline_error_level: NotRequired[ErrorSeverity]
     """Severity for diagnostics matching the baseline (default: ignore)."""
 
-    baseline_matching_mode: NotRequired[Literal["column", "concise-description"]]
-    """Match baseline entries by source column or concise diagnostic description."""
+    baseline_matching_mode: NotRequired[
+        Literal["column", "concise-description", "column-ordered"]
+    ]
+    """Match by column or description; column-ordered also limits suppressed counts."""
 
     baseline_format: NotRequired[Literal["full", "minimal"]]
     """Amount of metadata written to baseline entries."""
+
+    baseline_auto_update: NotRequired[bool]
+    """Prune resolved baseline entries when a file is saved in the IDE."""

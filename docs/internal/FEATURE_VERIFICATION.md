@@ -63,8 +63,8 @@ and send a real request with a control case when validating a claim.
 
 ## Verified Session features
 
-Snapshot **2026-10-10**: Pyright 1.1.414, basedpyright 1.40.2, Pyrefly 1.3.2,
-ty 0.0.86, Zuban 0.10.0. “Yes” means the named integration test passes for its
+Snapshot **2026-11-02**: Pyright 1.1.414, basedpyright 1.40.2, Pyrefly 1.4.0,
+ty 0.0.95, Zuban 0.10.2. “Yes” means the named integration test passes for its
 fixture, not comprehensive conformance for every Python program.
 
 | Feature | Pyright | basedpyright | Pyrefly | ty | Zuban |
@@ -100,11 +100,14 @@ rg -n 'xfail|skip' tests
 ```
 
 Compare legends with [the token reference](../SEMANTIC_TOKENS.md) and tagged source.
-Pyrefly 1.3.2 still omits its provider from initialization; it needs the fallback
-legend. `tests/test_semantic_tokens.py` checks that its five new string modifiers
-survive normalization, including a live server fixture. Append canonical entries
-so existing editor indices stay stable. The current legends match the previous
-maintenance run; ty's `operator` and `regexp` types remain covered.
+Pyrefly 1.4.0 omits its provider for the full token stream; it needs the fallback
+legend. It inserts three modifiers into the wire ordering, so the Pyrefly extra
+now requires 1.4.0. `tests/test_semantic_tokens.py` checks all eight string
+modifiers, their individual wire-to-canonical mappings and a live server fixture.
+Append canonical entries so existing editor indices stay stable. Advertising
+`augmentsSyntaxTokens=True` obtains the server legend but omits syntax tokens
+such as strings; it is not a substitute for the full stream. The other backend
+legends are unchanged; ty's `operator` and `regexp` types remain covered.
 
 Reprobe versioned limitations with positive controls before advancing their dates:
 [Pyrefly](../../lsp_types/pyrefly/KNOWN_LIMITATIONS.md),
