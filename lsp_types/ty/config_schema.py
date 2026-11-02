@@ -15,7 +15,7 @@ RuleSeverity = Literal["ignore", "warn", "error"]
 PythonPlatform = Literal["win32", "darwin", "android", "ios", "linux", "all"]
 
 # Output format options
-OutputFormat = Literal["full", "concise", "github", "gitlab", "junit"]
+OutputFormat = Literal["full", "concise", "github", "gitlab", "junit", "sarif"]
 
 
 class EnvironmentConfig(TypedDict, total=False):
@@ -71,6 +71,9 @@ class AnalysisConfig(TypedDict, total=False):
 
     Controls how ty performs type analysis.
     """
+
+    return_type_inference: NotRequired[Literal["never", "always"]]
+    """Infer unannotated function return types when set to always. Default: never."""
 
     respect_type_ignore_comments: NotRequired[bool]
     """Whether 'type: ignore' comments suppress errors. Default: true."""
@@ -132,6 +135,9 @@ class Model(TypedDict, total=False):
 
     Official Documentation: https://docs.astral.sh/ty/reference/configuration/
     """
+
+    baseline: NotRequired[str]
+    """Path to a diagnostic baseline JSON file. Preview: its format may change."""
 
     # ========================================================================
     # RULES CONFIGURATION

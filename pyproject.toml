@@ -36,7 +36,7 @@ Documentation = "https://github.com/mazyod/lsp-python-types#readme"
 
 [project.optional-dependencies]
 pyrefly = [
-  "pyrefly>=0.32.0",
+  "pyrefly>=1.4.0",  # semantic-token modifier ordering changed in 1.4
 ]
 ty = [
   "ty>=0.0.84",  # fixes GHSA-vxvm-j4xq-q7m4 in incremental type checking

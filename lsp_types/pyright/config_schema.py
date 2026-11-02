@@ -398,6 +398,7 @@ class Model(TypedDict):
     extends: NotRequired[str]
     include: NotRequired[list[str]]
     exclude: NotRequired[list[str]]
+    useDefaultExcludes: NotRequired[bool]
     ignore: NotRequired[list[str]]
     strict: NotRequired[list[str]]
     defineConstant: NotRequired[dict[str, str | bool]]
