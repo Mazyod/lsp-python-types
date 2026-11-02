@@ -154,3 +154,57 @@ PLAYWRIGHT_MODULE=/tmp/lsp-browser-check-2026-11-02/node_modules/playwright/inde
 - Production browser checks passed diagnostics, hover and error clearing through
   basedpyright → Pyrefly → ty → Pyrefly → ty → basedpyright. Rapid selections
   preserved the final backend. No console or page errors.
+
+## Release close-out
+
+[PR #64](https://github.com/Mazyod/lsp-python-types/pull/64) merged as
+`fc7083d5646a3ffa14560906b77a586c6d47de81` after all six Python
+3.12/3.13/3.14 × basedpyright/Microsoft Pyright jobs and lint/type checking passed
+([PR tests](https://github.com/Mazyod/lsp-python-types/actions/runs/41453637453),
+[PR lint](https://github.com/Mazyod/lsp-python-types/actions/runs/41453637588)).
+The same checks passed on the merged commit
+([main tests](https://github.com/Mazyod/lsp-python-types/actions/runs/41453909073),
+[main lint](https://github.com/Mazyod/lsp-python-types/actions/runs/41453909089)).
+
+The existing [publication workflow](https://github.com/Mazyod/lsp-python-types/actions/runs/41454232260)
+applied a minor bump and published [lsp-types 0.26.0](https://pypi.org/project/lsp-types/0.26.0/).
+Tag `v0.26.0` points to its version-bump commit, `293a00e`.
+The [GitHub release](https://github.com/Mazyod/lsp-python-types/releases/tag/v0.26.0)
+contains the wheel, source archive and publication attestations.
+
+A fresh isolated PyPI installation with all three Python extras passed
+diagnostics, error clearing after edits, hover and normalized semantic tokens
+across basedpyright, Pyrefly, ty and Zuban. The installed artifact includes
+`useDefaultExcludes`, the Pyrefly >=1.4.0 requirement, stable existing canonical
+indices and the three new string-content modifiers, verified against live tokens.
+The PyPI description matches the repository README exactly. Downloaded PyPI
+artifact SHA-256 values match GitHub's release assets:
+
+- Wheel: `7795eb334a0f91da1e69f82e99d837db0705290de2277eedc35cc75e965005ca`
+- Source: `68cacf9cfff423a4c7ab5fd7e8f6ce238aa26535c57b3fb59cc9d1f6e98214ef`
+
+The [playground workflow](https://github.com/Mazyod/lsp-python-types/actions/runs/41453909049)
+verified both pinned archives, passed both WASM tests and the production build,
+and deployed to [the live site](https://mazyod.com/lsp-python-types/).
+Live HTTP checks confirmed the Pages base path and basedpyright 1.40.2 worker pin.
+Pyrefly WASM and both JavaScript glue files match the local release builds.
+ty's CI binary embeds `/home/runner/.cargo` source paths instead of the local
+container's `/root/.cargo` paths; independent build hashes therefore differ.
+Downloaded Pages artifact **13146267455** and verified its ZIP digest
+`3a83a85fb21de926eb158ec0f4945709ff66a5b673f193adaf6e6091b2e9475e`.
+The deployed ty binary matches that artifact exactly: **19,968,148 bytes**,
+SHA-256 `5d203f9f4a401060d293211fb6ac43bd37e486fca3676425a61e79d74926bd14`.
+
+The complete Chromium regression passed on the live HTTPS site: diagnostics,
+hover, error clearing, repeated WASM backend switches and rapid selections,
+with no console or page errors.
+
+GitHub's dependency-graph SBOM confirms DOMPurify **3.4.17** on `main`.
+Alerts #35–37 still reported `open` at close-out despite their affected range
+ending at 3.4.16 and their patched version being 3.4.17. No alerts were manually
+dismissed; their automatic status refresh remains pending. The installed lock
+and npm audit confirm the remediation.
+
+Before committing the close-out, rechecked the tagged source: **251 passed,
+1 existing ty xfail**, zero Pyright errors/warnings/information, Ruff lint and
+Python formatting passed.

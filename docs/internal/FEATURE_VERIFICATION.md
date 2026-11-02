@@ -134,6 +134,8 @@ toolchain, the WASM target and a native compiler. Pyrefly has a release WASM arc
 Verify actual browser diagnostics, hover and edits for every engine; successful
 TypeScript compilation does not prove workers or WASM load. Test the configured
 GitHub Pages base path and confirm the build includes `dist/pyrefly` and `dist/ty` assets.
+After deployment, compare live binaries with the workflow's Pages artifact.
+ty embeds build paths, so independent local and CI builds can have different hashes.
 
 For the optional browser regression check, install Playwright outside the project
 and run the production preview in another terminal:
