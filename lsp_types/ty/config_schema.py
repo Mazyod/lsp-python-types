@@ -79,7 +79,7 @@ class AnalysisConfig(TypedDict, total=False):
     """Whether 'type: ignore' comments suppress errors. Default: true."""
 
     allowed_unresolved_imports: NotRequired[list[str]]
-    """Module glob patterns exempt from unresolved-import diagnostics."""
+    """Module glob patterns exempt from missing-import diagnostics."""
 
     replace_imports_with_any: NotRequired[list[str]]
     """Module glob patterns whose imports become Any, even when resolvable."""
