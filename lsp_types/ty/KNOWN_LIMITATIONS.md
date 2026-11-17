@@ -12,12 +12,14 @@ using upstream kebab-case keys:
 ```python
 initialize_params = {
     "initializationOptions": {
-        "configuration": {"rules": {"unresolved-import": "ignore"}}
+        "configuration": {"rules": {"import-not-found": "ignore"}}
     }
 }
 ```
 
-Misspelled nested settings, including `unresolved_import` in this example, are
+Before ty 0.0.97, use `unresolved-import` instead of `import-not-found`.
+
+Misspelled nested settings, including `import_not_found` in this example, are
 silently ignored. `ty server` accepts no configuration flags. Use `ty.toml` or
 LSP initialization options, including `logLevel` and `configurationFile`.
 See the [editor settings reference](https://docs.astral.sh/ty/reference/editor-settings/).
