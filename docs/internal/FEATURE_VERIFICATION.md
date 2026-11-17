@@ -63,8 +63,8 @@ and send a real request with a control case when validating a claim.
 
 ## Verified Session features
 
-Snapshot **2026-11-02**: Pyright 1.1.414, basedpyright 1.40.2, Pyrefly 1.4.0,
-ty 0.0.95, Zuban 0.10.2. “Yes” means the named integration test passes for its
+Snapshot **2026-11-17**: Pyright 1.1.414, basedpyright 1.40.2, Pyrefly 1.4.1,
+ty 0.0.104, Zuban 0.10.2. “Yes” means the named integration test passes for its
 fixture, not comprehensive conformance for every Python program.
 
 | Feature | Pyright | basedpyright | Pyrefly | ty | Zuban |
@@ -91,6 +91,22 @@ Go to definition, references, code actions, formatting and broader upstream
 features are **not verified by this Session suite**. The low-level `LSPProcess`
 API exposes requests, but exposure alone does not establish server support.
 
+### Existing benchmarks and comparisons
+
+Capture the pool benchmarks' timings during the full suite with
+`--log-file=/tmp/lsp-benchmarks.log --log-file-level=INFO`, or run them alone:
+
+```sh
+PATH=/tmp/lsp-basedpyright/node_modules/.bin:$PATH \
+  uv run pytest tests/test_pool.py -k benchmark -q --log-cli-level=INFO
+```
+
+Record pooled/fresh creation, warmed reuse with hover, concurrent creation and
+Pyrefly thread-option timings in the dated maintenance record. These small
+fixtures measure session lifecycle costs; they do not rank whole-project checking
+or incremental diagnostics. Review the upstream sources behind the backend guide
+and keep historical benchmark claims tied to their original workloads and versions.
+
 ## 3. Recheck the integration boundaries
 
 ```sh
@@ -100,7 +116,7 @@ rg -n 'xfail|skip' tests
 ```
 
 Compare legends with [the token reference](../SEMANTIC_TOKENS.md) and tagged source.
-Pyrefly 1.4.0 omits its provider for the full token stream; it needs the fallback
+Pyrefly 1.4.1 omits its provider for the full token stream; it needs the fallback
 legend. It inserts three modifiers into the wire ordering, so the Pyrefly extra
 now requires 1.4.0. `tests/test_semantic_tokens.py` checks all eight string
 modifiers, their individual wire-to-canonical mappings and a live server fixture.
